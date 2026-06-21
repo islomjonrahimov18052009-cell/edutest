@@ -652,7 +652,7 @@ function afterLogin(){
   if(ME.role==='teacher'){showPg('pg-teacher');renderQT();}
   else{selTopic=null;showPg('pg-topic');renderTopics();loadMyHist();}
 }
-function logout(){ME=null;if(S.iv)clearInterval(S.iv);document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
+function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
 
 function renderTopics(){
   var topics=getTopics();
@@ -710,7 +710,7 @@ function startTest(mode){
     if(q.optImages){orig.forEach(function(opt,oi){var ni=sh.indexOf(opt);if(q.optImages[String(oi)])newOptImg[String(ni)]=q.optImages[String(oi)];});}
     return Object.assign({},q,{options:sh,shuffledCorrect:nc,optImages:Object.keys(newOptImg).length?newOptImg:q.optImages});
   });
-  S.test=qs;S.idx=0;S.answers={};S.mode=mode;var _meta=getTopicMeta(selTopic);
+  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;history.pushState(null,'',location.href);var _meta=getTopicMeta(selTopic);
   var timerOn=(!_meta||_meta.timerEnabled===undefined)?true:_meta.timerEnabled;
   var timerMins=(_meta&&_meta.timerMinutes)||15;
   S.timeLeft=timerOn?timerMins*60:0;showDet=false;
@@ -721,7 +721,7 @@ function startTest(mode){
   if(mode==='exam'){mb.textContent='Imtihon';mb.className='bdg bbl';}else{mb.textContent='Sinov';mb.className='bdg bgy';}
   renderQ();showPg('pg-test');startTimer();
 }
-function startTimer(){if(S.iv)clearInterval(S.iv);updTmr();if(S.timeLeft>0){S.iv=setInterval(function(){S.timeLeft--;updTmr();if(S.timeLeft<=0){clearInterval(S.iv);submitTest();}},1000);}else{var tel=document.getElementById('t-tmr');if(tel)tel.style.display='none';}}
+function startTimer(){if(S.iv)clearInterval(S.iv);_backWarned=false;updTmr();if(S.timeLeft>0){S.iv=setInterval(function(){S.timeLeft--;updTmr();if(S.timeLeft<=0){clearInterval(S.iv);submitTest();}},1000);}else{var tel=document.getElementById('t-tmr');if(tel)tel.style.display='none';}}
 function updTmr(){var el=document.getElementById('t-tmr');if(!el)return;var m=Math.floor(S.timeLeft/60),s=S.timeLeft%60;el.textContent=m+':'+(s<10?'0'+s:s);el.className=S.timeLeft<=60?'tmr red':'tmr';}
 function renderQ(){
   var q=S.test[S.idx],ans=S.answers[S.idx]||[],isLast=S.idx===S.test.length-1;
@@ -732,6 +732,18 @@ function renderQ(){
   document.getElementById('btn-prev').disabled=S.idx===0;
   document.getElementById('btn-next').style.display=isLast?'none':'inline-flex';
   document.getElementById('btn-sub').style.display=isLast?'inline-flex':'none';
+  // Javobsiz savollar soni
+  var unansweredCount=S.test.filter(function(_,i){return !S.answers[i]||S.answers[i].length===0;}).length;
+  var btnSub=document.getElementById('btn-sub');
+  if(btnSub){
+    if(unansweredCount>0){
+      btnSub.title=unansweredCount+' ta savol javobsiz!';
+      btnSub.style.opacity='0.5';
+    } else {
+      btnSub.title='';
+      btnSub.style.opacity='1';
+    }
+  }
   var imgSrc = q.img ? (q.img.startsWith('data:') ? q.img : 'data:image/jpeg;base64,'+q.img) : '';
   var imgHtml = imgSrc ? '<div style="text-align:center;margin:10px 0"><img src="'+imgSrc+'" style="max-width:100%;max-height:200px;border-radius:8px;background:#fff;padding:4px"></div>' : '';
   document.getElementById('t-qbody').innerHTML='<div style="font-weight:700;font-size:17px;margin-bottom:8px;line-height:1.6">'+(S.idx+1)+'. '+q.text+'</div>'+imgHtml+(q.isMulti?'<div class="alt ai ts" style="margin-bottom:10px">Ko\'p javobli: bir nechta to\'g\'ri</div>':'')+
@@ -740,7 +752,22 @@ function renderQ(){
 function goQ(d){S.idx=Math.max(0,Math.min(S.test.length-1,S.idx+d));renderQ();}
 function selAns(i){var q=S.test[S.idx],ans=(S.answers[S.idx]||[]).slice();if(q.isMulti){var x=ans.indexOf(i);if(x>=0)ans.splice(x,1);else ans.push(i);}else{ans=[i];}S.answers[S.idx]=ans;renderQ();}
 function submitTest(){
-  if(S.iv)clearInterval(S.iv);
+  // Barcha savollarga javob berilganmi tekshir (faqat manual yakunlashda)
+  if(!arguments[0]) {
+    var unanswered=[];
+    S.test.forEach(function(q,i){
+      if(!S.answers[i]||S.answers[i].length===0)unanswered.push(i);
+    });
+    if(unanswered.length>0){
+      var nextUnanswered=unanswered.find(function(i){return i>S.idx;});
+      if(nextUnanswered===undefined)nextUnanswered=unanswered[0];
+      alert(unanswered.length+' ta savol javobsiz! '+(nextUnanswered+1)+'-savolga o\'tilmoqda...');
+      S.idx=nextUnanswered;
+      renderQ();
+      return;
+    }
+  }
+  if(S.iv)clearInterval(S.iv);_backWarned=false;
   var correct=0,details=S.test.map(function(q,i){var ans=S.answers[i]||[],right=q.shuffledCorrect,ok=right.length>0&&right.every(function(r){return ans.indexOf(r)>=0;})&&ans.every(function(a){return right.indexOf(a)>=0;})&&ans.length>0;if(ok)correct++;return{text:q.text,options:q.options,userAns:ans,correct:right,ok:ok};});
   var pct=Math.round(correct/S.test.length*100);
   var res={student:ME.name,cls:ME.cls,topic:selTopic,mode:S.mode,correct:correct,total:S.test.length,pct:pct,date:new Date().toLocaleDateString('uz-UZ'),time:new Date().toLocaleTimeString('uz-UZ'),details:details};
@@ -759,7 +786,7 @@ function showResult(r){
 }
 function toggleDetail(){
   showDet=!showDet;var el=document.getElementById('r-det');el.style.display=showDet?'block':'none';
-  if(showDet&&S.lastRes){document.getElementById('r-det-body').innerHTML=S.lastRes.details.map(function(d,i){return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px"><div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+(d.image?'<img src="'+(d.image.startsWith('data:')?d.image:'data:image/png;base64,'+d.image)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block">':'')+d.options.map(function(opt,oi){var isR=d.correct.indexOf(oi)>=0,isU=d.userAns.indexOf(oi)>=0,bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent',ic=isR?'✅':(isU&&!isR)?'❌':'⬜';var isImg=opt&&(opt.startsWith('data:image')||opt.startsWith('/9j/')||opt.startsWith('iVBOR'));var optContent=isImg?'<img src="'+(opt.startsWith('data:')?opt:'data:image/png;base64,'+opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';}).join('')+'</div>';}).join('');}
+  if(showDet&&S.lastRes){document.getElementById('r-det-body').innerHTML=S.lastRes.details.map(function(d,i){return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px"><div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+(d.img||d.image?'<img src="'+((d.img||d.image).startsWith('data:')?(d.img||d.image):'data:image/png;base64,'+(d.img||d.image))+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+d.options.map(function(opt,oi){var isR=d.correct.indexOf(oi)>=0,isU=d.userAns.indexOf(oi)>=0,bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent',ic=isR?'✅':(isU&&!isR)?'❌':'⬜';var isImg=opt&&(opt.startsWith('data:image')||opt.startsWith('/9j/')||opt.startsWith('iVBOR'));var optContent=isImg?'<img src="'+(opt.startsWith('data:')?opt:'data:image/png;base64,'+opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';}).join('')+'</div>';}).join('');}
 }
 
 function renderQT(){
@@ -879,11 +906,12 @@ function editQ(qid,topic){
   document.getElementById('eq-qid').value=qid;
   document.getElementById('eq-topic').value=topic;
   document.getElementById('eq-text').value=q.text||'';
-  // Savol rasmi
+  // Savol rasmi (q.img yoki q.image)
   var eqImgDiv=document.getElementById('eq-q-img');
   if(eqImgDiv){
-    if(q.image){
-      eqImgDiv.innerHTML='<img src="'+(q.image.startsWith('data:')?q.image:'data:image/png;base64,'+q.image)+'" style="max-width:100%;max-height:150px;border-radius:8px;margin-bottom:8px;display:block">';
+    var qImg=q.img||q.image||'';
+    if(qImg){
+      eqImgDiv.innerHTML='<img src="'+(qImg.startsWith('data:')?qImg:'data:image/png;base64,'+qImg)+'" style="max-width:100%;max-height:180px;border-radius:8px;margin-bottom:8px;display:block;background:#fff;padding:6px">';
     } else {
       eqImgDiv.innerHTML='';
     }
@@ -1325,6 +1353,47 @@ initMeta();
 sbInit();
 // Pull latest data from cloud when page loads
 syncFromCloud().then(function(){});
+
+// ── ORQAGA TUGMA VA SAHIFADAN CHIQISH ──────────────────────────────
+var _backWarned = false;
+
+// Android orqaga tugmasi
+window.addEventListener('popstate', function(e) {
+  if(S.mode) {
+    if(!_backWarned) {
+      _backWarned = true;
+      history.pushState(null, '', location.href);
+      var unanswered = S.test.filter(function(_,i){return !S.answers[i]||S.answers[i].length===0;}).length;
+      alert('⚠️ Testdan chiqmoqchimisiz?\n' +
+        (unanswered > 0 ? unanswered + ' ta savol javobsiz qoldi.\n' : '') +
+        'Chiqsangiz test tugaydi' +
+        (S.mode==='exam' ? ' va natija saqlanadi.' : ', natija saqlanmaydi.') +
+        '\n\nChiqish uchun yana bir marta "Orqaga" tugmasini bosing.');
+    } else {
+      _backWarned = false;
+      submitTest(true); // force - unanswered tekshirilmasin
+    }
+  }
+});
+
+// Sahifa yopilsa yoki boshqa tabga o'tsa
+document.addEventListener('visibilitychange', function() {
+  if(document.hidden && S.mode) {
+    submitTest(true); // force - unanswered tekshirilmasin
+  }
+});
+
+// Sahifadan ketsa (browser tab yopilsa, boshqa saytga o'tsa)
+window.addEventListener('beforeunload', function(e) {
+  if(S.mode) {
+    e.preventDefault();
+    e.returnValue = 'Test davom etmoqda. Sahifani yopsangiz test tugaydi!';
+    return e.returnValue;
+  }
+});
+
+// Sahifa ochilganda history stack ga push qilamiz
+history.pushState(null, '', location.href);
 
 </script>
 
