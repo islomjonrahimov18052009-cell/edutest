@@ -714,7 +714,7 @@ function startTest(mode){
     if(q.optImages){orig.forEach(function(opt,oi){var ni=sh.indexOf(opt);if(q.optImages[String(oi)])newOptImg[String(ni)]=q.optImages[String(oi)];});}
     return Object.assign({},q,{options:sh,shuffledCorrect:nc,optImages:Object.keys(newOptImg).length?newOptImg:q.optImages});
   });
-  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;history.pushState(null,'',location.href);
+  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;_visWarnCount=0;history.pushState(null,'',location.href);
   // To'liq ekran rejimi
   var el=document.documentElement;
   if(el.requestFullscreen)el.requestFullscreen();
@@ -1394,9 +1394,27 @@ window.addEventListener('popstate', function(e) {
 });
 
 // Sahifa yopilsa yoki boshqa tabga o'tsa
+var _visWarnCount = 0;
 document.addEventListener('visibilitychange', function() {
   if(document.hidden && S.mode) {
-    submitTest(true);
+    _visWarnCount++;
+    if(_visWarnCount === 1) {
+      // Birinchi marta - ogohlantirish, test davom etadi
+      // alert chiqarib bo'lmaydi (hidden tab da ishlmaydi)
+      // Shuning uchun sahifa ko'ringunga qadar xabar ko'rsatamiz
+      S._warnPending = true;
+    } else {
+      // Ikkinchi marta - test tugaydi
+      _visWarnCount = 0;
+      submitTest(true);
+    }
+  }
+  if(!document.hidden && S.mode && S._warnPending) {
+    S._warnPending = false;
+    var ok = confirm('⚠️ OGOHLANTIRISH!\n\nTest vaqtida boshqa oyna/tab ochildi!\n\nAgar yana boshqa joyga o\'tsangiz — test avtomatik tugaydi!\n\nTestni davom ettirasizmi?');
+    if(!ok) {
+      submitTest(true);
+    }
   }
 });
 
