@@ -653,11 +653,14 @@ function afterLogin(){
   else{selTopic=null;showPg('pg-topic');renderTopics();loadMyHist();}
 }
 var _logoutWarned = false;
+var _alertOpen = false;
 function safeLogout(){
   if(S.mode){
     if(!_logoutWarned){
       _logoutWarned = true;
+      _alertOpen = true;
       alert('⚠️ Diqqat! Test hali tugamagan!\n\nAgar chiqib ketsangiz — test tugaydi.\n' + (S.mode==='exam'?'Imtihon rejimida ishlayotganingiz sababli natijangiz saqlanib qoladi.':'Sinov rejimi — natija saqlanmaydi.') + '\n\nChiqish uchun "Chiqish" tugmasini yana bir marta bosing.');
+      _alertOpen = false;
       return;
     } else {
       _logoutWarned = false;
@@ -1424,6 +1427,8 @@ document.addEventListener('visibilitychange', function() {
 // Oyna fokusdan chiqqanda - darhol test tugaydi
 window.addEventListener('blur', function() {
   if(!S.mode) return;
+  if(_alertOpen) return; // alert ochiq bo'lsa ishlamasin
+  if(_logoutWarned) return; // chiqish ogohlantirish ko'rsatilgandan keyin ishlamasin
   submitTest(true);
 });
 
