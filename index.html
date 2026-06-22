@@ -652,7 +652,11 @@ function afterLogin(){
   if(ME.role==='teacher'){showPg('pg-teacher');renderQT();}
   else{selTopic=null;showPg('pg-topic');renderTopics();loadMyHist();}
 }
-function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
+function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
+  // To'liq ekrandan chiqish
+  if(document.exitFullscreen)document.exitFullscreen();
+  else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+  else if(document.mozCancelFullScreen)document.mozCancelFullScreen();document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
 
 function renderTopics(){
   var topics=getTopics();
@@ -710,7 +714,12 @@ function startTest(mode){
     if(q.optImages){orig.forEach(function(opt,oi){var ni=sh.indexOf(opt);if(q.optImages[String(oi)])newOptImg[String(ni)]=q.optImages[String(oi)];});}
     return Object.assign({},q,{options:sh,shuffledCorrect:nc,optImages:Object.keys(newOptImg).length?newOptImg:q.optImages});
   });
-  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;history.pushState(null,'',location.href);var _meta=getTopicMeta(selTopic);
+  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;history.pushState(null,'',location.href);
+  // To'liq ekran rejimi
+  var el=document.documentElement;
+  if(el.requestFullscreen)el.requestFullscreen();
+  else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+  else if(el.mozRequestFullScreen)el.mozRequestFullScreen();var _meta=getTopicMeta(selTopic);
   var timerOn=(!_meta||_meta.timerEnabled===undefined)?true:_meta.timerEnabled;
   var timerMins=(_meta&&_meta.timerMinutes)||15;
   S.timeLeft=timerOn?timerMins*60:0;showDet=false;
@@ -721,7 +730,11 @@ function startTest(mode){
   if(mode==='exam'){mb.textContent='Imtihon';mb.className='bdg bbl';}else{mb.textContent='Sinov';mb.className='bdg bgy';}
   renderQ();showPg('pg-test');startTimer();
 }
-function startTimer(){if(S.iv)clearInterval(S.iv);_backWarned=false;updTmr();if(S.timeLeft>0){S.iv=setInterval(function(){S.timeLeft--;updTmr();if(S.timeLeft<=0){clearInterval(S.iv);submitTest();}},1000);}else{var tel=document.getElementById('t-tmr');if(tel)tel.style.display='none';}}
+function startTimer(){if(S.iv)clearInterval(S.iv);_backWarned=false;
+  // To'liq ekrandan chiqish
+  if(document.exitFullscreen)document.exitFullscreen();
+  else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+  else if(document.mozCancelFullScreen)document.mozCancelFullScreen();updTmr();if(S.timeLeft>0){S.iv=setInterval(function(){S.timeLeft--;updTmr();if(S.timeLeft<=0){clearInterval(S.iv);submitTest();}},1000);}else{var tel=document.getElementById('t-tmr');if(tel)tel.style.display='none';}}
 function updTmr(){var el=document.getElementById('t-tmr');if(!el)return;var m=Math.floor(S.timeLeft/60),s=S.timeLeft%60;el.textContent=m+':'+(s<10?'0'+s:s);el.className=S.timeLeft<=60?'tmr red':'tmr';}
 function renderQ(){
   var q=S.test[S.idx],ans=S.answers[S.idx]||[],isLast=S.idx===S.test.length-1;
@@ -768,6 +781,10 @@ function submitTest(){
     }
   }
   if(S.iv)clearInterval(S.iv);_backWarned=false;
+  // To'liq ekrandan chiqish
+  if(document.exitFullscreen)document.exitFullscreen();
+  else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+  else if(document.mozCancelFullScreen)document.mozCancelFullScreen();
   var correct=0,details=S.test.map(function(q,i){var ans=S.answers[i]||[],right=q.shuffledCorrect,ok=right.length>0&&right.every(function(r){return ans.indexOf(r)>=0;})&&ans.every(function(a){return right.indexOf(a)>=0;})&&ans.length>0;if(ok)correct++;return{text:q.text,options:q.options,userAns:ans,correct:right,ok:ok,img:q.img||q.image||''};});
   var pct=Math.round(correct/S.test.length*100);
   var res={student:ME.name,cls:ME.cls,topic:selTopic,mode:S.mode,correct:correct,total:S.test.length,pct:pct,date:new Date().toLocaleDateString('uz-UZ'),time:new Date().toLocaleTimeString('uz-UZ'),details:details};
@@ -1379,7 +1396,19 @@ window.addEventListener('popstate', function(e) {
 // Sahifa yopilsa yoki boshqa tabga o'tsa
 document.addEventListener('visibilitychange', function() {
   if(document.hidden && S.mode) {
-    submitTest(true); // force - unanswered tekshirilmasin
+    submitTest(true);
+  }
+});
+
+// Fullscreen dan chiqsa (Esc) - test tugaydi
+document.addEventListener('fullscreenchange', function() {
+  if(!document.fullscreenElement && S.mode) {
+    submitTest(true);
+  }
+});
+document.addEventListener('webkitfullscreenchange', function() {
+  if(!document.webkitFullscreenElement && S.mode) {
+    submitTest(true);
   }
 });
 
