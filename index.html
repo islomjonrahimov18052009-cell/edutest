@@ -790,6 +790,7 @@ function submitTest(){
   var res={student:ME.name,cls:ME.cls,topic:selTopic,mode:S.mode,correct:correct,total:S.test.length,pct:pct,date:new Date().toLocaleDateString('uz-UZ'),time:new Date().toLocaleTimeString('uz-UZ'),details:details};
   S.lastRes=res;
   if(S.mode==='exam'){var db=getDB();db.results.push(res);saveDB(db);}
+  S.mode='';S._blurWarnPending=false;
   showResult(res);showPg('pg-res');
 }
 function showResult(r){
