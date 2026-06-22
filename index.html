@@ -108,7 +108,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   <div class="nav-r">
     <span id="nav-user" style="font-weight:600;opacity:.9"></span>
     <button class="btn bsm" id="btn-install" style="display:none;background:#fff;color:#6C3EF4;font-weight:700;margin-right:4px" onclick="installApp()">&#x2B07; O'rnatish</button>
-    <button class="btn bwh bsm" id="btn-out" style="display:none" onclick="logout()">Chiqish</button>
+    <button class="btn bwh bsm" id="btn-out" style="display:none" onclick="safeLogout()">Chiqish</button>
   </div>
 </nav>
 <div class="main">
@@ -652,6 +652,22 @@ function afterLogin(){
   if(ME.role==='teacher'){showPg('pg-teacher');renderQT();}
   else{selTopic=null;showPg('pg-topic');renderTopics();loadMyHist();}
 }
+var _logoutWarned = false;
+function safeLogout(){
+  if(S.mode){
+    if(!_logoutWarned){
+      _logoutWarned = true;
+      alert('⚠️ Diqqat! Test hali tugamagan!\n\nAgar chiqib ketsangiz — test tugaydi.\n' + (S.mode==='exam'?'Imtihon rejimida ishlayotganingiz sababli natijangiz saqlanib qoladi.':'Sinov rejimi — natija saqlanmaydi.') + '\n\nChiqish uchun "Chiqish" tugmasini yana bir marta bosing.');
+      return;
+    } else {
+      _logoutWarned = false;
+      submitTest(true);
+      setTimeout(function(){logout();},300);
+      return;
+    }
+  }
+  logout();
+}
 function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
   // To'liq ekrandan chiqish
   if(document.exitFullscreen)document.exitFullscreen();
@@ -714,7 +730,7 @@ function startTest(mode){
     if(q.optImages){orig.forEach(function(opt,oi){var ni=sh.indexOf(opt);if(q.optImages[String(oi)])newOptImg[String(ni)]=q.optImages[String(oi)];});}
     return Object.assign({},q,{options:sh,shuffledCorrect:nc,optImages:Object.keys(newOptImg).length?newOptImg:q.optImages});
   });
-  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;_visWarnCount=0;_blurWarnCount=0;S._blurWarnPending=false;history.pushState(null,'',location.href);
+  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;_visWarnCount=0;_blurWarnCount=0;S._blurWarnPending=false;_logoutWarned=false;history.pushState(null,'',location.href);
   // To'liq ekran rejimi
   var el=document.documentElement;
   if(el.requestFullscreen)el.requestFullscreen();
