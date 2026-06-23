@@ -653,19 +653,19 @@ function afterLogin(){
   else{selTopic=null;showPg('pg-topic');renderTopics();loadMyHist();}
 }
 var _logoutWarned = false;
-var _alertOpen = false;
 function safeLogout(){
   if(S.mode){
     if(!_logoutWarned){
       _logoutWarned = true;
-      _alertOpen = true;
+      _ignoreBlur = true;
       alert('⚠️ Diqqat! Test hali tugamagan!\n\nAgar chiqib ketsangiz — test tugaydi.\n' + (S.mode==='exam'?'Imtihon rejimida ishlayotganingiz sababli natijangiz saqlanib qoladi.':'Sinov rejimi — natija saqlanmaydi.') + '\n\nChiqish uchun "Chiqish" tugmasini yana bir marta bosing.');
-      _alertOpen = false;
+      setTimeout(function(){ _ignoreBlur = false; }, 500);
       return;
     } else {
       _logoutWarned = false;
+      _ignoreBlur = false;
       submitTest(true);
-      setTimeout(function(){logout();},300);
+      setTimeout(function(){logout();}, 300);
       return;
     }
   }
@@ -733,7 +733,7 @@ function startTest(mode){
     if(q.optImages){orig.forEach(function(opt,oi){var ni=sh.indexOf(opt);if(q.optImages[String(oi)])newOptImg[String(ni)]=q.optImages[String(oi)];});}
     return Object.assign({},q,{options:sh,shuffledCorrect:nc,optImages:Object.keys(newOptImg).length?newOptImg:q.optImages});
   });
-  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;_visWarnCount=0;_blurWarnCount=0;S._blurWarnPending=false;_logoutWarned=false;history.pushState(null,'',location.href);
+  S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;_visWarnCount=0;_blurWarnCount=0;S._blurWarnPending=false;_logoutWarned=false;_ignoreBlur=false;history.pushState(null,'',location.href);
   // To'liq ekran rejimi
   var el=document.documentElement;
   if(el.requestFullscreen)el.requestFullscreen();
@@ -791,9 +791,11 @@ function submitTest(){
       if(!S.answers[i]||S.answers[i].length===0)unanswered.push(i);
     });
     if(unanswered.length>0){
+      _ignoreBlur=true;
       var nextUnanswered=unanswered.find(function(i){return i>S.idx;});
       if(nextUnanswered===undefined)nextUnanswered=unanswered[0];
       alert(unanswered.length+' ta savol javobsiz! '+(nextUnanswered+1)+'-savolga o\'tilmoqda...');
+      setTimeout(function(){_ignoreBlur=false;},500);
       S.idx=nextUnanswered;
       renderQ();
       return;
@@ -1416,10 +1418,11 @@ window.addEventListener('popstate', function(e) {
 // Sahifa yopilsa yoki boshqa tabga o'tsa
 var _visWarnCount = 0;
 var _blurWarnCount = 0;
+var _ignoreBlur = false;
 
 // Tab yashirilganda (boshqa tabga o'tganda)
 document.addEventListener('visibilitychange', function() {
-  if(document.hidden && S.mode) {
+  if(document.hidden && S.mode && !_ignoreBlur) {
     submitTest(true);
   }
 });
@@ -1427,8 +1430,7 @@ document.addEventListener('visibilitychange', function() {
 // Oyna fokusdan chiqqanda - darhol test tugaydi
 window.addEventListener('blur', function() {
   if(!S.mode) return;
-  if(_alertOpen) return; // alert ochiq bo'lsa ishlamasin
-  if(_logoutWarned) return; // chiqish ogohlantirish ko'rsatilgandan keyin ishlamasin
+  if(_ignoreBlur) return;
   submitTest(true);
 });
 
