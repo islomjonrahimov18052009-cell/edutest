@@ -293,6 +293,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
           <button class="btn bs bsm" onclick="backToTopics()">← Orqaga</button>
           <h2 id="q-detail-title" style="margin:0"></h2>
           <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn bsm" style="background:#e8f4fd;color:#1565c0;font-size:13px" onclick="aiCheckTopic(_curTopicDetail)">🤖 Mavzuni tekshirish</button>
             <label style="font-size:13px;font-weight:500">⏱ Timer:</label>
             <input type="checkbox" id="topic-timer-toggle" onchange="saveTopicTimer(this.checked)" style="width:16px;height:16px">
             <span id="topic-timer-label" style="font-size:12px">Yoqiq</span>
@@ -926,7 +927,6 @@ function renderTopicDetail(t){
       '<td style="font-size:12px;color:var(--color-text-secondary)">'+opts+'</td>'+
       '<td><span class="bdg" style="background:#e8f5e9;color:#2e7d32">'+correctOpts+'</span></td>'+
       '<td style="display:flex;gap:4px"><button class="btn bs bsm" onclick="editQ('+q.id+',\''+t.replace(/'/g,"\'")+'\')" title="Tahrirlash">✏️</button>'+
-      '<button class="btn bsm" style="background:#e8f4fd;color:#1565c0" onclick="aiCheckQ('+q.id+')" title="AI tekshirish">🤖</button>'+
       '<button class="btn bd bsm" onclick="deleteQ('+q.id+')" title="O\'chirish">🗑️</button></td>'+
     '</tr>';
   }).join('')||'<tr><td colspan="5" style="text-align:center;padding:14px">Savollar yo\'q</td></tr>';
@@ -1399,66 +1399,97 @@ initMeta();
 // ── AI SAVOL TEKSHIRISH ──────────────────────────────────────────
 var OR_KEY = localStorage.getItem('or_key') || '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';
 
-function aiCheckQ(qid) {
-  var qs = getAllQs();
-  var q = qs.find(function(x){return x.id===qid;});
-  if(!q) return;
+function aiCheckTopic(topic) {
+  var qs = getAllQs().filter(function(q){return q.topic===topic;});
+  if(!qs.length){alert('Savollar topilmadi!');return;}
   
-  OR_KEY = localStorage.getItem('or_key') || '';
+  OR_KEY = localStorage.getItem('or_key') || OR_KEY;
   if(!OR_KEY) {
-    OR_KEY = prompt('OpenRouter API kalitini kiriting (sk-or-...):');
+    OR_KEY = window.prompt('OpenRouter API kalitini kiriting (sk-or-...):');
     if(!OR_KEY) return;
     localStorage.setItem('or_key', OR_KEY);
   }
-  
-  // Show loading
+
   var modal = document.getElementById('ai-modal');
   var body = document.getElementById('ai-modal-body');
   modal.style.display = 'flex';
-  body.innerHTML = '<div style="text-align:center;padding:20px">🤖 AI tekshirmoqda...</div>';
-  
-  // Build prompt
-  var opts = (q.options||[]).map(function(o,i){
-    var isImg = o&&(o.startsWith('data:image')||o.startsWith('iVBOR'));
-    return String.fromCharCode(65+i)+') '+(isImg?'[rasm javob]':o);
-  });
-  var correct = (q.correct||[]).map(function(i){return String.fromCharCode(65+i);});
-  
-  var prompt = 'Matematika testi savolini tekshir:\n\n' +
-    'Savol: ' + (q.text||'(formula rasmi)') + '\n\n' +
-    'Javob variantlari:\n' + opts.join('\n') + '\n\n' +
-    'Belgilangan to\'g\'ri javob(lar): ' + correct.join(', ') + '\n\n' +
-    'Iltimos quyidagilarni tekshir:\n' +
-    '1. Belgilangan to\'g\'ri javob haqiqatan to\'g\'rimi?\n' +
-    '2. Boshqa variantlar noto\'g\'rimi?\n' +
-    '3. Savolda xato bormi?\n\n' +
-    'Qisqa va aniq javob ber. Agar to\'g\'ri bo\'lsa: "✅ To\'g\'ri", noto\'g\'ri bo\'lsa: "⚠️ Shubhali: [sabab]"';
+  body.innerHTML = '<div style="text-align:center;padding:20px">🤖 ' + qs.length + ' ta savol tekshirilmoqda...<br><small>Bu bir necha daqiqa olishi mumkin</small></div>';
 
-  fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + OR_KEY,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': location.origin
-    },
-    body: JSON.stringify({
-      model: 'meta-llama/llama-3.1-8b-instruct:free',
-      messages: [{role:'user', content: prompt}],
-      max_tokens: 300
+  var results = [];
+  var idx = 0;
+
+  function checkNext() {
+    if(idx >= qs.length) {
+      // Hammasi tugadi - natija ko'rsat
+      var html_res = '<div style="margin-bottom:8px;font-weight:600">' + qs.length + ' ta savol tekshirildi:</div>';
+      var warned = 0;
+      results.forEach(function(r, i) {
+        var isOk = r.result.indexOf('✅') >= 0 || r.result.toLowerCase().indexOf("to'g'ri") >= 0;
+        if(!isOk) warned++;
+        html_res += '<div style="padding:10px;border-radius:8px;background:'+(isOk?'#f0fdf4':'#fff7ed')+';border:1px solid '+(isOk?'#86efac':'#fdba74')+';margin-bottom:8px">' +
+          '<div style="font-weight:600;margin-bottom:4px">' + (i+1) + '. ' + (r.text||'(formula)').substring(0,60) + (r.text&&r.text.length>60?'...':'') + '</div>' +
+          '<div style="font-size:13px">' + r.result.replace(/
+/g,'<br>') + '</div>' +
+          '</div>';
+      });
+      html_res += '<div style="margin-top:12px;padding:10px;background:#f8f9fa;border-radius:8px;font-size:13px">';
+      html_res += warned > 0 ? '⚠️ <strong>' + warned + ' ta shubhali savol topildi!</strong>' : '✅ Barcha savollar to'g'ri ko'rinadi';
+      html_res += '</div><div style="margin-top:8px;font-size:11px;color:#888">⚠️ AI 100% to'g'ri emas — natijani o'zingiz tekshiring</div>';
+      body.innerHTML = html_res;
+      return;
+    }
+
+    var q = qs[idx];
+    body.innerHTML = '<div style="text-align:center;padding:20px">🤖 ' + (idx+1) + ' / ' + qs.length + ' tekshirilmoqda...<br><div style="background:#e0e0e0;border-radius:10px;height:8px;margin-top:10px"><div style="background:#1565c0;border-radius:10px;height:8px;width:'+Math.round((idx/qs.length)*100)+'%"></div></div></div>';
+
+    var opts = (q.options||[]).map(function(o,i){
+      var isImg = o&&(o.startsWith('data:image')||o.startsWith('iVBOR'));
+      return String.fromCharCode(65+i)+') '+(isImg?'[rasm variant]':o);
+    });
+    var correct = (q.correct||[]).map(function(i){return String.fromCharCode(65+i);});
+
+    var prompt = 'Matematika test savolini tekshir. Faqat qisqa javob ber.
+
+' +
+      'Savol: ' + (q.text||'(formula rasmi, tekshirib bo'lmaydi)') + '
+' +
+      'Variantlar:
+' + opts.join('
+') + '
+' +
+      'Belgilangan to'g'ri javob: ' + correct.join(', ') + '
+
+' +
+      'Javob: agar to'g'ri bo'lsa "✅ To'g'ri", noto'g'ri bo'lsa "⚠️ Xato: [qisqa sabab]"';
+
+    fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + OR_KEY,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': location.origin
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-3.1-8b-instruct:free',
+        messages: [{role:'user', content: prompt}],
+        max_tokens: 150
+      })
     })
-  })
-  .then(function(r){return r.json();})
-  .then(function(data){
-    var result = data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content || 'Xato yuz berdi';
-    var isOk = result.indexOf('✅') >= 0;
-    body.innerHTML = '<div style="padding:16px;border-radius:8px;background:'+(isOk?'#f0fdf4':'#fff7ed')+';border:1px solid '+(isOk?'#86efac':'#fdba74')+'">' +
-      '<div style="font-size:15px;line-height:1.6">' + result.replace(/\n/g,'<br>') + '</div>' +
-      '</div>' +
-      '<div style="margin-top:12px;font-size:12px;color:#888">⚠️ AI 100% to\'g\'ri emas — natijani o\'zingiz tekshiring</div>';
-  })
-  .catch(function(e){
-    body.innerHTML = '<div style="color:red">Xato: ' + e.message + '</div>';
-  });
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var result = (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||'Tekshirib bo'lmadi';
+      results.push({text: q.text, result: result});
+      idx++;
+      setTimeout(checkNext, 500);
+    })
+    .catch(function(e){
+      results.push({text: q.text, result: '❓ Xato: ' + e.message});
+      idx++;
+      setTimeout(checkNext, 500);
+    });
+  }
+
+  checkNext();
 }
 
 sbInit();
