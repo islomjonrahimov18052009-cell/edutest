@@ -180,7 +180,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   <div class="card" id="mode-card" style="display:none">
     <h3 style="margin-bottom:12px">Test rejimini tanlang</h3>
     <div style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div id="timer-teacher-only" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <label style="font-size:14px;font-weight:500">⏱ Timer:</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
           <input type="checkbox" id="timer-toggle" checked onchange="saveTimerPref(this.checked)" style="width:18px;height:18px">
@@ -694,8 +694,13 @@ function selectTopic(idx,el){
   el.classList.add('on');
   var mc=document.getElementById('mode-card');
   mc.style.display='block';
+  // Timer - faqat ustoz ko'rsin
+  var timerTeacher=document.getElementById('timer-teacher-only');
+  var timerTimeRow=document.getElementById('timer-time-row');
+  var isTeacher=ME&&ME.role==='teacher';
+  if(timerTeacher)timerTeacher.style.display=isTeacher?'flex':'none';
+  if(timerTimeRow)timerTimeRow.style.display=(isTeacher&&document.getElementById('timer-toggle')&&document.getElementById('timer-toggle').checked)?'flex':'none';
   setTimeout(function(){mc.scrollIntoView({behavior:'smooth',block:'center'});},100);
-
 }
 function loadMyHist(){
   var db=getDB(),myR=db.results.filter(function(r){return r.student===ME.name&&r.cls===ME.cls&&r.mode==='exam';});
