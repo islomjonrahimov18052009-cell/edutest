@@ -835,34 +835,41 @@ function toggleDetail(){
 }
 
 function renderQT(){
-  // Mavzular ro'yxatini ko'rsat
   var qs=getAllQs();
   var topics=[];
   qs.forEach(function(q){if(q.topic&&topics.indexOf(q.topic)<0)topics.push(q.topic);});
   var list=document.getElementById('q-topics-list');
   if(!list)return;
   if(!topics.length){
-    list.innerHTML='<p style="color:var(--color-text-secondary);text-align:center;padding:20px">Hali savollar yo\'q. Import orqali qo\'shing.</p>';
+    list.innerHTML='<p style="color:var(--color-text-secondary);text-align:center;padding:20px">Hali savollar yoq. Import orqali qoshing.</p>';
     return;
   }
-  list.innerHTML=topics.map(function(t){
+  // Store topics globally for safe access by index
+  window._topicsList = topics;
+  list.innerHTML=topics.map(function(t,ti){
     var meta=getTopicMeta(t);
     var cnt=qs.filter(function(q){return q.topic===t;}).length;
     var ask=meta?meta.questionsToAsk:cnt;
     var timerOn=(!meta||meta.timerEnabled===undefined)?true:meta.timerEnabled;
     var timerMins=(meta&&meta.timerMinutes)||15;
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--color-card);border:1px solid var(--color-border);border-radius:10px;gap:10px">'+
-      '<div style="flex:1;cursor:pointer" onclick="openTopicDetail(\''+t.replace(/'/g,"\'")+'\')">'+
+      '<div style="flex:1;cursor:pointer" onclick="openTopicByIdx('+ti+')">'+
         '<div style="font-weight:600;font-size:15px">'+t+'</div>'+
-        '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">'+cnt+' ta savol · '+ask+' ta beriladi · ⏱'+(timerOn?timerMins+' daq':'O\'chiq')+'</div>'+
+        '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">'+cnt+' ta savol &middot; '+ask+' ta beriladi &middot; '+(timerOn?timerMins+' daq':'Timersiz')+'</div>'+
       '</div>'+
       '<div style="display:flex;gap:6px">'+
-        '<button class="btn bpu bsm" onclick="openTopicDetail(\''+t.replace(/'/g,"\'")+'\')" title="Savollarni ko\'rish">📋</button>'+
-        '<button class="btn bd bsm" onclick="deleteTopic(\''+t.replace(/'/g,"\'")+'\')" title="Mavzuni o\'chirish">🗑️</button>'+
+        '<button class="btn bpu bsm" onclick="openTopicByIdx('+ti+')" title="Savollarni korish">📋</button>'+
+        '<button class="btn bsm" style="background:#e8f4fd;color:#1565c0" onclick="aiCheckByIdx('+ti+')" title="AI tekshirish">🤖</button>'+
+        '<button class="btn bd bsm" onclick="deleteTopicByIdx('+ti+')" title="Mavzuni ochirish">🗑️</button>'+
       '</div>'+
     '</div>';
   }).join('');
 }
+
+function openTopicByIdx(i){ openTopicDetail(window._topicsList[i]); }
+function aiCheckByIdx(i){ aiCheckTopic(window._topicsList[i]); }
+function deleteTopicByIdx(i){ deleteTopic(window._topicsList[i]); }
+
 
 function deleteTopic(t){
   if(!confirm('\''+t+'\'mavzusini va uning barcha savollarini o\'chirasizmi?'))return;
@@ -915,22 +922,30 @@ function renderTopicDetail(t){
   var qs=getAllQs().filter(function(q){return q.topic===t;});
   var tbody=document.getElementById('q-detail-tbody');
   if(!tbody)return;
-  tbody.innerHTML=qs.map(function(q,i){
+  // Store for index access
+  window._detailQs = qs;
+  tbody.innerHTML=qs.map(function(q,qi){
     var opts=(q.options||[]).map(function(o,oi){
-      var isImg=o&&(o.startsWith('data:image')||o.startsWith('/9j/')||o.startsWith('iVBOR'));
+      var isImg=o&&(o.indexOf('data:image')===0||o.indexOf('iVBOR')===0);
       return String.fromCharCode(65+oi)+(isImg?'.[rasm]':'. '+o.substring(0,30));
     }).join('<br>');
     var correctOpts=(q.correct||[]).map(function(ci){return String.fromCharCode(65+ci);}).join(',');
     return '<tr>'+
-      '<td>'+(i+1)+'</td>'+
+      '<td>'+(qi+1)+'</td>'+
       '<td style="max-width:200px;font-size:13px">'+(q.image?'🖼 ':'')+(q.text||'').substring(0,60)+'...</td>'+
       '<td style="font-size:12px;color:var(--color-text-secondary)">'+opts+'</td>'+
       '<td><span class="bdg" style="background:#e8f5e9;color:#2e7d32">'+correctOpts+'</span></td>'+
-      '<td style="display:flex;gap:4px"><button class="btn bs bsm" onclick="editQ('+q.id+',\''+t.replace(/'/g,"\'")+'\')" title="Tahrirlash">✏️</button>'+
-      '<button class="btn bd bsm" onclick="deleteQ('+q.id+')" title="O\'chirish">🗑️</button></td>'+
+      '<td style="display:flex;gap:4px">'+
+        '<button class="btn bs bsm" onclick="editQByIdx('+qi+')" title="Tahrirlash">✏️</button>'+
+        '<button class="btn bd bsm" onclick="deleteQByIdx('+qi+')" title="Ochirish">🗑️</button>'+
+      '</td>'+
     '</tr>';
-  }).join('')||'<tr><td colspan="5" style="text-align:center;padding:14px">Savollar yo\'q</td></tr>';
+  }).join('')||'<tr><td colspan="5" style="text-align:center;padding:14px">Savollar yoq</td></tr>';
 }
+
+function editQByIdx(qi){ var q=window._detailQs[qi]; if(q) editQ(q.id, _curTopicDetail); }
+function deleteQByIdx(qi){ var q=window._detailQs[qi]; if(q) deleteQ(q.id); }
+
 
 function deleteQ(qid){
   if(!confirm('Savolni o\'chirasizmi?'))return;
