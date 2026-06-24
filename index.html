@@ -1396,7 +1396,7 @@ initMeta();
   // URL va KEY kod ichida - localStorage dan o'qish shart emas
 })();
 
-// ── AI SAVOL TEKSHIRISH ──────────────────────────────────────────
+// AI SAVOL TEKSHIRISH
 var OR_KEY = localStorage.getItem('or_key') || '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';
 
 function aiCheckTopic(topic) {
@@ -1414,40 +1414,34 @@ function aiCheckTopic(topic) {
   var modal = document.getElementById('ai-modal');
   var body = document.getElementById('ai-modal-body');
   modal.style.display = 'flex';
-  body.innerHTML = '<div style="text-align:center;padding:20px">🤖 ' + qs.length + ' ta savol tekshirilmoqda...</div>';
+  body.innerHTML = '<div style="text-align:center;padding:20px">AI ' + qs.length + ' ta savol tekshirmoqda...</div>';
 
   var results = [];
   var currentIdx = 0;
 
   function showResults() {
     var warned = 0;
-    var html = '<div style="margin-bottom:8px;font-weight:600">' + qs.length + ' ta savol tekshirildi:</div>';
+    var out = '<div style="margin-bottom:8px;font-weight:600">' + qs.length + ' ta savol tekshirildi:</div>';
     results.forEach(function(r, i) {
-      var isOk = r.result.indexOf('\u2705') >= 0;
+      var isOk = r.result.toUpperCase().indexOf('OK') >= 0 || r.result.indexOf('correct') >= 0;
       if (!isOk) warned++;
       var bg = isOk ? '#f0fdf4' : '#fff7ed';
-      var border = isOk ? '#86efac' : '#fdba74';
-      var txt = r.result.split('\n').join(' ');
-      html += '<div style="padding:10px;border-radius:8px;background:' + bg + ';border:1px solid ' + border + ';margin-bottom:8px">';
-      html += '<div style="font-weight:600;margin-bottom:4px">' + (i+1) + '. ' + (r.text || '(formula)').substring(0, 60) + '</div>';
-      html += '<div style="font-size:13px">' + txt + '</div></div>';
+      var bd = isOk ? '#86efac' : '#fdba74';
+      out += '<div style="padding:10px;border-radius:8px;background:' + bg + ';border:1px solid ' + bd + ';margin-bottom:8px">';
+      out += '<div style="font-weight:600;margin-bottom:4px">' + (i+1) + '. ' + (r.text || '(formula)').substring(0, 60) + '</div>';
+      out += '<div style="font-size:13px">' + r.result + '</div></div>';
     });
-    html += '<div style="margin-top:12px;padding:10px;background:#f8f9fa;border-radius:8px;font-size:13px">';
-    if (warned > 0) {
-      html += '\u26a0\ufe0f <strong>' + warned + ' ta shubhali savol topildi!</strong>';
-    } else {
-      html += '\u2705 Barcha savollar to\'g\'ri ko\'rinadi';
-    }
-    html += '</div><div style="margin-top:8px;font-size:11px;color:#888">\u26a0\ufe0f AI 100% to\'g\'ri emas</div>';
-    body.innerHTML = html;
+    out += '<div style="margin-top:12px;padding:10px;background:#f8f9fa;border-radius:8px;font-size:13px">';
+    out += warned > 0 ? '<b>' + warned + ' ta shubhali savol topildi!</b>' : 'Barcha savollar togri korinadi';
+    out += '</div>';
+    body.innerHTML = out;
   }
 
   function checkNext() {
     if (currentIdx >= qs.length) { showResults(); return; }
-
     var q = qs[currentIdx];
     var pct = Math.round((currentIdx / qs.length) * 100);
-    body.innerHTML = '<div style="text-align:center;padding:20px">🤖 ' + (currentIdx+1) + ' / ' + qs.length + '<br><div style="background:#e0e0e0;border-radius:10px;height:8px;margin-top:10px"><div style="background:#1565c0;border-radius:10px;height:8px;width:' + pct + '%"></div></div></div>';
+    body.innerHTML = '<div style="text-align:center;padding:20px">AI ' + (currentIdx+1) + ' / ' + qs.length + '<br><div style="background:#e0e0e0;border-radius:10px;height:8px;margin-top:10px"><div style="background:#1565c0;border-radius:10px;height:8px;width:' + pct + '%"></div></div></div>';
 
     var opts = (q.options || []).map(function(o, i) {
       var isImg = o && (o.indexOf('data:image') === 0 || o.indexOf('iVBOR') === 0);
@@ -1455,7 +1449,7 @@ function aiCheckTopic(topic) {
     });
     var correct = (q.correct || []).map(function(i) { return String.fromCharCode(65 + i); });
 
-    var promptText = 'Matematika savol:\n' + (q.text || '(formula)') + '\nVariantlar:\n' + opts.join('\n') + '\nTogri javob: ' + correct.join(', ') + '\nTekshir: togri bo\'lsa "✅", xato bo\'lsa "⚠️ Xato: sabab"';
+    var promptText = 'Math question: ' + (q.text || 'see image') + ' Options: ' + opts.join(', ') + ' Correct answer marked: ' + correct.join(', ') + ' Is the marked answer correct? Reply only: OK if correct, or WRONG: reason if incorrect.';
 
     fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -1467,18 +1461,18 @@ function aiCheckTopic(topic) {
       body: JSON.stringify({
         model: 'meta-llama/llama-3.1-8b-instruct:free',
         messages: [{ role: 'user', content: promptText }],
-        max_tokens: 150
+        max_tokens: 100
       })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var result = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'Tekshirib bo\'lmadi';
-      results.push({ text: q.text, result: result });
+      var res = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'Error';
+      results.push({ text: q.text, result: res });
       currentIdx++;
       setTimeout(checkNext, 600);
     })
     .catch(function(e) {
-      results.push({ text: q.text, result: 'Xato: ' + e.message });
+      results.push({ text: q.text, result: 'Error: ' + e.message });
       currentIdx++;
       setTimeout(checkNext, 600);
     });
@@ -1486,7 +1480,6 @@ function aiCheckTopic(topic) {
 
   checkNext();
 }
-
 
 sbInit();
 // Pull latest data from cloud when page loads
