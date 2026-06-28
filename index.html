@@ -1412,7 +1412,7 @@ initMeta();
 })();
 
 // AI SAVOL TEKSHIRISH (Gemini)
-var GEMINI_KEY = 'AQ.Ab8RN6KtmNcqhKWekf6pJWQIJ6FjOwk9WZziN2KoVdD1HxcJCw';
+var GEMINI_KEY = 'AQ.Ab8RN6Ivnoxw-T8POaLNiF-b5pTegxALHPFfyuuCiAsySxHC6A';
 
 function aiCheckTopic(topic) {
   var qs = getAllQs().filter(function(q){ return q.topic === topic; });
@@ -1468,24 +1468,19 @@ function aiCheckTopic(topic) {
       lines.push('   Togri javob: ' + correct.join(', '));
     });
 
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_KEY;
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-fetch(url, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    contents: [{
-      parts: [{
-        text: lines.join('\n')
-      }]
-    }],
-    generationConfig: {
-      maxOutputTokens: 500
-    }
-  })
-})
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + GEMINI_KEY
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: lines.join('\n') }] }],
+        generationConfig: { maxOutputTokens: 500 }
+      })
+    })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var content = '';
