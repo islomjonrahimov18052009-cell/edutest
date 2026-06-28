@@ -1412,7 +1412,7 @@ initMeta();
 })();
 
 // AI SAVOL TEKSHIRISH (Gemini)
-var GEMINI_KEY = 'AQ.Ab8RN6Ivnoxw-T8POaLNiF-b5pTegxALHPFfyuuCiAsySxHC6A';
+var GEMINI_KEY = 'AQ.Ab8RN6LK2WQZujS8cjjBU4XWVA7HNY0Fs3LJNMIYmZeWGLjOSA';
 
 function aiCheckTopic(topic) {
   var qs = getAllQs().filter(function(q){ return q.topic === topic; });
@@ -1468,13 +1468,12 @@ function aiCheckTopic(topic) {
       lines.push('   Togri javob: ' + correct.join(', '));
     });
 
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_KEY;
 
     fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + GEMINI_KEY
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: lines.join('\n') }] }],
