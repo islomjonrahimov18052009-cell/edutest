@@ -1411,89 +1411,107 @@ initMeta();
   // URL va KEY kod ichida - localStorage dan o'qish shart emas
 })();
 
-// AI SAVOL TEKSHIRISH
-var OR_KEY = localStorage.getItem('or_key') || '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';
+// AI SAVOL TEKSHIRISH (Gemini)
+var GEMINI_KEY = 'AQ.Ab8RN6Ivnoxw-T8POaLNiF-b5pTegxALHPFfyuuCiAsySxHC6A';
 
 function aiCheckTopic(topic) {
   var qs = getAllQs().filter(function(q){ return q.topic === topic; });
   if (!qs.length) { alert('Savollar topilmadi!'); return; }
 
-  var key = localStorage.getItem('or_key') || OR_KEY;
-  if (!key) {
-    key = window.prompt('OpenRouter API kalitini kiriting:');
-    if (!key) return;
-    localStorage.setItem('or_key', key);
-    OR_KEY = key;
-  }
-
   var modal = document.getElementById('ai-modal');
   var body = document.getElementById('ai-modal-body');
   modal.style.display = 'flex';
-  body.innerHTML = '<div style="text-align:center;padding:20px">AI ' + qs.length + ' ta savol tekshirmoqda...</div>';
+  body.innerHTML = '<div style="text-align:center;padding:20px">AI tekshirmoqda... 0/' + qs.length + '</div>';
 
-  var results = [];
-  var currentIdx = 0;
+  var BATCH = 10;
+  var batches = [];
+  for (var i = 0; i < qs.length; i += BATCH) {
+    batches.push(qs.slice(i, i + BATCH));
+  }
+
+  var allResults = [];
+  var batchIdx = 0;
 
   function showResults() {
     var warned = 0;
     var out = '<div style="margin-bottom:8px;font-weight:600">' + qs.length + ' ta savol tekshirildi:</div>';
-    results.forEach(function(r, i) {
-      var isOk = r.result.toUpperCase().indexOf('OK') >= 0 || r.result.indexOf('correct') >= 0;
+    allResults.forEach(function(r, i) {
+      var isOk = r.ok;
       if (!isOk) warned++;
       var bg = isOk ? '#f0fdf4' : '#fff7ed';
       var bd = isOk ? '#86efac' : '#fdba74';
-      out += '<div style="padding:10px;border-radius:8px;background:' + bg + ';border:1px solid ' + bd + ';margin-bottom:8px">';
-      out += '<div style="font-weight:600;margin-bottom:4px">' + (i+1) + '. ' + (r.text || '(formula)').substring(0, 60) + '</div>';
-      out += '<div style="font-size:13px">' + r.result + '</div></div>';
+      out += '<div style="padding:8px 10px;border-radius:8px;background:' + bg + ';border:1px solid ' + bd + ';margin-bottom:6px">';
+      out += '<b>' + (i+1) + '.</b> ' + (r.text || '(formula)').substring(0, 50) + '  -  <span style="font-size:13px">' + r.result + '</span>';
+      out += '</div>';
     });
-    out += '<div style="margin-top:12px;padding:10px;background:#f8f9fa;border-radius:8px;font-size:13px">';
-    out += warned > 0 ? '<b>' + warned + ' ta shubhali savol topildi!</b>' : 'Barcha savollar togri korinadi';
-    out += '</div>';
+    out += '<div style="margin-top:12px;padding:10px;background:#f8f9fa;border-radius:8px">';
+    out += warned > 0 ? '<b>' + warned + ' ta shubhali savol!</b>' : 'Barcha savollar togri korinadi';
+    out += '</div><div style="font-size:11px;color:#888;margin-top:6px">AI 100% togri emas</div>';
     body.innerHTML = out;
   }
 
-  function checkNext() {
-    if (currentIdx >= qs.length) { showResults(); return; }
-    var q = qs[currentIdx];
-    var pct = Math.round((currentIdx / qs.length) * 100);
-    body.innerHTML = '<div style="text-align:center;padding:20px">AI ' + (currentIdx+1) + ' / ' + qs.length + '<br><div style="background:#e0e0e0;border-radius:10px;height:8px;margin-top:10px"><div style="background:#1565c0;border-radius:10px;height:8px;width:' + pct + '%"></div></div></div>';
+  function checkBatch() {
+    if (batchIdx >= batches.length) { showResults(); return; }
+    var batch = batches[batchIdx];
+    var pct = Math.round((allResults.length / qs.length) * 100);
+    body.innerHTML = '<div style="text-align:center;padding:20px">AI ' + allResults.length + ' / ' + qs.length + ' tekshirdi<br><div style="background:#e0e0e0;border-radius:10px;height:8px;margin-top:10px"><div style="background:#1565c0;border-radius:10px;height:8px;width:' + pct + '%"></div></div></div>';
 
-    var opts = (q.options || []).map(function(o, i) {
-      var isImg = o && (o.indexOf('data:image') === 0 || o.indexOf('iVBOR') === 0);
-      return String.fromCharCode(65 + i) + ') ' + (isImg ? '[rasm]' : o);
+    var lines = ['Quyidagi matematika test savollarini tekshir. Har savol uchun faqat "OK" yoki "XATO: sabab" deb javob ber:', ''];
+    batch.forEach(function(q, i) {
+      var opts = (q.options || []).map(function(o, oi) {
+        var isImg = o && (o.indexOf('data:image') === 0 || o.indexOf('iVBOR') === 0);
+        return String.fromCharCode(65+oi) + ') ' + (isImg ? '[rasm]' : o.substring(0, 30));
+      });
+      var correct = (q.correct || []).map(function(ci) { return String.fromCharCode(65+ci); });
+      lines.push((allResults.length + i + 1) + '. ' + (q.text || '(formula/rasm)'));
+      lines.push('   Variantlar: ' + opts.join('; '));
+      lines.push('   Togri javob: ' + correct.join(', '));
     });
-    var correct = (q.correct || []).map(function(i) { return String.fromCharCode(65 + i); });
 
-    var promptText = 'Math question: ' + (q.text || 'see image') + ' Options: ' + opts.join(', ') + ' Correct answer marked: ' + correct.join(', ') + ' Is the marked answer correct? Reply only: OK if correct, or WRONG: reason if incorrect.';
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-    fetch('https://openrouter.ai/api/v1/chat/completions', {
+    fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + OR_KEY,
         'Content-Type': 'application/json',
-        'HTTP-Referer': location.origin
+        'Authorization': 'Bearer ' + GEMINI_KEY
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-8b-instruct:free',
-        messages: [{ role: 'user', content: promptText }],
-        max_tokens: 100
+        contents: [{ parts: [{ text: lines.join('\n') }] }],
+        generationConfig: { maxOutputTokens: 500 }
       })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var res = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'Error';
-      results.push({ text: q.text, result: res });
-      currentIdx++;
-      setTimeout(checkNext, 600);
+      var content = '';
+      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+        content = data.candidates[0].content.parts[0].text || '';
+      }
+      if (!content) {
+        batch.forEach(function(q) {
+          allResults.push({ text: q.text, result: 'Tekshirib bolmadi', ok: true });
+        });
+      } else {
+        var resLines = content.split('\n').filter(function(l){ return l.trim(); });
+        batch.forEach(function(q, i) {
+          var line = resLines[i] || 'OK';
+          var isOk = line.toUpperCase().indexOf('XATO') < 0 && line.toUpperCase().indexOf('WRONG') < 0;
+          allResults.push({ text: q.text, result: line, ok: isOk });
+        });
+      }
+      batchIdx++;
+      setTimeout(checkBatch, 1000);
     })
     .catch(function(e) {
-      results.push({ text: q.text, result: 'Error: ' + e.message });
-      currentIdx++;
-      setTimeout(checkNext, 600);
+      batch.forEach(function(q) {
+        allResults.push({ text: q.text, result: 'Xato: ' + e.message, ok: false });
+      });
+      batchIdx++;
+      setTimeout(checkBatch, 1000);
     });
   }
 
-  checkNext();
+  checkBatch();
 }
 
 sbInit();
