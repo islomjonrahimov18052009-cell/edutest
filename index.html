@@ -1539,20 +1539,6 @@ fetch(url, {
   batchIdx++;
   setTimeout(checkBatch, 1000);
 })
-.catch(function(e) {
-  batch.forEach(function(q) {
-    allResults.push({
-      text: q.text,
-      result: 'Xato: ' + e.message,
-      ok: false
-    });
-  });
-
-  batchIdx++;
-  setTimeout(checkBatch, 1000);
-});
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
       var content = '';
       if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
         content = data.candidates[0].content.parts[0].text || '';
