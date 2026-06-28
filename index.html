@@ -1557,7 +1557,7 @@ fetch(url, {
       }
       batchIdx++;
       setTimeout(checkBatch, 1000);
-     })
+      })
     .catch(function(e) {
       batch.forEach(function(q) {
         allResults.push({ text: q.text, result: 'Xato: ' + e.message, ok: false });
