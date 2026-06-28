@@ -1412,7 +1412,7 @@ initMeta();
 })();
 
 // AI SAVOL TEKSHIRISH (Gemini)
-var GEMINI_KEY = 'AQ.Ab8RN6Ivnoxw-T8POaLNiF-b5pTegxALHPFfyuuCiAsySxHC6A';
+var GEMINI_KEY = 'AQ.Ab8RN6KtmNcqhKWekf6pJWQIJ6FjOwk9WZziN2KoVdD1HxcJCw';
 
 function aiCheckTopic(topic) {
   var qs = getAllQs().filter(function(q){ return q.topic === topic; });
@@ -1468,19 +1468,89 @@ function aiCheckTopic(topic) {
       lines.push('   Togri javob: ' + correct.join(', '));
     });
 
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+ var url =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='
+  + GEMINI_KEY;
 
-    fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + GEMINI_KEY
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: lines.join('\n') }] }],
-        generationConfig: { maxOutputTokens: 500 }
-      })
-    })
+fetch(url, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    contents: [{
+      parts: [{
+        text: lines.join('\n')
+      }]
+    }],
+    generationConfig: {
+      maxOutputTokens: 500,
+      temperature: 0.2
+    }
+  })
+})
+.then(function(r) {
+  if (!r.ok) {
+    return r.json().then(function(err) {
+      throw new Error(err.error ? err.error.message : 'API xatosi');
+    });
+  }
+  return r.json();
+})
+.then(function(data) {
+  var content = '';
+
+  if (
+    data.candidates &&
+    data.candidates[0] &&
+    data.candidates[0].content &&
+    data.candidates[0].content.parts
+  ) {
+    content = data.candidates[0].content.parts[0].text || '';
+  }
+
+  if (!content) {
+    batch.forEach(function(q) {
+      allResults.push({
+        text: q.text,
+        result: 'Tekshirib bo‘lmadi',
+        ok: true
+      });
+    });
+  } else {
+    var resLines = content
+      .split('\n')
+      .filter(function(l) { return l.trim(); });
+
+    batch.forEach(function(q, i) {
+      var line = resLines[i] || 'OK';
+      var isOk =
+        line.toUpperCase().indexOf('XATO') < 0 &&
+        line.toUpperCase().indexOf('WRONG') < 0;
+
+      allResults.push({
+        text: q.text,
+        result: line,
+        ok: isOk
+      });
+    });
+  }
+
+  batchIdx++;
+  setTimeout(checkBatch, 1000);
+})
+.catch(function(e) {
+  batch.forEach(function(q) {
+    allResults.push({
+      text: q.text,
+      result: 'Xato: ' + e.message,
+      ok: false
+    });
+  });
+
+  batchIdx++;
+  setTimeout(checkBatch, 1000);
+});
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var content = '';
