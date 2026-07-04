@@ -1411,8 +1411,8 @@ initMeta();
   // URL va KEY kod ichida - localStorage dan o'qish shart emas
 })();
 
-// AI SAVOL TEKSHIRISH (Gemini)
-var GEMINI_KEY = 'AQ.Ab8RN6LK2WQZujS8cjjBU4XWVA7HNY0Fs3LJNMIYmZeWGLjOSA';
+// AI SAVOL TEKSHIRISH (Groq)
+var GROQ_KEY = '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';
 
 function aiCheckTopic(topic) {
   var qs = getAllQs().filter(function(q){ return q.topic === topic; });
@@ -1468,23 +1468,29 @@ function aiCheckTopic(topic) {
       lines.push('   Togri javob: ' + correct.join(', '));
     });
 
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + GEMINI_KEY;
+    var url = 'https://api.groq.com/openai/v1/chat/completions';
 
     fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + GROQ_KEY
       },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: lines.join('\n') }] }],
-        generationConfig: { maxOutputTokens: 500 }
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: lines.join('\n') }],
+        max_tokens: 500,
+        temperature: 0.2
       })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var content = '';
-      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
-        content = data.candidates[0].content.parts[0].text || '';
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        content = data.choices[0].message.content || '';
+      }
+      if (data.error) {
+        console.error('Groq error:', data.error);
       }
       if (!content) {
         batch.forEach(function(q) {
