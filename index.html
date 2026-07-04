@@ -1516,7 +1516,7 @@ function aiCheckTopic(topic) {
     var batch = batches[batchIdx];
     updateProgress();
 
-    var lines = ['Quyidagi matematika test savollarini tekshir. Savol matni, variantlar va belgilangan togri javob mantiqan mos kelishini teksh. Har savol uchun faqat "OK" yoki "XATO: qisqa sabab" deb javob ber, boshqa hech narsa yozma:', ''];
+    var lines = ['Sen matematika ustozisan. Har bir savolni tekshir: avval o\'zing qisqacha hisoblab chiq (1-2 qator), keyin albatta "ANSWER:" so\'zidan keyin "OK" yoki "XATO: qisqa sabab" deb yoz. Har savol javobini "ANSWER:" bilan tugat, formatga qatiy amal qil:', ''];
     batch.forEach(function(item, i) {
       var q = item.q;
       var opts = (q.options || []).map(function(o, oi) {
@@ -1539,8 +1539,8 @@ function aiCheckTopic(topic) {
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: lines.join('\n') }],
-        max_tokens: 500,
-        temperature: 0.2
+        max_tokens: 1000,
+        temperature: 0.1
       })
     })
     .then(function(r) {
@@ -1568,9 +1568,13 @@ function aiCheckTopic(topic) {
           _aiResults[item.origIdx] = { q: item.q, result: 'Tekshirib bolmadi', ok: true };
         });
       } else {
-        var resLines = content.split('\n').filter(function(l){ return l.trim(); });
+        // "ANSWER:" belgisidan keyingi qismni topamiz - hisob-kitob matnini emas, xulosani olamiz
+        var answerMatches = content.match(/ANSWER:\s*([^\n]*)/gi) || [];
+        var verdicts = answerMatches.map(function(m) {
+          return m.replace(/ANSWER:\s*/i, '').trim();
+        });
         batch.forEach(function(item, i) {
-          var line = resLines[i] || 'OK';
+          var line = verdicts[i] || 'OK';
           var isOk = line.toUpperCase().indexOf('XATO') < 0 && line.toUpperCase().indexOf('WRONG') < 0;
           _aiResults[item.origIdx] = { q: item.q, result: line, ok: isOk };
         });
