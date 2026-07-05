@@ -226,18 +226,36 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <button id="tab-rg" style="flex:1;padding:10px;font-size:14px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:#f1f5f9;color:var(--mut)" onclick="showAuthTab('rg')">Ro'yxatdan o'tish</button>
       </div>
       <div id="form-li">
-        <div class="fg"><label>Login</label><input type="text" id="li-u" placeholder="Login"></div>
-        <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="li-p" placeholder="Parol" style="padding-right:38px" onkeydown="if(event.key==='Enter')doLogin()"><span onclick="togglePw('li-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+        <div class="fg"><label>Login</label><input type="text" id="li-u" placeholder="Login" autocomplete="off" data-lpignore="true" data-1p-ignore></div>
+        <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="li-p" placeholder="Parol" style="padding-right:38px" autocomplete="off" data-lpignore="true" data-1p-ignore onkeydown="if(event.key==='Enter')doLogin()"><span onclick="togglePw('li-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
         <button class="btn bp bfw blg mt8" onclick="doLogin()">Kirish</button>
       </div>
       <div id="form-rg" style="display:none">
         <div class="fg"><label>Ism Familiya</label><input type="text" id="rg-n" placeholder="Masalan: Abror Karimov"></div>
-        <div class="fg"><label>Login</label><input type="text" id="rg-u" placeholder="Foydalanuvchi nomi"></div>
-        <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="rg-p" placeholder="Parol" style="padding-right:38px"><span onclick="togglePw('rg-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+        <div class="fg">
+          <label>Viloyat</label>
+          <select id="rg-vil" onchange="onVilChange()"><option value="">-- Belgilanmagan --</option></select>
+        </div>
+        <div class="fg">
+          <label>Tuman/Shahar</label>
+          <select id="rg-tum" disabled><option value="">-- Avval viloyatni tanlang --</option></select>
+        </div>
+        <div class="fg">
+          <label>Maktab</label>
+          <input type="text" id="rg-maktab" placeholder="Masalan: 21-maktab">
+        </div>
         <div id="rg-cls-fg" class="fg">
           <label>Sinf</label>
           <select id="rg-cls"><option value="">-- Sinf tanlang --</option></select>
         </div>
+        <div id="rg-subj-fg" class="fg" style="display:none">
+          <label>Qaysi fandan dars berasiz</label>
+          <select id="rg-subj">
+            <option value="">-- Fan tanlang --</option>
+          </select>
+        </div>
+        <div class="fg"><label>Login</label><input type="text" id="rg-u" placeholder="Foydalanuvchi nomi"></div>
+        <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="rg-p" placeholder="Parol" style="padding-right:38px"><span onclick="togglePw('rg-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
         <div id="rg-code-fg" class="fg" style="display:none">
           <label>Admindan olingan maxfiy kod</label>
           <div style="position:relative"><input type="password" id="rg-code" placeholder="Admin bergan maxfiy kod" style="padding-right:38px"><span onclick="togglePw('rg-code',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div>
@@ -260,6 +278,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <button class="btn bg bsm" onclick="logout();showPg('pg-home')">Chiqish</button>
     </div>
     <div class="fg">
+      <label>Fan</label>
+      <div id="subj-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
       <label>Qaysi mavzuni ishlaysiz?</label>
       <div class="tgrid" id="topic-grid"></div>
     </div>
@@ -462,8 +482,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
       <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Standart "admin / 1234" parolini o'zgartirib qo'ying — bu ma'lumot ko'pchilikka ma'lum bo'lishi mumkin.</p>
-      <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="pw-old" placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('pw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
-      <div class="fg"><label>Yangi parol</label><div style="position:relative"><input type="password" id="pw-new" placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('pw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+      <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="pw-old" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('pw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+      <div class="fg"><label>Yangi parol</label><div style="position:relative"><input type="password" id="pw-new" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('pw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
       <button class="btn bpu bsm" onclick="changeMyPassword()">Parolni yangilash</button>
       <div id="pw-msg"></div>
     </div>
@@ -586,8 +606,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     </div>
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
-      <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="apw-old" placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('apw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
-      <div class="fg"><label>Yangi parol</label><div style="position:relative"><input type="password" id="apw-new" placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('apw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+      <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="apw-old" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('apw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+      <div class="fg"><label>Yangi parol</label><div style="position:relative"><input type="password" id="apw-new" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('apw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
       <button class="btn bpu bsm" onclick="changeMyPassword('apw')">Parolni yangilash</button>
       <div id="apw-msg"></div>
     </div>
@@ -602,13 +622,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="mh"><h3>Savol qo'shish</h3><button class="xb" onclick="closeAQ()">&#x2715;</button></div>
     <div class="fg"><label>Mavzu</label><input type="text" id="aq-topic" placeholder="Mavzu nomi"></div>
     <div class="fg"><label>Fan</label>
-      <select id="aq-subj">
-        <option value="math">Matematika</option><option value="phys">Fizika</option>
-        <option value="chem">Kimyo</option><option value="bio">Biologiya</option>
-        <option value="hist">Tarix</option><option value="geo">Geografiya</option>
-        <option value="lit">Adabiyot</option><option value="lang">Ona tili</option>
-        <option value="eng">Ingliz tili</option><option value="info">Informatika</option>
-      </select>
+      <select id="aq-subj" onchange="refreshSyms()"></select>
     </div>
     <div class="fg"><label>Berilishi kerak bo'lgan savol soni</label><input type="number" id="aq-qcount" placeholder="20" min="1" style="width:120px"></div>
     <div class="fg">
@@ -746,6 +760,49 @@ function initMathBg(){
 }
 initMathBg();
 
+// ── FANLAR VA VILOYAT/TUMAN MALUMOTLARI ────────────────────────────────────
+var SUBJECTS=[
+  {v:'math',n:'Matematika'},{v:'phys',n:'Fizika'},{v:'chem',n:'Kimyo'},
+  {v:'bio',n:'Biologiya'},{v:'hist',n:'Tarix'},{v:'geo',n:'Geografiya'},
+  {v:'lit',n:'Adabiyot'},{v:'lang',n:'Ona tili'},{v:'eng',n:'Ingliz tili'},
+  {v:'rus',n:'Rus tili'},{v:'info',n:'Informatika'},{v:'other',n:'Boshqa fan'}
+];
+function subjName(v){var s=SUBJECTS.find(function(x){return x.v===v;});return s?s.n:v;}
+
+var SYMBOLS_BY_SUBJECT={
+  math:['=','±','√','∛','∜','π','∞','≤','≥','≠','≈','∑','∫','÷','×','∆','∈','∉','∅','∪','∩','→','⇒','⇔','∀','∃','⊂','⊆','%','∠','⊥','∥','!','(',')','[',']','{','}',
+    '⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹','⁺','⁻',
+    '₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'],
+  phys:['Δ','Ω','λ','μ','ν','θ','ρ','ω','α','β','γ','→','⇌','∝','·','²','³','°','°C','∥','⊥','∫','∑','×','÷','≈','≤','≥','√','∞','⁺','⁻','₀','₁','₂'],
+  chem:['→','⇌','↑','↓','²','³','⁺','⁻','₀','₁','₂','₃','₄','₅','₆','₇','₈','·','°C','Δ','%','≈','pH','⇋','═'],
+  bio:['°C','×','²','³','→','↔','↑','↓','♀','♂','±','%','∆','≈','µm','×10'],
+  hist:['№','§','—','«','»','...','†','г.','в.','н.э.','до н.э.','↔','→'],
+  geo:['°','′','″','≈','→','%','²','³','км²','км','м','±','↔','↑','↓'],
+  lit:['«','»','—','...','№','!','?','...','–'],
+  lang:['«','»','—','?!','...','–','№'],
+  eng:['«','»','...','?!','–','—',"'",'"'],
+  rus:['«','»','...','?!','–','—','№'],
+  info:['≠','==','===','&&','||','!','→','∑','%','²','{}','[]','()','<=','>=','++','--','::'],
+  other:['±','→','°','%','...','«','»','№','–','×','÷','²']
+};
+
+var UZ_REGIONS={
+  'Toshkent shahri':['Bektemir','Chilonzor','Yakkasaroy','Mirobod','Mirzo Ulugbek','Olmazor','Sergeli','Shayxontohur','Uchtepa','Yashnobod','Yunusobod','Yangihayot'],
+  'Toshkent viloyati':['Bekobod','Bo\'ka','Chinoz','Qibray','Ohangaron','Oqqo\'rg\'on','Parkent','Piskent','Quyi Chirchiq','O\'rta Chirchiq','Yuqori Chirchiq','Zangiota','Toshkent tumani','Bo\'stonliq','Angren','Olmaliq','Chirchiq','Yangiyo\'l'],
+  'Andijon viloyati':['Andijon shahri','Andijon tumani','Asaka','Baliqchi','Bo\'z','Buloqboshi','Izboskan','Jalaquduq','Xo\'jaobod','Qo\'rg\'ontepa','Marhamat','Oltinko\'l','Paxtaobod','Shahrixon','Ulug\'nor','Xonobod'],
+  'Farg\'ona viloyati':['Farg\'ona shahri','Farg\'ona tumani','Bag\'dod','Beshariq','Buvayda','Dang\'ara','Furqat','Qo\'shtepa','Quva','Quvasoy','Rishton','So\'x','Toshloq','Uchko\'prik','O\'zbekiston','Yozyovon','Marg\'ilon','Qo\'qon'],
+  'Namangan viloyati':['Namangan shahri','Namangan tumani','Chortoq','Chust','Kosonsoy','Mingbuloq','Norin','Pop','To\'raqo\'rg\'on','Uchqo\'rg\'on','Uychi','Yangiqo\'rg\'on','Davlatobod','Kosonsoy'],
+  'Samarqand viloyati':['Samarqand shahri','Samarqand tumani','Bulung\'ur','Ishtixon','Jomboy','Kattaqo\'rg\'on','Qo\'shrabot','Narpay','Nurobod','Oqdaryo','Pastdarg\'om','Payariq','Paxtachi','Toyloq','Urgut','Kattaqo\'rg\'on shahri'],
+  'Buxoro viloyati':['Buxoro shahri','Buxoro tumani','Vobkent','G\'ijduvon','Jondor','Kogon','Qorako\'l','Qorovulbozor','Peshku','Romitan','Shofirkon','Olot','Vobkent'],
+  'Qashqadaryo viloyati':['Qarshi shahri','Qarshi tumani','Chiroqchi','Dehqonobod','G\'uzor','Kasbi','Kitob','Koson','Mirishkor','Muborak','Nishon','Qamashi','Shahrisabz','Yakkabog\''],
+  'Surxondaryo viloyati':['Termiz shahri','Termiz tumani','Angor','Bandixon','Boysun','Denov','Jarqo\'rg\'on','Muzrabot','Oltinsoy','Qiziriq','Qumqo\'rg\'on','Sariosiyo','Sherobod','Sho\'rchi','Uzun'],
+  'Jizzax viloyati':['Jizzax shahri','Jizzax tumani','Arnasoy','Baxmal','Do\'stlik','Forish','G\'allaorol','Mirzacho\'l','Paxtakor','Yangiobod','Zafarobod','Zarbdor','Zomin'],
+  'Sirdaryo viloyati':['Guliston shahri','Guliston tumani','Boyovut','Mirzaobod','Oqoltin','Sardoba','Sayxunobod','Sirdaryo','Xovos','Yangiyer'],
+  'Navoiy viloyati':['Navoiy shahri','Navoiy tumani','Karmana','Konimex','Qiziltepa','Nurota','Tomdi','Uchquduq','Xatirchi','Zarafshon'],
+  'Xorazm viloyati':['Urganch shahri','Urganch tumani','Bog\'ot','Gurlan','Xiva','Xonqa','Qo\'shko\'pir','Shovot','Yangiariq','Yangibozor'],
+  'Qoraqalpog\'iston':['Nukus shahri','Nukus tumani','Amudaryo','Beruniy','Chimboy','Ellikqal\'a','Kegeyli','Mo\'ynoq','Qanliko\'l','Qorao\'zak','Qo\'ng\'irot','Shumanay','Taxtako\'pir','To\'rtko\'l','Xo\'jayli']
+};
+
 function genTeacherCode(){
   // Har bir belgi mustaqil, teng ehtimollik bilan tanlanadi - qattiq qolip yoq
   var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; // I,O,0,1,l chalkashmasin uchun olib tashlangan
@@ -794,6 +851,10 @@ async function syncFromCloud() {
 function getAllQs() { var db=getDB(); return BQ.concat(db.userQs||[]); }
 function getTopics() { var qs=getAllQs(),t=[]; qs.forEach(function(q){if(q.topic&&t.indexOf(q.topic)<0)t.push(q.topic);}); return t; }
 function getQsByTopic(t) { return getAllQs().filter(function(q){return q.topic===t;}); }
+// Ustoz panelida faqat OZ savollarini korsatish uchun (ustozlar orasida malumot ajratish)
+function getMyQs(){ return (getAllQs()).filter(function(q){return q.teacherId===ME.id;}); }
+function getMyTopics(){ var qs=getMyQs(),t=[]; qs.forEach(function(q){if(q.topic&&t.indexOf(q.topic)<0)t.push(q.topic);}); return t; }
+function getMyQsByTopic(t){ return getMyQs().filter(function(q){return q.topic===t;}); }
 function getTopicMeta(topic) {
   var db=getDB();
   var all=(db.topicsMeta||[]).concat(INIT_META);
@@ -861,14 +922,37 @@ function goAuth(role){
   document.getElementById('auth-title').textContent=isA?'Admin':(isT?'Ustoz':"O'quvchi");
   document.getElementById('auth-sub').textContent=isA?'Boshqaruv paneli':(isT?'Ustoz paneli':"Test ishlash");
   document.getElementById('rg-cls-fg').style.display=isT?'none':'block';
+  document.getElementById('rg-subj-fg').style.display=isT?'block':'none';
   document.getElementById('rg-code-fg').style.display=isT?'block':'none';
   document.getElementById('tab-rg').style.display=isA?'none':'flex';
   document.getElementById('auth-err').innerHTML='';
   var db=getDB();
   var sel=document.getElementById('rg-cls');
   sel.innerHTML='<option value="">-- Sinf tanlang --</option>'+db.classes.map(function(c){return '<option>'+c+'</option>';}).join('');
+  var subjSel=document.getElementById('rg-subj');
+  subjSel.innerHTML='<option value="">-- Fan tanlang --</option>'+SUBJECTS.map(function(s){return '<option value="'+s.v+'">'+s.n+'</option>';}).join('');
+  var vilSel=document.getElementById('rg-vil');
+  vilSel.innerHTML='<option value="">-- Belgilanmagan --</option>'+Object.keys(UZ_REGIONS).map(function(v){return '<option>'+v+'</option>';}).join('');
+  document.getElementById('rg-tum').innerHTML='<option value="">-- Avval viloyatni tanlang --</option>';
+  document.getElementById('rg-tum').disabled=true;
+  document.getElementById('rg-maktab').value='';
+  // Xavfsizlik: parol maydonlari har safar bosh sahifadan qayta ochilganda tozalanadi
+  // (brauzerning avtomatik toldirish/eslab qolishidan himoya uchun)
+  ['li-u','li-p','rg-code'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   showAuthTab('li');
   showPg('pg-auth');
+}
+function onVilChange(){
+  var vil=document.getElementById('rg-vil').value;
+  var tumSel=document.getElementById('rg-tum');
+  var districts=UZ_REGIONS[vil];
+  if(!districts){
+    tumSel.innerHTML='<option value="">-- Avval viloyatni tanlang --</option>';
+    tumSel.disabled=true;
+    return;
+  }
+  tumSel.innerHTML='<option value="">-- Tumanni belgilang --</option>'+districts.map(function(d){return '<option>'+d+'</option>';}).join('');
+  tumSel.disabled=false;
 }
 function showAuthTab(tab){
   var isLi=tab==='li';
@@ -894,11 +978,16 @@ function doRegister(){
   var user=document.getElementById('rg-u').value.trim();
   var pass=document.getElementById('rg-p').value;
   var cls=authRole==='student'?document.getElementById('rg-cls').value:'';
+  var subj=authRole==='teacher'?document.getElementById('rg-subj').value:'';
+  var vil=document.getElementById('rg-vil').value;
+  var tum=document.getElementById('rg-tum').value;
+  var maktab=document.getElementById('rg-maktab').value.trim();
   if(authRole==='admin'){showErr("Admin sifatida royxatdan otib bolmaydi.");return;}
   if(!name){showErr("Ism familiya kiriting!");return;}
   if(!user){showErr("Login kiriting!");return;}
   if(!pass){showErr("Parol kiriting!");return;}
   if(authRole==='student'&&!cls){showErr("Sinf tanlang!");return;}
+  if(authRole==='teacher'&&!subj){showErr("Fan tanlang!");return;}
   var db=getDB();
   if(authRole==='teacher'){
     if(db.teacherCodeUsed){showErr("Bu kod allaqachon ishlatilgan! Yangi kod olish uchun admin bilan boglaning.");return;}
@@ -908,7 +997,7 @@ function doRegister(){
   }
   var dup=db.users.filter(function(x){return x.login===user;});
   if(dup.length){showErr("Bu login band! Boshqa login tanlang.");return;}
-  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls};
+  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,viloyat:vil,tuman:tum,maktab:maktab};
   db.users.push(nu);
   if(authRole==='teacher'){db.teacherCodeUsed=true;}
   saveDB(db);ME=nu;afterLogin();
@@ -949,18 +1038,38 @@ function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
   }
   document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
 
+var _curSubjFilter='';
 function renderTopics(){
-  var topics=getTopics();
   document.getElementById('tp-gr').textContent='Salom, '+ME.name+'!';
   document.getElementById('tp-sub').textContent='Qaysi mavzuni ishlaysiz?';
   selTopic=null;document.getElementById('mode-card').style.display='none';
+  var allQs=getAllQs();
+  var subjSet=[];
+  allQs.forEach(function(q){if(q.subject&&subjSet.indexOf(q.subject)<0)subjSet.push(q.subject);});
+  var filterHost=document.getElementById('subj-filter');
+  if(subjSet.length<=1){
+    filterHost.innerHTML='';
+    _curSubjFilter='';
+  } else {
+    var pills=['<button class="tab'+(_curSubjFilter===''?' on':'')+'" style="flex:none;padding:6px 14px" onclick="filterBySubj(\'\')">Barchasi</button>'];
+    subjSet.forEach(function(s){
+      pills.push('<button class="tab'+(_curSubjFilter===s?' on':'')+'" style="flex:none;padding:6px 14px" onclick="filterBySubj(\''+s+'\')">'+subjName(s)+'</button>');
+    });
+    filterHost.innerHTML=pills.join('');
+  }
+  var topics=getTopics().filter(function(t){
+    if(!_curSubjFilter)return true;
+    return allQs.some(function(q){return q.topic===t&&q.subject===_curSubjFilter;});
+  });
+  window._topicsListStudent=topics;
   document.getElementById('topic-grid').innerHTML=topics.map(function(t,i){
     var qs=getQsByTopic(t),meta=getTopicMeta(t),ask=meta?meta.questionsToAsk:qs.length;
     return '<div class="tbtn" onclick="selectTopic('+i+',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
   }).join('')||'<p class="ts tm">Mavzular yo\'q</p>';
 }
+function filterBySubj(s){_curSubjFilter=s;renderTopics();}
 function selectTopic(idx,el){
-  var topics=getTopics();
+  var topics=window._topicsListStudent||getTopics();
   selTopic=topics[idx];
   document.querySelectorAll('.tbtn').forEach(function(b){b.classList.remove('on');});
   el.classList.add('on');
@@ -1057,6 +1166,24 @@ function renderQ(){
 }
 function goQ(d){S.idx=Math.max(0,Math.min(S.test.length-1,S.idx+d));renderQ();}
 function selAns(i){var q=S.test[S.idx],ans=(S.answers[S.idx]||[]).slice();if(q.isMulti){var x=ans.indexOf(i);if(x>=0)ans.splice(x,1);else ans.push(i);}else{ans=[i];}S.answers[S.idx]=ans;renderQ();}
+// Klaviatura orqali javob belgilash: 1-9 raqamlar yoki A-Z harflar variant tanlaydi,
+// chap/ong strelkalar savol almashtiradi. Faqat test sahifasi ochiq bolganda ishlaydi.
+document.addEventListener('keydown',function(e){
+  var testPg=document.getElementById('pg-test');
+  if(!testPg||!testPg.classList.contains('on'))return;
+  if(!S.test||!S.test.length)return;
+  var t=e.target.tagName;
+  if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT')return;
+  var q=S.test[S.idx];
+  if(!q)return;
+  var key=e.key;
+  var idx=-1;
+  if(key>='1'&&key<='9'){idx=key.charCodeAt(0)-'1'.charCodeAt(0);}
+  else if(key.length===1&&/[a-zA-Z]/.test(key)){idx=key.toUpperCase().charCodeAt(0)-65;}
+  if(idx>=0&&idx<(q.options||[]).length){selAns(idx);e.preventDefault();return;}
+  if(key==='ArrowRight'){if(S.idx<S.test.length-1){S.idx++;renderQ();}e.preventDefault();}
+  else if(key==='ArrowLeft'){if(S.idx>0){S.idx--;renderQ();}e.preventDefault();}
+});
 function submitTest(forced){
   if(!forced){
     var unanswered=[];
@@ -1154,7 +1281,7 @@ function toggleDetail(){
 }
 
 function renderQT(){
-  var qs=getAllQs();
+  var qs=getMyQs();
   var topics=[];
   qs.forEach(function(q){if(q.topic&&topics.indexOf(q.topic)<0)topics.push(q.topic);});
   var list=document.getElementById('q-topics-list');
@@ -1193,8 +1320,8 @@ function deleteTopicByIdx(i){ deleteTopic(window._topicsList[i]); }
 function deleteTopic(t){
   if(!confirm('\''+t+'\'mavzusini va uning barcha savollarini o\'chirasizmi?'))return;
   var db=getDB();
-  db.userQs=(db.userQs||[]).filter(function(q){return q.topic!==t;});
-  db.topicsMeta=(db.topicsMeta||[]).filter(function(m){return m.topic!==t;});
+  db.userQs=(db.userQs||[]).filter(function(q){return !(q.topic===t&&q.teacherId===ME.id);});
+  db.topicsMeta=(db.topicsMeta||[]).filter(function(m){return !(m.topic===t&&m.teacherId===ME.id);});
   saveDB(db);
   renderQT();
 }
@@ -1238,7 +1365,7 @@ function saveTopicTimerMins(val){
 }
 
 function renderTopicDetail(t){
-  var qs=getAllQs().filter(function(q){return q.topic===t;});
+  var qs=getMyQsByTopic(t);
   var tbody=document.getElementById('q-detail-tbody');
   if(!tbody)return;
   // Store for index access
@@ -1269,14 +1396,14 @@ function deleteQByIdx(qi){ var q=window._detailQs[qi]; if(q) deleteQ(q.id); }
 function deleteQ(qid){
   if(!confirm('Savolni o\'chirasizmi?'))return;
   var db=getDB();
-  db.userQs=(db.userQs||[]).filter(function(q){return q.id!==qid;});
+  db.userQs=(db.userQs||[]).filter(function(q){return !(q.id===qid&&q.teacherId===ME.id);});
   saveDB(db);
   renderTopicDetail(_curTopicDetail);
   renderQT();
 }
 
 function editQ(qid,topic){
-  var qs=getAllQs();
+  var qs=getMyQs();
   var q=qs.find(function(x){return x.id===qid;});
   if(!q)return;
   
@@ -1342,7 +1469,24 @@ function closeEditQ(){
 }
 
 
-function openAddQ(){aqOpts=['','','',''];aqCorr=[];aqIsM=false;document.getElementById('aq-topic').value='';document.getElementById('aq-text').value='';document.getElementById('aq-qcount').value='';document.querySelector('input[name="aqtype"][value="single"]').checked=true;document.getElementById('aq-syms').innerHTML=SYMS.map(function(s){return '<button class="symb" onclick="insSym(\''+s+'\')">'+s+'</button>';}).join('');renderAQO();document.getElementById('aq-modal').style.display='flex';}
+function openAddQ(){
+  aqOpts=['','','',''];aqCorr=[];aqIsM=false;
+  document.getElementById('aq-topic').value='';
+  document.getElementById('aq-text').value='';
+  document.getElementById('aq-qcount').value='';
+  document.querySelector('input[name="aqtype"][value="single"]').checked=true;
+  var subjSel=document.getElementById('aq-subj');
+  if(!subjSel.options.length){subjSel.innerHTML=SUBJECTS.map(function(s){return '<option value="'+s.v+'">'+s.n+'</option>';}).join('');}
+  if(ME&&ME.subject)subjSel.value=ME.subject;
+  refreshSyms();
+  renderAQO();
+  document.getElementById('aq-modal').style.display='flex';
+}
+function refreshSyms(){
+  var subj=document.getElementById('aq-subj').value||'math';
+  var syms=SYMBOLS_BY_SUBJECT[subj]||SYMBOLS_BY_SUBJECT.math;
+  document.getElementById('aq-syms').innerHTML=syms.map(function(s){return '<button class="symb" onclick="insSym(\''+s+'\')">'+s+'</button>';}).join('');
+}
 function closeAQ(){document.getElementById('aq-modal').style.display='none';}
 document.querySelectorAll('input[name="aqtype"]').forEach(function(r){r.addEventListener('change',function(){aqIsM=this.value==='multi';aqCorr=[];renderAQO();});});
 function renderAQO(){document.getElementById('aq-opts').innerHTML=aqOpts.map(function(o,i){var s=aqCorr.indexOf(i)>=0;var ctrl=aqIsM?'<div class="csel'+(s?' on':'')+'\" onclick="tgC('+i+')">'+(s?'V':'')+'</div>':'<div class="rsel'+(s?' on':'')+'\" onclick="stC('+i+')"></div>';var rm=aqOpts.length>2?'<button class="btn bg bsm" onclick="rmO('+i+')" style="padding:6px 8px;flex-shrink:0">X</button>':'';return '<div class="or">'+ctrl+'<input value="'+o.replace(/"/g,'&quot;')+'" oninput="aqOpts['+i+']=this.value" placeholder="Variant '+String.fromCharCode(65+i)+'" style="flex:1">'+rm+'</div>';}).join('');}
@@ -1355,9 +1499,9 @@ function saveQ(){
   var topic=document.getElementById('aq-topic').value.trim(),text=document.getElementById('aq-text').value.trim(),subj=document.getElementById('aq-subj').value,qcount=parseInt(document.getElementById('aq-qcount').value)||null;
   if(!topic){alert("Mavzu kiriting!");return;}if(!text){alert("Savol matnini kiriting!");return;}
   var opts=aqOpts.filter(function(o){return o.trim();});if(opts.length<2){alert("Kamida 2 ta variant!");return;}if(!aqCorr.length){alert("To'g'ri javobni belgilang!");return;}
-  var q={id:Date.now(),subject:subj,topic:topic,text:text,options:opts,correct:aqCorr.filter(function(c){return c<opts.length;}),isMulti:aqIsM};
+  var q={id:Date.now(),subject:subj,topic:topic,text:text,options:opts,correct:aqCorr.filter(function(c){return c<opts.length;}),isMulti:aqIsM,teacherId:ME.id};
   var db=getDB();db.userQs=db.userQs||[];db.userQs.push(q);
-  if(qcount){db.topicsMeta=db.topicsMeta||[];var f=false;db.topicsMeta.forEach(function(m){if(m.topic===topic){m.questionsToAsk=qcount;f=true;}});if(!f)db.topicsMeta.push({topic:topic,questionsToAsk:qcount});}
+  if(qcount){db.topicsMeta=db.topicsMeta||[];var f=false;db.topicsMeta.forEach(function(m){if(m.topic===topic){m.questionsToAsk=qcount;f=true;}});if(!f)db.topicsMeta.push({topic:topic,questionsToAsk:qcount,teacherId:ME.id,subject:subj});}
   saveDB(db);closeAQ();renderQT();
 }
 function delQ(idx){if(idx<BQ.length){alert("Bu savol o'zgarmas!");return;}if(!confirm("O'chirasizmi?"))return;var db=getDB();db.userQs.splice(idx-BQ.length,1);saveDB(db);renderQT();}
@@ -1647,7 +1791,7 @@ document.getElementById('exe-inp').addEventListener('change',function(){if(this.
 document.getElementById('json-inp').addEventListener('change',function(){
   var f=this.files[0];if(!f)return;
   var reader=new FileReader();
-  reader.onload=function(e){try{var qs=JSON.parse(e.target.result);if(!Array.isArray(qs))throw 0;var db=getDB();db.userQs=(db.userQs||[]).concat(qs);saveDB(db);renderQT();alert(qs.length+" ta savol qo'shildi!");}catch(ex){alert("Xatolik: JSON format noto'g'ri");}};
+  reader.onload=function(e){try{var qs=JSON.parse(e.target.result);if(!Array.isArray(qs))throw 0;qs.forEach(function(q){q.teacherId=ME.id;if(!q.subject)q.subject=ME.subject||'math';});var db=getDB();db.userQs=(db.userQs||[]).concat(qs);saveDB(db);renderQT();alert(qs.length+" ta savol qo'shildi!");}catch(ex){alert("Xatolik: JSON format noto'g'ri");}};
   reader.readAsText(f);
 });
 
@@ -1656,12 +1800,13 @@ var RENDER_SERVER='https://edutest-server.onrender.com';
 function saveImportedQs(parsed,msg){
   var db=getDB();
   db.userQs=db.userQs||[];
-  db.userQs=db.userQs.filter(function(q){return q.topic!==parsed.topic;});
+  parsed.qs.forEach(function(q){q.teacherId=ME.id;if(!q.subject)q.subject=ME.subject||'math';});
+  db.userQs=db.userQs.filter(function(q){return !(q.topic===parsed.topic&&q.teacherId===ME.id);});
   db.userQs=db.userQs.concat(parsed.qs);
   db.topicsMeta=db.topicsMeta||[];
   var f=false;
-  db.topicsMeta.forEach(function(m){if(m.topic===parsed.topic){m.questionsToAsk=parsed.questionsToAsk;f=true;}});
-  if(!f)db.topicsMeta.push({topic:parsed.topic,questionsToAsk:parsed.questionsToAsk});
+  db.topicsMeta.forEach(function(m){if(m.topic===parsed.topic&&m.teacherId===ME.id){m.questionsToAsk=parsed.questionsToAsk;f=true;}});
+  if(!f)db.topicsMeta.push({topic:parsed.topic,questionsToAsk:parsed.questionsToAsk,teacherId:ME.id,subject:ME.subject||'math'});
   saveDB(db);renderQT();
   var imgCount=(parsed.qs||[]).filter(function(q){return q.img;}).length;
   msg.innerHTML='<div class="alt as">&#x2705; <strong>'+parsed.qs.length+' ta savol</strong>'+(imgCount?' ('+imgCount+' ta rasm bilan)':'')+' import qilindi: "<b>'+parsed.topic+'</b>" ('+parsed.questionsToAsk+' ta beriladi)</div>';
@@ -1850,7 +1995,7 @@ function toggleAiDetail(idx) {
 }
 
 function aiCheckTopic(topic) {
-  var qs = getAllQs().filter(function(q){ return q.topic === topic; });
+  var qs = getMyQsByTopic(topic);
   if (!qs.length) { alert('Savollar topilmadi!'); return; }
 
   var modal = document.getElementById('ai-modal');
