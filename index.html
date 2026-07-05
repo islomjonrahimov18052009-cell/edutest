@@ -152,20 +152,20 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       </div>
       <div id="form-li">
         <div class="fg"><label>Login</label><input type="text" id="li-u" placeholder="Login"></div>
-        <div class="fg"><label>Parol</label><input type="password" id="li-p" placeholder="Parol" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="li-p" placeholder="Parol" style="padding-right:38px" onkeydown="if(event.key==='Enter')doLogin()"><span onclick="togglePw('li-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
         <button class="btn bp bfw blg mt8" onclick="doLogin()">Kirish</button>
       </div>
       <div id="form-rg" style="display:none">
         <div class="fg"><label>Ism Familiya</label><input type="text" id="rg-n" placeholder="Masalan: Abror Karimov"></div>
         <div class="fg"><label>Login</label><input type="text" id="rg-u" placeholder="Foydalanuvchi nomi"></div>
-        <div class="fg"><label>Parol</label><input type="password" id="rg-p" placeholder="Parol"></div>
+        <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="rg-p" placeholder="Parol" style="padding-right:38px"><span onclick="togglePw('rg-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
         <div id="rg-cls-fg" class="fg">
           <label>Sinf</label>
           <select id="rg-cls"><option value="">-- Sinf tanlang --</option></select>
         </div>
         <div id="rg-code-fg" class="fg" style="display:none">
           <label>Admindan olingan maxfiy kod</label>
-          <input type="password" id="rg-code" placeholder="Admin bergan maxfiy kod">
+          <div style="position:relative"><input type="password" id="rg-code" placeholder="Admin bergan maxfiy kod" style="padding-right:38px"><span onclick="togglePw('rg-code',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div>
         </div>
         <button class="btn bpu bfw blg mt8" onclick="doRegister()">Ro'yxatdan o'tish</button>
       </div>
@@ -387,8 +387,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
       <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Standart "admin / 1234" parolini o'zgartirib qo'ying — bu ma'lumot ko'pchilikka ma'lum bo'lishi mumkin.</p>
-      <div class="fg"><label>Joriy parol</label><input type="password" id="pw-old" placeholder="Joriy parol"></div>
-      <div class="fg"><label>Yangi parol</label><input type="password" id="pw-new" placeholder="Yangi parol"></div>
+      <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="pw-old" placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('pw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+      <div class="fg"><label>Yangi parol</label><div style="position:relative"><input type="password" id="pw-new" placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('pw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
       <button class="btn bpu bsm" onclick="changeMyPassword()">Parolni yangilash</button>
       <div id="pw-msg"></div>
     </div>
@@ -507,8 +507,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     </div>
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
-      <div class="fg"><label>Joriy parol</label><input type="password" id="apw-old" placeholder="Joriy parol"></div>
-      <div class="fg"><label>Yangi parol</label><input type="password" id="apw-new" placeholder="Yangi parol"></div>
+      <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="apw-old" placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('apw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+      <div class="fg"><label>Yangi parol</label><div style="position:relative"><input type="password" id="apw-new" placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('apw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
       <button class="btn bpu bsm" onclick="changeMyPassword('apw')">Parolni yangilash</button>
       <div id="apw-msg"></div>
     </div>
@@ -729,6 +729,11 @@ document.addEventListener('keydown', function(e){
     }
   }
 });
+function togglePw(id,el){
+  var inp=document.getElementById(id);
+  if(inp.type==='password'){inp.type='text';el.innerHTML='&#x1F576;&#xFE0F;';}
+  else{inp.type='password';el.innerHTML='&#x1F441;';}
+}
 function goAuth(role){
   authRole=role;
   var isT=role==='teacher';
@@ -929,30 +934,34 @@ function renderQ(){
 }
 function goQ(d){S.idx=Math.max(0,Math.min(S.test.length-1,S.idx+d));renderQ();}
 function selAns(i){var q=S.test[S.idx],ans=(S.answers[S.idx]||[]).slice();if(q.isMulti){var x=ans.indexOf(i);if(x>=0)ans.splice(x,1);else ans.push(i);}else{ans=[i];}S.answers[S.idx]=ans;renderQ();}
-function submitTest(){
-  // Barcha savollarga javob berilganmi tekshir (faqat manual yakunlashda)
-  if(!arguments[0]) {
+function submitTest(forced){
+  if(!forced){
     var unanswered=[];
     S.test.forEach(function(q,i){
       if(!S.answers[i]||S.answers[i].length===0)unanswered.push(i);
     });
+    var msg='<h2 style="margin-bottom:10px">Testni yakunlaysizmi?</h2>';
     if(unanswered.length>0){
-      _ignoreBlur=true;
-      var nextUnanswered=unanswered.find(function(i){return i>S.idx;});
-      if(nextUnanswered===undefined)nextUnanswered=unanswered[0];
-      alert(unanswered.length+' ta savol javobsiz! '+(nextUnanswered+1)+'-savolga o\'tilmoqda...');
-      // alert() brauzerni fullscreen'dan avtomatik chiqarib yuboradi - qayta tiklaymiz
-      var _el=document.documentElement;
-      if(!document.fullscreenElement&&!document.webkitFullscreenElement){
-        if(_el.requestFullscreen)_el.requestFullscreen().catch(function(){});
-        else if(_el.webkitRequestFullscreen)_el.webkitRequestFullscreen();
-      }
-      setTimeout(function(){_ignoreBlur=false;},600);
-      S.idx=nextUnanswered;
-      renderQ();
-      return;
+      msg+='<div class="alt aw">'+unanswered.length+' ta savolga javob berilmagan!</div>';
     }
+    msg+=S.mode==='exam'
+      ? '<p class="ts" style="color:var(--ok);font-weight:600">Imtihon rejimi — natijangiz saqlanib qoladi.</p>'
+      : '<p class="ts tm">Sinov rejimi — natijalar saqlanmaydi.</p>';
+    document.getElementById('finish-modal-body').innerHTML=msg;
+    document.getElementById('finish-modal').style.display='flex';
+    return;
   }
+  closeFinishModal();
+  doSubmitTest();
+}
+function closeFinishModal(){
+  var m=document.getElementById('finish-modal');
+  if(m)m.style.display='none';
+}
+function confirmFinishTest(){
+  submitTest(true);
+}
+function doSubmitTest(){
   if(S.iv)clearInterval(S.iv);_backWarned=false;
   // To'liq ekrandan chiqish
   if(document.exitFullscreen)document.exitFullscreen();
@@ -1906,6 +1915,16 @@ history.pushState(null, '', location.href);
 </script>
 
   <!-- EDIT Q MODAL -->
+  <div class="mbg" id="finish-modal" style="display:none;z-index:300">
+    <div class="modal" style="max-width:420px;text-align:center">
+      <div id="finish-modal-body"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn bg bfw" onclick="closeFinishModal()">Bekor qilish</button>
+        <button class="btn bs bfw" onclick="confirmFinishTest()">Ha, yakunlash</button>
+      </div>
+    </div>
+  </div>
+
   <div class="mbg" id="eq-modal" style="display:none">
     <div class="modal" style="max-width:500px;width:95%">
       <div class="mh"><h3>Savolni tahrirlash</h3><button class="xb" onclick="closeEditQ()">&#x2715;</button></div>
