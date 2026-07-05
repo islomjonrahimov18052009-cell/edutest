@@ -134,6 +134,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <h3>Ustoz</h3><p class="ts tm">Kirish / Ro'yxatdan o'tish</p>
       </div>
     </div>
+    <div style="margin-top:18px">
+      <a href="javascript:void(0)" onclick="goAuth('admin')" style="font-size:12px;color:var(--mut);text-decoration:underline">Admin kirish</a>
+    </div>
   </div>
 </div>
 
@@ -161,8 +164,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
           <select id="rg-cls"><option value="">-- Sinf tanlang --</option></select>
         </div>
         <div id="rg-code-fg" class="fg" style="display:none">
-          <label>Ustoz maxfiy kodi</label>
-          <input type="password" id="rg-code" placeholder="Ustozdan olingan maxfiy kod">
+          <label>Admindan olingan maxfiy kod</label>
+          <input type="password" id="rg-code" placeholder="Admin bergan maxfiy kod">
         </div>
         <button class="btn bpu bfw blg mt8" onclick="doRegister()">Ro'yxatdan o'tish</button>
       </div>
@@ -454,6 +457,64 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   </div>
 </div>
 
+<!-- ADMIN PANEL -->
+<div class="pg" id="pg-admin">
+  <div class="tabs">
+    <button class="tab on" onclick="switchTab('ta-o',this);renderAdminOverview()">&#x1F4CA; Umumiy</button>
+    <button class="tab" onclick="switchTab('ta-r',this);renderAdminResults()">&#x1F4CB; Natijalar</button>
+    <button class="tab" onclick="switchTab('ta-e',this);renderAdminErrors()">&#x26A0; Xatolar tahlili</button>
+    <button class="tab" onclick="switchTab('ta-s',this);initAdminSettings()">&#x2699; Sozlamalar</button>
+  </div>
+
+  <div class="tc on" id="ta-o">
+    <div class="card">
+      <h2 style="margin-bottom:14px">Tizim ko'rsatkichlari</h2>
+      <div class="g4" id="admin-stats"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:10px">Ustozlar</h3>
+      <div style="overflow-x:auto"><table><thead><tr><th>Ism</th><th>Login</th></tr></thead><tbody id="admin-teachers-tbody"></tbody></table></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:10px">Mavzular bo'yicha savollar soni</h3>
+      <div style="overflow-x:auto"><table><thead><tr><th>Mavzu</th><th>Savollar soni</th></tr></thead><tbody id="admin-topics-tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="tc" id="ta-r">
+    <div class="card">
+      <h2 style="margin-bottom:10px">Barcha natijalar</h2>
+      <p class="ts tm" style="margin-bottom:12px">Faqat ko'rish uchun — bu yerdan hech narsani o'zgartirib bo'lmaydi.</p>
+      <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>O'quvchi</th><th>Sinf</th><th>Mavzu</th><th>Natija</th><th>Ball</th><th>Turi</th><th>Sana</th></tr></thead><tbody id="admin-results-tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="tc" id="ta-e">
+    <div class="card">
+      <h2 style="margin-bottom:6px">Eng ko'p xato qilingan savollar</h2>
+      <p class="ts tm" style="margin-bottom:12px">Barcha o'quvchilar natijalari asosida hisoblangan. Ko'p xato qilingan savol — noto'g'ri kalit yoki qiyin savol belgisi bo'lishi mumkin.</p>
+      <div id="admin-errors-list"></div>
+    </div>
+  </div>
+
+  <div class="tc" id="ta-s">
+    <div class="card">
+      <h3 style="margin-bottom:8px">&#x1F511; Ustoz royxatdan otish kodi</h3>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Yangi ustozlar royxatdan otganda shu kodni kiritishlari kerak. Faqat siz (admin) bu kodni koʻra va oʻzgartira olasiz.</p>
+      <div class="fg"><label>Joriy kod</label><input type="text" id="admin-tcode" placeholder="Maxfiy kod"></div>
+      <button class="btn bpu bsm" onclick="saveTeacherCode()">Kodni saqlash</button>
+      <div id="admin-tcode-msg"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
+      <div class="fg"><label>Joriy parol</label><input type="password" id="apw-old" placeholder="Joriy parol"></div>
+      <div class="fg"><label>Yangi parol</label><input type="password" id="apw-new" placeholder="Yangi parol"></div>
+      <button class="btn bpu bsm" onclick="changeMyPassword('apw')">Parolni yangilash</button>
+      <div id="apw-msg"></div>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <!-- ADD Q MODAL -->
@@ -561,7 +622,21 @@ async function sbPull() {
 
 // ─── LOCAL DB ─────────────────────────────────────────────────────────────────
 function localGetDB() {
-  try { var r = localStorage.getItem(SK); if (r) return JSON.parse(r); } catch(e) {}
+  try {
+    var r = localStorage.getItem(SK);
+    if (r) {
+      var db = JSON.parse(r);
+      var changed = false;
+      if (!db.users) { db.users = []; changed = true; }
+      if (!db.users.some(function(u){return u.role==='admin';})) {
+        db.users.push({id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:'admin123',cls:''});
+        changed = true;
+      }
+      if (!db.teacherCode) { db.teacherCode = 'USTOZ-2026-MAKTAB'; changed = true; }
+      if (changed) { try { localStorage.setItem(SK, JSON.stringify(db)); } catch(e) {} }
+      return db;
+    }
+  } catch(e) {}
   return defDB();
 }
 
@@ -570,7 +645,14 @@ function getDB() {
 }
 
 function defDB() {
-  return { users: [{id:'t1',role:'teacher',name:'Admin',login:'admin',pass:'1234',cls:''}], classes: ['5A','5B','6A','6B','7A','7B','8A','8B','9A','9B','10A','10B','11A','11B'], userQs: [], topicsMeta: [], results: [], v: 0 };
+  return { users: [
+      {id:'t1',role:'teacher',name:'Admin',login:'admin',pass:'1234',cls:''},
+      {id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:'admin123',cls:''}
+    ],
+    classes: ['5A','5B','6A','6B','7A','7B','8A','8B','9A','9B','10A','10B','11A','11B'],
+    userQs: [], topicsMeta: [], results: [], v: 0,
+    teacherCode: 'USTOZ-2026-MAKTAB'
+  };
 }
 
 function saveDB(db) {
@@ -619,10 +701,12 @@ var authRole='student';
 function goAuth(role){
   authRole=role;
   var isT=role==='teacher';
-  document.getElementById('auth-title').textContent=isT?'Ustoz':"O'quvchi";
-  document.getElementById('auth-sub').textContent=isT?'Ustoz paneli':"Test ishlash";
+  var isA=role==='admin';
+  document.getElementById('auth-title').textContent=isA?'Admin':(isT?'Ustoz':"O'quvchi");
+  document.getElementById('auth-sub').textContent=isA?'Boshqaruv paneli':(isT?'Ustoz paneli':"Test ishlash");
   document.getElementById('rg-cls-fg').style.display=isT?'none':'block';
   document.getElementById('rg-code-fg').style.display=isT?'block':'none';
+  document.getElementById('tab-rg').style.display=isA?'none':'flex';
   document.getElementById('auth-err').innerHTML='';
   var db=getDB();
   var sel=document.getElementById('rg-cls');
@@ -649,34 +733,33 @@ function doLogin(){
   if(!found){showErr("Login yoki parol noto'g'ri!");return;}
   ME=found;afterLogin();
 }
-// Ustoz sifatida royxatdan otish uchun maxfiy kod.
-// MUHIM: shu qatordagi kodni ozingiz biladigan boshqa sozga almashtiring!
-var TEACHER_SECRET_CODE = 'USTOZ-2026-MAKTAB';
-
 function doRegister(){
   var name=document.getElementById('rg-n').value.trim();
   var user=document.getElementById('rg-u').value.trim();
   var pass=document.getElementById('rg-p').value;
   var cls=authRole==='student'?document.getElementById('rg-cls').value:'';
+  if(authRole==='admin'){showErr("Admin sifatida royxatdan otib bolmaydi.");return;}
   if(!name){showErr("Ism familiya kiriting!");return;}
   if(!user){showErr("Login kiriting!");return;}
   if(!pass){showErr("Parol kiriting!");return;}
   if(authRole==='student'&&!cls){showErr("Sinf tanlang!");return;}
+  var db=getDB();
   if(authRole==='teacher'){
     var code=document.getElementById('rg-code').value.trim();
-    if(code!==TEACHER_SECRET_CODE){showErr("Maxfiy kod noto'g'ri! Ustoz sifatida royxatdan otish uchun to'g'ri kod kerak.");return;}
+    var realCode=db.teacherCode||'USTOZ-2026-MAKTAB';
+    if(code!==realCode){showErr("Maxfiy kod noto'g'ri! Ustoz sifatida royxatdan otish uchun admindan kod so'rang.");return;}
   }
-  var db=getDB();
   var dup=db.users.filter(function(x){return x.login===user;});
   if(dup.length){showErr("Bu login band! Boshqa login tanlang.");return;}
   var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls};
   db.users.push(nu);saveDB(db);ME=nu;afterLogin();
 }
 function afterLogin(){
-  document.getElementById('nav-user').textContent=ME.name+(ME.cls?' - '+ME.cls:'')+(ME.role==='teacher'?' (Ustoz)':'');
+  document.getElementById('nav-user').textContent=ME.name+(ME.cls?' - '+ME.cls:'')+(ME.role==='teacher'?' (Ustoz)':ME.role==='admin'?' (Admin)':'');
   document.getElementById('btn-out').style.display='inline-flex';
   document.getElementById('auth-err').innerHTML='';
-  if(ME.role==='teacher'){showPg('pg-teacher');renderQT();}
+  if(ME.role==='admin'){showPg('pg-admin');initAdmin();}
+  else if(ME.role==='teacher'){showPg('pg-teacher');renderQT();}
   else{selTopic=null;showPg('pg-topic');renderTopics();loadMyHist();}
 }
 var _logoutWarned = false;
@@ -1110,10 +1193,11 @@ function showProg(enc){
 function addCls(){var c=prompt("Sinf nomini kiriting:");if(!c||!c.trim())return;var db=getDB();if(db.classes.indexOf(c.trim())<0){db.classes.push(c.trim());saveDB(db);loadClasses();}}
 function delCls(enc){var c=decodeURIComponent(enc);if(!confirm(c+" o'chirasizmi?"))return;var db=getDB();db.classes=db.classes.filter(function(x){return x!==c;});saveDB(db);loadClasses();document.getElementById('prog-panel').style.display='none';}
 
-function changeMyPassword(){
-  var oldP=document.getElementById('pw-old').value;
-  var newP=document.getElementById('pw-new').value;
-  var msg=document.getElementById('pw-msg');
+function changeMyPassword(prefix){
+  prefix=prefix||'pw';
+  var oldP=document.getElementById(prefix+'-old').value;
+  var newP=document.getElementById(prefix+'-new').value;
+  var msg=document.getElementById(prefix+'-msg');
   if(!oldP||!newP){msg.innerHTML='<div class="alt ar mt8">Ikkala maydonni ham toldiring!</div>';return;}
   if(oldP!==ME.pass){msg.innerHTML='<div class="alt ar mt8">Joriy parol notogri!</div>';return;}
   if(newP.length<4){msg.innerHTML='<div class="alt ar mt8">Yangi parol kamida 4 belgi bolsin!</div>';return;}
@@ -1121,10 +1205,78 @@ function changeMyPassword(){
   db.users.forEach(function(u){if(u.id===ME.id)u.pass=newP;});
   saveDB(db);
   ME.pass=newP;
-  document.getElementById('pw-old').value='';
-  document.getElementById('pw-new').value='';
+  document.getElementById(prefix+'-old').value='';
+  document.getElementById(prefix+'-new').value='';
   msg.innerHTML='<div class="alt as mt8">Parol muvaffaqiyatli yangilandi!</div>';
 }
+function initAdmin(){
+  renderAdminOverview();
+}
+function renderAdminOverview(){
+  var db=getDB();
+  var teachers=db.users.filter(function(u){return u.role==='teacher';});
+  var students=db.users.filter(function(u){return u.role==='student';});
+  var qs=getAllQs();
+  var results=db.results||[];
+  var exam=results.filter(function(r){return r.mode==='exam';});
+  var avg=exam.length?Math.round(exam.reduce(function(a,r){return a+r.pct;},0)/exam.length):0;
+  document.getElementById('admin-stats').innerHTML=
+    '<div class="sc"><div class="sn">'+teachers.length+'</div><div class="sl">Ustozlar</div></div>'+
+    '<div class="sc"><div class="sn">'+students.length+'</div><div class="sl">O\'quvchilar</div></div>'+
+    '<div class="sc"><div class="sn">'+qs.length+'</div><div class="sl">Savollar</div></div>'+
+    '<div class="sc"><div class="sn">'+exam.length+'</div><div class="sl">Imtihonlar</div></div>'+
+    '<div class="sc"><div class="sn">'+avg+'%</div><div class="sl">O\'rtacha ball</div></div>'+
+    '<div class="sc"><div class="sn">'+(db.classes||[]).length+'</div><div class="sl">Sinflar</div></div>';
+  document.getElementById('admin-teachers-tbody').innerHTML=teachers.map(function(t){
+    return '<tr><td>'+t.name+'</td><td class="ts tm">'+t.login+'</td></tr>';
+  }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--mut)">Ustozlar yoq</td></tr>';
+  var topics=getTopics();
+  document.getElementById('admin-topics-tbody').innerHTML=topics.map(function(t){
+    return '<tr><td class="ts">'+t+'</td><td>'+getQsByTopic(t).length+'</td></tr>';
+  }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--mut)">Mavzular yoq</td></tr>';
+}
+function renderAdminResults(){
+  var db=getDB(),res=(db.results||[]).slice().reverse();
+  document.getElementById('admin-results-tbody').innerHTML=res.slice(0,300).map(function(r,i){
+    var bc=r.pct>=70?'bgr':r.pct>=50?'byl':'brd';var c=r.cls||r.class||'';
+    return '<tr><td>'+(i+1)+'</td><td><strong>'+r.student+'</strong></td><td>'+c+'</td><td class="ts">'+r.topic+'</td><td>'+r.correct+'/'+r.total+'</td><td><span class="bdg '+bc+'">'+r.pct+'%</span></td><td><span class="bdg '+(r.mode==='exam'?'bbl':'bgy')+'">'+(r.mode==='exam'?'Imtihon':'Sinov')+'</span></td><td class="ts tm">'+r.date+'</td></tr>';
+  }).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--mut)">Natijalar yoq</td></tr>';
+}
+function renderAdminErrors(){
+  var db=getDB(),res=db.results||[];
+  var stats={}; // text -> {topic, wrong, total}
+  res.forEach(function(r){
+    (r.details||[]).forEach(function(d){
+      var key=(r.topic||'')+'||'+(d.text||'');
+      if(!stats[key])stats[key]={topic:r.topic,text:d.text,wrong:0,total:0};
+      stats[key].total++;
+      if(!d.ok)stats[key].wrong++;
+    });
+  });
+  var arr=Object.keys(stats).map(function(k){return stats[k];})
+    .filter(function(s){return s.total>=2 && s.wrong>0;})
+    .map(function(s){s.rate=Math.round(s.wrong/s.total*100);return s;})
+    .sort(function(a,b){return b.rate-a.rate || b.wrong-a.wrong;})
+    .slice(0,40);
+  document.getElementById('admin-errors-list').innerHTML=arr.map(function(s){
+    var col=s.rate>=70?'var(--err)':s.rate>=40?'var(--warn)':'var(--mut)';
+    return '<div class="pd"><div class="fx between" style="margin-bottom:4px"><span class="ts tm">'+_aiEsc(s.topic||'')+'</span><span class="bdg" style="background:'+col+';color:#fff">'+s.rate+'% xato</span></div>'+
+      '<div style="font-size:14px">'+_aiEsc((s.text||'(rasm/formula)').substring(0,120))+'</div>'+
+      '<div class="ts tm" style="margin-top:4px">'+s.wrong+' / '+s.total+' o\'quvchi notogri javob bergan</div></div>';
+  }).join('')||'<p class="ts tm">Hali yetarli malumot yoq (kamida 2 marta ishlangan savollar korsatiladi)</p>';
+}
+function initAdminSettings(){
+  var db=getDB();
+  document.getElementById('admin-tcode').value=db.teacherCode||'USTOZ-2026-MAKTAB';
+}
+function saveTeacherCode(){
+  var v=document.getElementById('admin-tcode').value.trim();
+  var msg=document.getElementById('admin-tcode-msg');
+  if(v.length<4){msg.innerHTML='<div class="alt ar mt8">Kod kamida 4 belgidan iborat bolsin!</div>';return;}
+  var db=getDB();db.teacherCode=v;saveDB(db);
+  msg.innerHTML='<div class="alt as mt8">Kod saqlandi! Yangi ustozlar shu kodni kiritishi kerak.</div>';
+}
+
 function initSettings(){
   var db=getDB();
   document.getElementById('cls-inp').value=(db.classes||[]).join(',');
