@@ -500,9 +500,13 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   <div class="tc" id="ta-s">
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F511; Ustoz royxatdan otish kodi</h3>
-      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Yangi ustozlar royxatdan otganda shu kodni kiritishlari kerak. Faqat siz (admin) bu kodni koʻra va oʻzgartira olasiz.</p>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Bu kod <b>bir martalik</b> — bitta kod bilan faqat bitta ustoz royxatdan ota oladi. Ishlatilgach, avtomatik bekor bo'ladi va yangi ustoz uchun yangi kod yaratishingiz kerak boladi.</p>
+      <div id="admin-tcode-status" style="margin-bottom:10px"></div>
       <div class="fg"><label>Joriy kod</label><input type="text" id="admin-tcode" placeholder="Maxfiy kod"></div>
-      <button class="btn bpu bsm" onclick="saveTeacherCode()">Kodni saqlash</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn bpu bsm" onclick="saveTeacherCode()">Shu kodni saqlash</button>
+        <button class="btn bg bsm" onclick="genRandomTeacherCode()">&#x1F3B2; Tasodifiy murakkab kod yaratish</button>
+      </div>
       <div id="admin-tcode-msg"></div>
     </div>
     <div class="card">
@@ -632,7 +636,8 @@ function localGetDB() {
         db.users.push({id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:'admin123',cls:''});
         changed = true;
       }
-      if (!db.teacherCode) { db.teacherCode = 'USTOZ-2026-MAKTAB'; changed = true; }
+      if (!db.teacherCode) { db.teacherCode = genTeacherCode(); db.teacherCodeUsed = false; changed = true; }
+      if (typeof db.teacherCodeUsed === 'undefined') { db.teacherCodeUsed = false; changed = true; }
       if (changed) { try { localStorage.setItem(SK, JSON.stringify(db)); } catch(e) {} }
       return db;
     }
@@ -644,6 +649,23 @@ function getDB() {
   return localGetDB();
 }
 
+function genTeacherCode(){
+  // Har bir belgi mustaqil, teng ehtimollik bilan tanlanadi - qattiq qolip yoq
+  var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; // I,O,0,1,l chalkashmasin uchun olib tashlangan
+  var rnd;
+  if(window.crypto&&window.crypto.getRandomValues){
+    var arr=new Uint32Array(16);
+    window.crypto.getRandomValues(arr);
+    rnd=function(i){return arr[i]/4294967296;};
+  } else {
+    rnd=function(){return Math.random();};
+  }
+  var s='';
+  for(var i=0;i<16;i++){
+    s+=chars[Math.floor(rnd(i)*chars.length)];
+  }
+  return 'USTOZ-'+s;
+}
 function defDB() {
   return { users: [
       {id:'t1',role:'teacher',name:'Admin',login:'admin',pass:'1234',cls:''},
@@ -651,7 +673,8 @@ function defDB() {
     ],
     classes: ['5A','5B','6A','6B','7A','7B','8A','8B','9A','9B','10A','10B','11A','11B'],
     userQs: [], topicsMeta: [], results: [], v: 0,
-    teacherCode: 'USTOZ-2026-MAKTAB'
+    teacherCode: genTeacherCode(),
+    teacherCodeUsed: false
   };
 }
 
@@ -781,14 +804,17 @@ function doRegister(){
   if(authRole==='student'&&!cls){showErr("Sinf tanlang!");return;}
   var db=getDB();
   if(authRole==='teacher'){
+    if(db.teacherCodeUsed){showErr("Bu kod allaqachon ishlatilgan! Yangi kod olish uchun admin bilan boglaning.");return;}
     var code=document.getElementById('rg-code').value.trim();
-    var realCode=db.teacherCode||'USTOZ-2026-MAKTAB';
+    var realCode=db.teacherCode||'';
     if(code!==realCode){showErr("Maxfiy kod noto'g'ri! Ustoz sifatida royxatdan otish uchun admindan kod so'rang.");return;}
   }
   var dup=db.users.filter(function(x){return x.login===user;});
   if(dup.length){showErr("Bu login band! Boshqa login tanlang.");return;}
   var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls};
-  db.users.push(nu);saveDB(db);ME=nu;afterLogin();
+  db.users.push(nu);
+  if(authRole==='teacher'){db.teacherCodeUsed=true;}
+  saveDB(db);ME=nu;afterLogin();
 }
 function afterLogin(){
   document.getElementById('nav-user').textContent=ME.name+(ME.cls?' - '+ME.cls:'')+(ME.role==='teacher'?' (Ustoz)':ME.role==='admin'?' (Admin)':'');
@@ -1313,14 +1339,26 @@ function renderAdminErrors(){
 }
 function initAdminSettings(){
   var db=getDB();
-  document.getElementById('admin-tcode').value=db.teacherCode||'USTOZ-2026-MAKTAB';
+  document.getElementById('admin-tcode').value=db.teacherCode||'';
+  var stEl=document.getElementById('admin-tcode-status');
+  stEl.innerHTML=db.teacherCodeUsed
+    ? '<span class="bdg brd">Ishlatilgan &#8212; yangi kod yarating</span>'
+    : '<span class="bdg bgr">Faol &#8212; hali ishlatilmagan</span>';
 }
 function saveTeacherCode(){
   var v=document.getElementById('admin-tcode').value.trim();
   var msg=document.getElementById('admin-tcode-msg');
   if(v.length<4){msg.innerHTML='<div class="alt ar mt8">Kod kamida 4 belgidan iborat bolsin!</div>';return;}
-  var db=getDB();db.teacherCode=v;saveDB(db);
-  msg.innerHTML='<div class="alt as mt8">Kod saqlandi! Yangi ustozlar shu kodni kiritishi kerak.</div>';
+  var db=getDB();db.teacherCode=v;db.teacherCodeUsed=false;saveDB(db);
+  msg.innerHTML='<div class="alt as mt8">Kod saqlandi va faollashtirildi! Faqat 1 ta ustoz shu kod bilan royxatdan ota oladi.</div>';
+  initAdminSettings();
+}
+function genRandomTeacherCode(){
+  var v=genTeacherCode();
+  document.getElementById('admin-tcode').value=v;
+  var db=getDB();db.teacherCode=v;db.teacherCodeUsed=false;saveDB(db);
+  document.getElementById('admin-tcode-msg').innerHTML='<div class="alt as mt8">Yangi murakkab kod yaratildi va saqlandi!</div>';
+  initAdminSettings();
 }
 
 function initSettings(){
