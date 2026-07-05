@@ -24,6 +24,8 @@ body{font-family:'Inter',system-ui,sans-serif;color:var(--txt);min-height:100vh;
 body{background:linear-gradient(125deg,#151b3d,#2a1f5c 30%,#5b3ea6 55%,#7c4fc9 70%,#2a1f5c 100%);background-size:280% 280%;animation:bgShift 24s ease-in-out infinite}
 @keyframes bgShift{0%,100%{background-position:0% 30%}50%{background-position:100% 70%}}
 #mathBg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+#heroArt{position:fixed;left:0;right:0;bottom:0;height:38vh;min-height:280px;z-index:-2;pointer-events:none}
+#heroArt svg{width:100%;height:100%;display:block}
 #mathBg span{position:absolute;color:rgba(255,255,255,.16);font-family:'Space Grotesk',sans-serif;font-weight:600;user-select:none;animation:floatSym linear infinite}
 @keyframes floatSym{
   0%{transform:translateY(8vh) translateX(0) rotate(0deg);opacity:0}
@@ -126,6 +128,60 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 </head>
 <body>
 <div id="mathBg"></div>
+<div id="heroArt" aria-hidden="true">
+<svg viewBox="0 0 1600 420" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd873" stop-opacity=".9"/>
+      <stop offset="60%" stop-color="#f0b429" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#f0b429" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- yulduzchalar -->
+  <g fill="#fff" opacity=".55">
+    <circle cx="120" cy="60" r="2.5"/><circle cx="260" cy="110" r="2"/><circle cx="520" cy="50" r="2"/>
+    <circle cx="720" cy="95" r="2.5"/><circle cx="950" cy="45" r="2"/><circle cx="1080" cy="120" r="2"/>
+    <circle cx="1480" cy="70" r="2.5"/><circle cx="1560" cy="140" r="2"/>
+  </g>
+  <!-- quyosh -->
+  <circle cx="1320" cy="95" r="120" fill="url(#sunGlow)"/>
+  <circle cx="1320" cy="95" r="46" fill="#ffd873" opacity=".85"/>
+  <!-- orqa tepalik -->
+  <path d="M0,270 C220,210 380,255 600,225 C830,195 1000,245 1220,210 C1380,185 1500,215 1600,205 L1600,420 L0,420 Z" fill="#5b3ea6" opacity=".38"/>
+  <!-- old tepalik -->
+  <path d="M0,330 C260,290 460,335 700,305 C940,275 1140,320 1400,290 C1480,280 1540,295 1600,288 L1600,420 L0,420 Z" fill="#2a1f5c" opacity=".55"/>
+  <!-- ochiq kitob -->
+  <g transform="translate(830,300)" opacity=".85">
+    <path d="M0,0 C-45,-14 -85,-8 -85,10 L-85,42 C-45,26 0,32 0,46 Z" fill="#fff"/>
+    <path d="M0,0 C45,-14 85,-8 85,10 L85,42 C45,26 0,32 0,46 Z" fill="#f3eefc"/>
+    <path d="M-70,10 L-15,20 M-70,20 L-15,28 M-70,30 L-15,36" stroke="#c9bdf2" stroke-width="2" fill="none"/>
+    <path d="M70,10 L15,20 M70,20 L15,28 M70,30 L15,36" stroke="#c9bdf2" stroke-width="2" fill="none"/>
+  </g>
+  <!-- raketa -->
+  <g transform="translate(230,235) rotate(-18)" opacity=".9">
+    <path d="M0,-58 C18,-30 18,10 0,26 C-18,10 -18,-30 0,-58 Z" fill="#fff"/>
+    <circle cx="0" cy="-16" r="9" fill="#5b3ea6"/>
+    <path d="M-14,10 L-30,32 L-6,22 Z" fill="#f0b429"/>
+    <path d="M14,10 L30,32 L6,22 Z" fill="#f0b429"/>
+    <path d="M-7,26 C-7,42 7,42 7,26 Z" fill="#e8683c" opacity=".8"/>
+  </g>
+  <!-- qalam -->
+  <g transform="translate(1120,255) rotate(38)" opacity=".85">
+    <rect x="-10" y="-55" width="20" height="80" rx="4" fill="#f0b429"/>
+    <path d="M-10,-55 L10,-55 L0,-75 Z" fill="#f6dca0"/>
+    <rect x="-2" y="-75" width="4" height="8" fill="#3d2c73"/>
+    <rect x="-10" y="25" width="20" height="14" rx="4" fill="#e8683c"/>
+  </g>
+  <!-- bitiruv shapkasi -->
+  <g transform="translate(480,355)" opacity=".85">
+    <rect x="-22" y="0" width="44" height="18" rx="3" fill="#fff"/>
+    <path d="M-46,-8 L0,-24 L46,-8 L0,8 Z" fill="#fff"/>
+    <circle cx="0" cy="-8" r="4" fill="#f0b429"/>
+    <path d="M38,-6 L44,20" stroke="#f0b429" stroke-width="2.5" fill="none"/>
+    <circle cx="44" cy="22" r="4" fill="#f0b429"/>
+  </g>
+</svg>
+</div>
 <nav class="nav">
   <div class="logo">&#x1F4DA; EduTest Pro</div>
   <div class="nav-r">
@@ -885,10 +941,13 @@ function safeLogout(){
   logout();
 }
 function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
-  // To'liq ekrandan chiqish
-  if(document.exitFullscreen)document.exitFullscreen();
-  else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
-  else if(document.mozCancelFullScreen)document.mozCancelFullScreen();document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
+  // To'liq ekrandan chiqish - faqat haqiqatan fullscreen bolsa
+  if(document.fullscreenElement||document.webkitFullscreenElement){
+    if(document.exitFullscreen)document.exitFullscreen().catch(function(){});
+    else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+    else if(document.mozCancelFullScreen)document.mozCancelFullScreen();
+  }
+  document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
 
 function renderTopics(){
   var topics=getTopics();
@@ -968,10 +1027,7 @@ function startTest(mode){
   renderQ();showPg('pg-test');startTimer();
 }
 function startTimer(){if(S.iv)clearInterval(S.iv);_backWarned=false;
-  // To'liq ekrandan chiqish
-  if(document.exitFullscreen)document.exitFullscreen();
-  else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
-  else if(document.mozCancelFullScreen)document.mozCancelFullScreen();updTmr();if(S.timeLeft>0){S.iv=setInterval(function(){S.timeLeft--;updTmr();if(S.timeLeft<=0){clearInterval(S.iv);submitTest();}},1000);}else{var tel=document.getElementById('t-tmr');if(tel)tel.style.display='none';}}
+  updTmr();if(S.timeLeft>0){S.iv=setInterval(function(){S.timeLeft--;updTmr();if(S.timeLeft<=0){clearInterval(S.iv);submitTest();}},1000);}else{var tel=document.getElementById('t-tmr');if(tel)tel.style.display='none';}}
 function updTmr(){var el=document.getElementById('t-tmr');if(!el)return;var m=Math.floor(S.timeLeft/60),s=S.timeLeft%60;el.textContent=m+':'+(s<10?'0'+s:s);el.className=S.timeLeft<=60?'tmr red':'tmr';}
 function renderQ(){
   var q=S.test[S.idx],ans=S.answers[S.idx]||[],isLast=S.idx===S.test.length-1;
@@ -1030,10 +1086,12 @@ function confirmFinishTest(){
 }
 function doSubmitTest(){
   if(S.iv)clearInterval(S.iv);_backWarned=false;
-  // To'liq ekrandan chiqish
-  if(document.exitFullscreen)document.exitFullscreen();
-  else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
-  else if(document.mozCancelFullScreen)document.mozCancelFullScreen();
+  // To'liq ekrandan chiqish - faqat haqiqatan fullscreen bolsa
+  if(document.fullscreenElement||document.webkitFullscreenElement){
+    if(document.exitFullscreen)document.exitFullscreen().catch(function(){});
+    else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+    else if(document.mozCancelFullScreen)document.mozCancelFullScreen();
+  }
   var correct=0,details=S.test.map(function(q,i){var ans=S.answers[i]||[],right=q.shuffledCorrect,ok=right.length>0&&right.every(function(r){return ans.indexOf(r)>=0;})&&ans.every(function(a){return right.indexOf(a)>=0;})&&ans.length>0;if(ok)correct++;return{text:q.text,options:q.options,userAns:ans,correct:right,ok:ok,img:q.img||q.image||''};});
   var pct=Math.round(correct/S.test.length*100);
   var res={student:ME.name,cls:ME.cls,topic:selTopic,mode:S.mode,correct:correct,total:S.test.length,pct:pct,date:new Date().toLocaleDateString('uz-UZ'),time:new Date().toLocaleTimeString('uz-UZ'),details:details};
