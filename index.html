@@ -121,7 +121,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 <div class="pg on" id="pg-home">
   <div class="card" style="text-align:center;padding:36px 20px;position:relative;overflow:hidden;background-image:repeating-linear-gradient(0deg,rgba(37,49,109,.035) 0 1px,transparent 1px 24px),repeating-linear-gradient(90deg,rgba(37,49,109,.035) 0 1px,transparent 1px 24px)">
     <div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--pri),var(--purd),var(--accent))"></div>
-    <div style="font-size:52px;margin-bottom:10px">&#x1F4DA;</div>
+    <div style="font-size:52px;margin-bottom:10px;cursor:default;user-select:none" onclick="_logoTap()">&#x1F4DA;</div>
     <h1 style="margin-bottom:8px">EduTest Pro</h1>
     <p class="tm" style="margin-bottom:24px">Maktab o'quvchilari uchun test platformasi</p>
     <div class="rc">
@@ -133,9 +133,6 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <div class="ic">&#x1F468;&#x200D;&#x1F3EB;</div>
         <h3>Ustoz</h3><p class="ts tm">Kirish / Ro'yxatdan o'tish</p>
       </div>
-    </div>
-    <div style="margin-top:18px">
-      <a href="javascript:void(0)" onclick="goAuth('admin')" style="font-size:12px;color:var(--mut);text-decoration:underline">Admin kirish</a>
     </div>
   </div>
 </div>
@@ -698,6 +695,16 @@ function showPg(id){document.querySelectorAll('.pg').forEach(function(p){p.class
 function switchTab(id,el){document.querySelectorAll('.tc').forEach(function(t){t.classList.remove('on');});document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});document.getElementById(id).classList.add('on');el.classList.add('on');}
 
 var authRole='student';
+var _logoTaps=[];
+function _logoTap(){
+  var now=Date.now();
+  _logoTaps.push(now);
+  _logoTaps=_logoTaps.filter(function(t){return now-t<2500;});
+  if(_logoTaps.length>=5){
+    _logoTaps=[];
+    goAuth('admin');
+  }
+}
 function goAuth(role){
   authRole=role;
   var isT=role==='teacher';
