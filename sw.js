@@ -1,5 +1,5 @@
-const CACHE = 'edutest-v1';
-const FILES = ['/', '/index.html'];
+const CACHE = 'edutest-v2';
+const FILES = ['./', './index.html'];
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
