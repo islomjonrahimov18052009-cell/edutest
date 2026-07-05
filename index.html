@@ -20,8 +20,27 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#eef1f7;--card:#fff;--pri:#25316d;--purd:#5b3ea6;--ok:#15803d;--err:#b91c1c;--warn:#b45309;--accent:#f0b429;--txt:#111827;--mut:#64748b;--bdr:#dbe1ea;--r:14px}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased}
-.nav{background:linear-gradient(120deg,#1b2452,#3d2c73);background-image:linear-gradient(120deg,#1b2452,#3d2c73),repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 1px,transparent 1px 26px),repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 26px);color:#fff;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 14px rgba(15,23,42,.25)}
+body{font-family:'Inter',system-ui,sans-serif;color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;position:relative;overflow-x:hidden}
+body{background:linear-gradient(125deg,#151b3d,#2a1f5c 30%,#5b3ea6 55%,#7c4fc9 70%,#2a1f5c 100%);background-size:280% 280%;animation:bgShift 24s ease-in-out infinite}
+@keyframes bgShift{0%,100%{background-position:0% 30%}50%{background-position:100% 70%}}
+#mathBg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+#mathBg span{position:absolute;color:rgba(255,255,255,.16);font-family:'Space Grotesk',sans-serif;font-weight:600;user-select:none;animation:floatSym linear infinite}
+@keyframes floatSym{
+  0%{transform:translateY(8vh) translateX(0) rotate(0deg);opacity:0}
+  8%{opacity:1}
+  92%{opacity:1}
+  100%{transform:translateY(-110vh) translateX(var(--sway)) rotate(var(--spin));opacity:0}
+}
+@media (prefers-reduced-motion:reduce){body{animation:none}#mathBg span{animation:none;opacity:0}}
+@keyframes confettiFall{
+  0%{transform:translate(0,0) rotate(0deg);opacity:1}
+  100%{transform:translate(var(--drift),105vh) rotate(var(--rot));opacity:.4}
+}
+.card{background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:var(--r);border:1px solid rgba(255,255,255,.6);padding:20px;margin-bottom:14px;box-shadow:0 8px 30px -8px rgba(21,27,61,.35),0 1px 3px rgba(0,0,0,.06)}
+.pg{display:none;animation:pgIn .35s ease}
+.pg.on{display:block}
+@keyframes pgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.nav{background:rgba(21,27,61,.55);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:#fff;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 20px rgba(15,23,42,.3);border-bottom:1px solid rgba(255,255,255,.12)}
 .logo{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;letter-spacing:-.2px}
 .nav-r{display:flex;gap:8px;align-items:center;font-size:13px}
 .main{max-width:860px;margin:0 auto;padding:20px 14px}
@@ -65,7 +84,6 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 .alt{padding:11px 14px;border-radius:9px;font-size:13px;margin-bottom:12px;font-weight:500}
 .ai{background:#dbeafe;color:#1e40af}.as{background:#dcfce7;color:#166534}
 .aw{background:#fef3c7;color:#92400e}.ar{background:#fee2e2;color:#991b1b}
-.pg{display:none}.pg.on{display:block}
 .tc{display:none}.tc.on{display:block}
 .mbg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
 .modal{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
@@ -107,6 +125,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 </style>
 </head>
 <body>
+<div id="mathBg"></div>
 <nav class="nav">
   <div class="logo">&#x1F4DA; EduTest Pro</div>
   <div class="nav-r">
@@ -649,6 +668,28 @@ function getDB() {
   return localGetDB();
 }
 
+// ── SUZUVCHI MATEMATIK BELGILAR (fon dizayni) ──────────────────────────────
+function initMathBg(){
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var host=document.getElementById('mathBg');
+  if(!host)return;
+  var symbols=['π','√','∑','∞','×','÷','+','−','%','∆','∫','θ','α','β','°','=','≠','½'];
+  var n=22;
+  for(var i=0;i<n;i++){
+    var el=document.createElement('span');
+    el.textContent=symbols[Math.floor(Math.random()*symbols.length)];
+    var size=16+Math.random()*34;
+    var left=Math.random()*100;
+    var dur=16+Math.random()*18;
+    var delay=-Math.random()*dur;
+    var sway=(Math.random()*160-80)+'px';
+    var spin=(Math.random()*360-180)+'deg';
+    el.style.cssText='left:'+left+'vw;font-size:'+size+'px;animation-duration:'+dur+'s;animation-delay:'+delay+'s;--sway:'+sway+';--spin:'+spin;
+    host.appendChild(el);
+  }
+}
+initMathBg();
+
 function genTeacherCode(){
   // Har bir belgi mustaqil, teng ehtimollik bilan tanlanadi - qattiq qolip yoq
   var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; // I,O,0,1,l chalkashmasin uchun olib tashlangan
@@ -1003,12 +1044,51 @@ function doSubmitTest(){
 }
 function showResult(r){
   var passed=r.pct>=70,col=passed?'#16a34a':r.pct>=50?'#d97706':'#dc2626';
-  var ring=document.getElementById('r-ring');ring.style.borderColor=col;
-  document.getElementById('r-pct').textContent=r.pct+'%';document.getElementById('r-pct').style.color=col;
+  var ring=document.getElementById('r-ring');
+  ring.style.borderColor=col;
+  ring.style.transform='scale(.6)';ring.style.opacity='0';
+  document.getElementById('r-pct').style.color=col;
   document.getElementById('r-frac').textContent=r.correct+'/'+r.total;
-  document.getElementById('r-title').textContent=passed?'Zo\'r natija!':r.pct>=50?'Qoniqarli':'Qayta urinib ko\'ring';
+  var titles=r.pct>=90?['A\'lo natija!','Zo\'r ketyapsiz!']:r.pct>=70?['Zo\'r natija!','Yaxshi ish!']:r.pct>=50?['Qoniqarli']:['Qayta urinib ko\'ring'];
+  document.getElementById('r-title').textContent=titles[Math.floor(Math.random()*titles.length)];
   document.getElementById('r-sub').textContent=r.student+' - '+r.cls+' - '+r.topic;
   document.getElementById('r-synote').style.display=r.mode==='practice'?'block':'none';
+  // Doira animatsiyasi bilan paydo bo'ladi
+  setTimeout(function(){
+    ring.style.transition='transform .5s cubic-bezier(.34,1.56,.64,1),opacity .4s';
+    ring.style.transform='scale(1)';ring.style.opacity='1';
+  },50);
+  // Foiz raqami 0 dan yakuniy qiymatgacha "hisoblanadi"
+  var pctEl=document.getElementById('r-pct'),start=0,target=r.pct,dur=900,t0=null;
+  function tick(ts){
+    if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/dur);
+    pctEl.textContent=Math.round(start+(target-start)*p)+'%';
+    if(p<1)requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+  // A'lo natijada konfetti portlaydi
+  if(r.pct>=70){setTimeout(function(){fireConfetti(r.pct>=90?70:40);},250);}
+}
+function fireConfetti(count){
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var colors=['#25316d','#5b3ea6','#f0b429','#15803d','#e11d48','#0891b2'];
+  var host=document.createElement('div');
+  host.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:400;overflow:hidden';
+  document.body.appendChild(host);
+  for(var i=0;i<count;i++){
+    var el=document.createElement('div');
+    var size=6+Math.random()*7;
+    var startX=Math.random()*100;
+    var dur=2.2+Math.random()*1.4;
+    var delay=Math.random()*0.4;
+    var rot=Math.random()*720-360;
+    var drift=(Math.random()*140-70);
+    el.style.cssText='position:absolute;top:-20px;left:'+startX+'vw;width:'+size+'px;height:'+(size*0.4)+'px;background:'+colors[i%colors.length]+';opacity:.9;border-radius:2px;'+
+      'animation:confettiFall '+dur+'s ease-in '+delay+'s forwards;'+
+      '--rot:'+rot+'deg;--drift:'+drift+'px';
+    host.appendChild(el);
+  }
+  setTimeout(function(){host.remove();},4200);
 }
 function toggleDetail(){
   showDet=!showDet;var el=document.getElementById('r-det');el.style.display=showDet?'block':'none';
