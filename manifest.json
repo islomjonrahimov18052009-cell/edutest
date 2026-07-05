@@ -2,10 +2,11 @@
   "name": "EduTest Pro",
   "short_name": "EduTest",
   "description": "O'quvchilar uchun test tizimi",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#6C3EF4",
+  "theme_color": "#25316d",
   "orientation": "portrait-primary",
   "icons": [
     {
