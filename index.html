@@ -941,7 +941,13 @@ function submitTest(){
       var nextUnanswered=unanswered.find(function(i){return i>S.idx;});
       if(nextUnanswered===undefined)nextUnanswered=unanswered[0];
       alert(unanswered.length+' ta savol javobsiz! '+(nextUnanswered+1)+'-savolga o\'tilmoqda...');
-      setTimeout(function(){_ignoreBlur=false;},500);
+      // alert() brauzerni fullscreen'dan avtomatik chiqarib yuboradi - qayta tiklaymiz
+      var _el=document.documentElement;
+      if(!document.fullscreenElement&&!document.webkitFullscreenElement){
+        if(_el.requestFullscreen)_el.requestFullscreen().catch(function(){});
+        else if(_el.webkitRequestFullscreen)_el.webkitRequestFullscreen();
+      }
+      setTimeout(function(){_ignoreBlur=false;},600);
       S.idx=nextUnanswered;
       renderQ();
       return;
@@ -1834,11 +1840,18 @@ window.addEventListener('popstate', function(e) {
       _backWarned = true;
       history.pushState(null, '', location.href);
       var unanswered = S.test.filter(function(_,i){return !S.answers[i]||S.answers[i].length===0;}).length;
+      _ignoreBlur = true;
       alert('⚠️ Testdan chiqmoqchimisiz?\n' +
         (unanswered > 0 ? unanswered + ' ta savol javobsiz qoldi.\n' : '') +
         'Chiqsangiz test tugaydi' +
         (S.mode==='exam' ? ' va natija saqlanadi.' : ', natija saqlanmaydi.') +
         '\n\nChiqish uchun yana bir marta "Orqaga" tugmasini bosing.');
+      var _el2=document.documentElement;
+      if(!document.fullscreenElement&&!document.webkitFullscreenElement){
+        if(_el2.requestFullscreen)_el2.requestFullscreen().catch(function(){});
+        else if(_el2.webkitRequestFullscreen)_el2.webkitRequestFullscreen();
+      }
+      setTimeout(function(){_ignoreBlur=false;},600);
     } else {
       _backWarned = false;
       submitTest(true); // force - unanswered tekshirilmasin
@@ -1866,13 +1879,14 @@ window.addEventListener('blur', function() {
 });
 
 // Fullscreen dan chiqsa (Esc) - test tugaydi
+// MUHIM: agar bu alert() sababli avtomatik chiqish bo'lsa (_ignoreBlur=true), tugatilmaydi
 document.addEventListener('fullscreenchange', function() {
-  if(!document.fullscreenElement && S.mode) {
+  if(!document.fullscreenElement && S.mode && !_ignoreBlur) {
     submitTest(true);
   }
 });
 document.addEventListener('webkitfullscreenchange', function() {
-  if(!document.webkitFullscreenElement && S.mode) {
+  if(!document.webkitFullscreenElement && S.mode && !_ignoreBlur) {
     submitTest(true);
   }
 });
