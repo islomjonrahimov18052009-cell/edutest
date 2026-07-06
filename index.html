@@ -464,9 +464,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div class="darea" id="drop-area" onclick="document.getElementById('exe-inp').click()">
         <div style="font-size:36px">&#x1F4C2;</div>
         <div style="font-weight:700;margin-top:6px">Bosing yoki tashlang</div>
-        <div class="ts tm">.exe fayllar qabul qilinadi</div>
+        <div class="ts tm">.exe fayllar qabul qilinadi (bir nechtasini birga tanlash mumkin - "kitob" sifatida birlashadi)</div>
       </div>
-      <input type="file" id="exe-inp" accept=".exe" style="display:none">
+      <input type="file" id="exe-inp" accept=".exe" multiple style="display:none">
       <div id="imp-msg" style="margin-top:10px"></div>
     </div>
     <div class="card">
@@ -1818,8 +1818,8 @@ function exportQsJSON(){var db=getDB();var blob=new Blob([JSON.stringify(db.user
 var da=document.getElementById('drop-area');
 da.addEventListener('dragover',function(e){e.preventDefault();da.style.borderColor='var(--pri)';da.style.background='#f0f9ff';});
 da.addEventListener('dragleave',function(){da.style.borderColor='';da.style.background='';});
-da.addEventListener('drop',function(e){e.preventDefault();da.style.borderColor='';da.style.background='';var f=e.dataTransfer.files[0];if(f)importExe(f);});
-document.getElementById('exe-inp').addEventListener('change',function(){if(this.files[0])importExe(this.files[0]);});
+da.addEventListener('drop',function(e){e.preventDefault();da.style.borderColor='';da.style.background='';var fs=e.dataTransfer.files;if(fs&&fs.length)importMultipleFiles(Array.prototype.slice.call(fs));});
+document.getElementById('exe-inp').addEventListener('change',function(){if(this.files&&this.files.length)importMultipleFiles(Array.prototype.slice.call(this.files));this.value='';});
 document.getElementById('json-inp').addEventListener('change',function(){
   var f=this.files[0];if(!f)return;
   var folderName=f.name.replace(/\.json$/i,'');
@@ -1859,8 +1859,8 @@ function saveImportedQs(parsed,msg){
   db.userQs=db.userQs.concat(parsed.qs);
   db.topicsMeta=db.topicsMeta||[];
   var f=false;
-  db.topicsMeta.forEach(function(m){if(m.topic===parsed.topic&&m.teacherId===ME.id){m.questionsToAsk=parsed.questionsToAsk;f=true;}});
-  if(!f)db.topicsMeta.push({topic:parsed.topic,questionsToAsk:parsed.questionsToAsk,teacherId:ME.id,subject:ME.subject||'math'});
+  db.topicsMeta.forEach(function(m){if(m.topic===parsed.topic&&m.teacherId===ME.id){m.questionsToAsk=parsed.questionsToAsk;if(_pendingImportFolder)m.folder=_pendingImportFolder;f=true;}});
+  if(!f)db.topicsMeta.push({topic:parsed.topic,questionsToAsk:parsed.questionsToAsk,teacherId:ME.id,subject:ME.subject||'math',folder:_pendingImportFolder||undefined});
   saveDB(db);renderQT();
   var imgCount=(parsed.qs||[]).filter(function(q){return q.img;}).length;
   msg.innerHTML='<div class="alt as">&#x2705; <strong>'+parsed.qs.length+' ta savol</strong>'+(imgCount?' ('+imgCount+' ta rasm bilan)':'')+' import qilindi: "<b>'+parsed.topic+'</b>" ('+parsed.questionsToAsk+' ta beriladi)</div>';
@@ -1893,56 +1893,94 @@ async function importViaBrowser(data,msg){
 }
 
 function sendToServer(file,msg){
-  var sizeMB=(file.size/1024/1024).toFixed(1);
-  msg.innerHTML='<div class="alt ai">&#x23F3; Fayl tayyorlanmoqda ('+sizeMB+' MB)...</div>';
-  var freader=new FileReader();
-  freader.onload=function(fe){
-    var dataUrl=fe.target.result;
-    var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
-    var xhr=new XMLHttpRequest();
-    xhr.open('POST',RENDER_SERVER+'/parse',true);
-    xhr.timeout=1800000;
-    xhr.setRequestHeader('Content-Type','application/json');
-    msg.innerHTML='<div class="alt ai">&#x23F3; Serverga yuborildi ('+sizeMB+' MB). Katta fayllar 10-30 daqiqagacha vaqt olishi mumkin, kuting...</div>';
-    xhr.onload=function(){
-      try{
-        var result=JSON.parse(xhr.responseText);
-        if(result.error)throw new Error(result.error);
-        if(!result.questions||!result.questions.length)throw new Error('Savollar topilmadi');
-        var qs=result.questions.map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
-        saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
-      }catch(e){
-        msg.innerHTML='<div class="alt ar">&#x274C; Server xatosi: '+e.message+'</div>';
-      }
-    };
-    xhr.onerror=function(){
-      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server javob bermadi. Rasmsiz o\'qilmoqda...</div>';
-      var reader=new FileReader();
-      reader.onload=async function(ev){
-        await importViaBrowser(new Uint8Array(ev.target.result),msg);
+  return new Promise(function(resolve){
+    var sizeMB=(file.size/1024/1024).toFixed(1);
+    msg.innerHTML='<div class="alt ai">&#x23F3; Fayl tayyorlanmoqda ('+sizeMB+' MB)...</div>';
+    var freader=new FileReader();
+    freader.onload=function(fe){
+      var dataUrl=fe.target.result;
+      var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
+      var xhr=new XMLHttpRequest();
+      xhr.open('POST',RENDER_SERVER+'/parse',true);
+      xhr.timeout=1800000;
+      xhr.setRequestHeader('Content-Type','application/json');
+      msg.innerHTML='<div class="alt ai">&#x23F3; Serverga yuborildi ('+sizeMB+' MB). Katta fayllar 10-30 daqiqagacha vaqt olishi mumkin, kuting...</div>';
+      xhr.onload=function(){
+        try{
+          var result=JSON.parse(xhr.responseText);
+          if(result.error)throw new Error(result.error);
+          if(!result.questions||!result.questions.length)throw new Error('Savollar topilmadi');
+          var qs=result.questions.map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
+          saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
+        }catch(e){
+          msg.innerHTML='<div class="alt ar">&#x274C; Server xatosi ('+file.name+'): '+e.message+'</div>';
+        }
+        resolve();
       };
-      reader.readAsArrayBuffer(file);
-    };
-    xhr.ontimeout=function(){
-      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi (30 daqiqa). Rasmsiz o\'qilmoqda...</div>';
-      var reader=new FileReader();
-      reader.onload=async function(ev){
-        await importViaBrowser(new Uint8Array(ev.target.result),msg);
+      xhr.onerror=function(){
+        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server javob bermadi. Rasmsiz o\'qilmoqda...</div>';
+        var reader=new FileReader();
+        reader.onload=async function(ev){
+          await importViaBrowser(new Uint8Array(ev.target.result),msg);
+          resolve();
+        };
+        reader.onerror=function(){resolve();};
+        reader.readAsArrayBuffer(file);
       };
-      reader.readAsArrayBuffer(file);
+      xhr.ontimeout=function(){
+        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi (30 daqiqa). Rasmsiz o\'qilmoqda...</div>';
+        var reader=new FileReader();
+        reader.onload=async function(ev){
+          await importViaBrowser(new Uint8Array(ev.target.result),msg);
+          resolve();
+        };
+        reader.onerror=function(){resolve();};
+        reader.readAsArrayBuffer(file);
+      };
+      xhr.send(JSON.stringify({data:base64,filename:file.name}));
     };
-    xhr.send(JSON.stringify({data:base64,filename:file.name}));
-  };
-  freader.onerror=function(){
-    msg.innerHTML='<div class="alt ar">&#x274C; Faylni oqib bolmadi.</div>';
-  };
-  freader.readAsDataURL(file);
+    freader.onerror=function(){
+      msg.innerHTML='<div class="alt ar">&#x274C; Faylni oqib bolmadi ('+file.name+').</div>';
+      resolve();
+    };
+    freader.readAsDataURL(file);
+  });
 }
 
+var _pendingImportFolder=null;
+function importMultipleFiles(files){
+  if(files.length===1){
+    _pendingImportFolder=null;
+    importExe(files[0]);
+    return;
+  }
+  var folderName=prompt('Bu '+files.length+' ta faylni bitta "kitob" nomiga birlashtiramiz.\nKitob nomini kiriting:', files[0].name.replace(/\.exe$/i,'').replace(/[\s_-]*\d+$/,'') || 'Kitob 1');
+  if(folderName===null)return; // bekor qilindi
+  folderName=folderName.trim()||'Kitob';
+  _pendingImportFolder=folderName;
+  var msg=document.getElementById('imp-msg');
+  var idx=0;
+  function next(){
+    if(idx>=files.length){
+      _pendingImportFolder=null;
+      msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+files.length+' ta mavzu (fayl) import qilindi!</div>';
+      renderQT();
+      return;
+    }
+    var f=files[idx];
+    msg.innerHTML='<div class="alt ai">&#x23F3; ('+(idx+1)+'/'+files.length+') "'+f.name+'" qayta ishlanmoqda...</div>';
+    importExeAsync(f).then(function(){ idx++; next(); });
+  }
+  next();
+}
 function importExe(file){
   var msg=document.getElementById('imp-msg');
   msg.innerHTML='<div class="alt ai">&#x23F3; Server bilan bog\'lanilmoqda... Rasmlar o\'girilmoqda, 2-5 daqiqa kutish mumkin</div>';
   sendToServer(file,msg);
+}
+function importExeAsync(file){
+  var msg=document.getElementById('imp-msg');
+  return sendToServer(file,msg);
 }
 
 function decompZ(chunk){
