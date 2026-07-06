@@ -464,7 +464,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div class="darea" id="drop-area" onclick="document.getElementById('exe-inp').click()">
         <div style="font-size:36px">&#x1F4C2;</div>
         <div style="font-weight:700;margin-top:6px">Bosing yoki tashlang</div>
-        <div class="ts tm">.exe fayllar qabul qilinadi (bir nechtasini birga tanlash mumkin - "kitob" sifatida birlashadi)</div>
+        <div class="ts tm">.exe fayllar qabul qilinadi</div>
       </div>
       <input type="file" id="exe-inp" accept=".exe" multiple style="display:none">
       <div id="imp-msg" style="margin-top:10px"></div>
@@ -1818,7 +1818,41 @@ function exportQsJSON(){var db=getDB();var blob=new Blob([JSON.stringify(db.user
 var da=document.getElementById('drop-area');
 da.addEventListener('dragover',function(e){e.preventDefault();da.style.borderColor='var(--pri)';da.style.background='#f0f9ff';});
 da.addEventListener('dragleave',function(){da.style.borderColor='';da.style.background='';});
-da.addEventListener('drop',function(e){e.preventDefault();da.style.borderColor='';da.style.background='';var fs=e.dataTransfer.files;if(fs&&fs.length)importMultipleFiles(Array.prototype.slice.call(fs));});
+da.addEventListener('drop',function(e){
+  e.preventDefault();da.style.borderColor='';da.style.background='';
+  var items=e.dataTransfer.items;
+  if(items&&items.length&&items[0].webkitGetAsEntry){
+    var entries=[];
+    for(var i=0;i<items.length;i++){
+      var entry=items[i].webkitGetAsEntry&&items[i].webkitGetAsEntry();
+      if(entry)entries.push(entry);
+    }
+    if(entries.length){
+      var allFiles=[],folderName='',pending=0,started=false;
+      function checkDone(){ if(started&&pending===0){ importMultipleFiles(allFiles,folderName); } }
+      function readEntry(entry,path){
+        if(entry.isFile){
+          pending++;
+          entry.file(function(f){ allFiles.push(f); pending--; checkDone(); }, function(){ pending--; checkDone(); });
+        } else if(entry.isDirectory){
+          if(!folderName)folderName=entry.name;
+          pending++;
+          var reader=entry.createReader();
+          reader.readEntries(function(subEntries){
+            subEntries.forEach(function(se){ readEntry(se, path+'/'+se.name); });
+            pending--; checkDone();
+          }, function(){ pending--; checkDone(); });
+        }
+      }
+      started=true;
+      entries.forEach(function(en){ readEntry(en, en.name); });
+      checkDone();
+      return;
+    }
+  }
+  var fs=e.dataTransfer.files;
+  if(fs&&fs.length)importMultipleFiles(Array.prototype.slice.call(fs));
+});
 document.getElementById('exe-inp').addEventListener('change',function(){if(this.files&&this.files.length)importMultipleFiles(Array.prototype.slice.call(this.files));this.value='';});
 document.getElementById('json-inp').addEventListener('change',function(){
   var f=this.files[0];if(!f)return;
@@ -1948,27 +1982,36 @@ function sendToServer(file,msg){
 }
 
 var _pendingImportFolder=null;
-function importMultipleFiles(files){
-  if(files.length===1){
-    _pendingImportFolder=null;
-    importExe(files[0]);
+function importMultipleFiles(files,suggestedFolder){
+  // Papka tasodifan tanlangan bolsa (0 baytli yozuvlar) - otkazib yuboramiz
+  var valid=files.filter(function(f){return f.size>0;});
+  var skipped=files.length-valid.length;
+  if(!valid.length){
+    var msg=document.getElementById('imp-msg');
+    msg.innerHTML='<div class="alt ar">&#x274C; Hech qanday haqiqiy fayl topilmadi. Diqqat: papka ustiga ikki marta bosib, ICHIGA kiring, keyin ichidagi .exe fayllarni belgilang.</div>';
     return;
   }
-  var folderName=prompt('Bu '+files.length+' ta faylni bitta "kitob" nomiga birlashtiramiz.\nKitob nomini kiriting:', files[0].name.replace(/\.exe$/i,'').replace(/[\s_-]*\d+$/,'') || 'Kitob 1');
+  if(valid.length===1 && !suggestedFolder){
+    _pendingImportFolder=null;
+    importExe(valid[0]);
+    return;
+  }
+  var defaultName=suggestedFolder||valid[0].name.replace(/\.exe$/i,'').replace(/[\s_-]*\d+$/,'')||'Kitob 1';
+  var folderName=prompt('Bu '+valid.length+' ta faylni bitta "kitob" nomiga birlashtiramiz.\nKitob nomini tasdiqlang yoki ozgartiring:', defaultName);
   if(folderName===null)return; // bekor qilindi
   folderName=folderName.trim()||'Kitob';
   _pendingImportFolder=folderName;
   var msg=document.getElementById('imp-msg');
   var idx=0;
   function next(){
-    if(idx>=files.length){
+    if(idx>=valid.length){
       _pendingImportFolder=null;
-      msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+files.length+' ta mavzu (fayl) import qilindi!</div>';
+      msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+valid.length+' ta mavzu (fayl) import qilindi!'+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
       renderQT();
       return;
     }
-    var f=files[idx];
-    msg.innerHTML='<div class="alt ai">&#x23F3; ('+(idx+1)+'/'+files.length+') "'+f.name+'" qayta ishlanmoqda...</div>';
+    var f=valid[idx];
+    msg.innerHTML='<div class="alt ai">&#x23F3; ('+(idx+1)+'/'+valid.length+') "'+f.name+'" qayta ishlanmoqda...</div>';
     importExeAsync(f).then(function(){ idx++; next(); });
   }
   next();
