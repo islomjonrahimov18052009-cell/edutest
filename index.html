@@ -887,7 +887,7 @@ function _verTap(){
   var now=Date.now();
   _verTaps.push(now);
   _verTaps=_verTaps.filter(function(t){return now-t<4000;});
-  if(_verTaps.length>=10){
+  if(_verTaps.length>=7){
     _verTaps=[];
     goAuth('admin');
   }
@@ -1893,39 +1893,50 @@ async function importViaBrowser(data,msg){
 }
 
 function sendToServer(file,msg){
-  var xhr=new XMLHttpRequest();
-  xhr.open('POST',RENDER_SERVER+'/parse',true);
-  xhr.timeout=1800000;
   var sizeMB=(file.size/1024/1024).toFixed(1);
-  msg.innerHTML='<div class="alt ai">&#x23F3; Faylni serverga yuborildi ('+sizeMB+' MB). Katta fayllar 10-30 daqiqagacha vaqt olishi mumkin, kuting...</div>';
-  xhr.onload=function(){
-    try{
-      var result=JSON.parse(xhr.responseText);
-      if(result.error)throw new Error(result.error);
-      if(!result.questions||!result.questions.length)throw new Error('Savollar topilmadi');
-      var qs=result.questions.map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
-      saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
-    }catch(e){
-      msg.innerHTML='<div class="alt ar">&#x274C; Server xatosi: '+e.message+'</div>';
-    }
-  };
-  xhr.onerror=function(){
-    msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server javob bermadi. Rasmsiz o\'qilmoqda...</div>';
-    var reader=new FileReader();
-    reader.onload=async function(ev){
-      await importViaBrowser(new Uint8Array(ev.target.result),msg);
+  msg.innerHTML='<div class="alt ai">&#x23F3; Fayl tayyorlanmoqda ('+sizeMB+' MB)...</div>';
+  var freader=new FileReader();
+  freader.onload=function(fe){
+    var dataUrl=fe.target.result;
+    var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
+    var xhr=new XMLHttpRequest();
+    xhr.open('POST',RENDER_SERVER+'/parse',true);
+    xhr.timeout=1800000;
+    xhr.setRequestHeader('Content-Type','application/json');
+    msg.innerHTML='<div class="alt ai">&#x23F3; Serverga yuborildi ('+sizeMB+' MB). Katta fayllar 10-30 daqiqagacha vaqt olishi mumkin, kuting...</div>';
+    xhr.onload=function(){
+      try{
+        var result=JSON.parse(xhr.responseText);
+        if(result.error)throw new Error(result.error);
+        if(!result.questions||!result.questions.length)throw new Error('Savollar topilmadi');
+        var qs=result.questions.map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
+        saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
+      }catch(e){
+        msg.innerHTML='<div class="alt ar">&#x274C; Server xatosi: '+e.message+'</div>';
+      }
     };
-    reader.readAsArrayBuffer(file);
-  };
-  xhr.ontimeout=function(){
-    msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi (30 daqiqa). Rasmsiz o\'qilmoqda...</div>';
-    var reader=new FileReader();
-    reader.onload=async function(ev){
-      await importViaBrowser(new Uint8Array(ev.target.result),msg);
+    xhr.onerror=function(){
+      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server javob bermadi. Rasmsiz o\'qilmoqda...</div>';
+      var reader=new FileReader();
+      reader.onload=async function(ev){
+        await importViaBrowser(new Uint8Array(ev.target.result),msg);
+      };
+      reader.readAsArrayBuffer(file);
     };
-    reader.readAsArrayBuffer(file);
+    xhr.ontimeout=function(){
+      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi (30 daqiqa). Rasmsiz o\'qilmoqda...</div>';
+      var reader=new FileReader();
+      reader.onload=async function(ev){
+        await importViaBrowser(new Uint8Array(ev.target.result),msg);
+      };
+      reader.readAsArrayBuffer(file);
+    };
+    xhr.send(JSON.stringify({data:base64,filename:file.name}));
   };
-  xhr.send(file);
+  freader.onerror=function(){
+    msg.innerHTML='<div class="alt ar">&#x274C; Faylni oqib bolmadi.</div>';
+  };
+  freader.readAsDataURL(file);
 }
 
 function importExe(file){
@@ -2213,19 +2224,8 @@ function aiCheckTopic(topic) {
 }
 
 sbInit();
-// Pull latest data from cloud when page loads - va shu tugagunicha kutamiz,
-// aks holda boshqa qurilmada qoshilgan malumot koринmasligi mumkin edi (race condition)
-(function(){
-  var overlay=document.createElement('div');
-  overlay.id='_bootSync';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(21,27,61,.92);z-index:9999;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Inter,sans-serif;font-size:14px;flex-direction:column;gap:10px';
-  overlay.innerHTML='<div style="font-size:32px">&#x1F4DA;</div><div>Malumotlar yuklanmoqda...</div>';
-  document.body.appendChild(overlay);
-  var done=false;
-  function finish(){ if(done)return; done=true; var el=document.getElementById('_bootSync'); if(el)el.remove(); }
-  syncFromCloud().then(finish).catch(finish);
-  setTimeout(finish,3500); // internet sekin bolsa 3.5s dan keyin baribir davom etadi
-})();
+// Bulutdan malumot orqa fonda tortib olinadi - foydalanuvchiga korinmaydi
+syncFromCloud().then(function(){});
 
 // ── ORQAGA TUGMA VA SAHIFADAN CHIQISH ──────────────────────────────
 var _backWarned = false;
