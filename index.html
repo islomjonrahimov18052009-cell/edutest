@@ -1008,7 +1008,7 @@ function afterLogin(){
   document.getElementById('auth-err').innerHTML='';
   if(ME.role==='admin'){showPg('pg-admin');initAdmin();}
   else if(ME.role==='teacher'){showPg('pg-teacher');renderQT();}
-  else{selTopic=null;showPg('pg-topic');renderTopics();loadMyHist();}
+  else{selTopic=null;_curFolder=null;showPg('pg-topic');renderTopics();loadMyHist();}
 }
 var _logoutWarned = false;
 function safeLogout(){
@@ -1039,6 +1039,7 @@ function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
   document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
 
 var _curSubjFilter='';
+var _curFolder=null;
 function renderTopics(){
   document.getElementById('tp-gr').textContent='Salom, '+ME.name+'!';
   document.getElementById('tp-sub').textContent='Qaysi mavzuni ishlaysiz?';
@@ -1061,13 +1062,44 @@ function renderTopics(){
     if(!_curSubjFilter)return true;
     return allQs.some(function(q){return q.topic===t&&q.subject===_curSubjFilter;});
   });
-  window._topicsListStudent=topics;
-  document.getElementById('topic-grid').innerHTML=topics.map(function(t,i){
+  // Mavzularni papka(kitob)larga guruhlash
+  var db=getDB();
+  var folderOf={};
+  (db.topicsMeta||[]).forEach(function(m){ if(m.folder && !folderOf[m.topic]) folderOf[m.topic]=m.folder; });
+
+  var grid=document.getElementById('topic-grid');
+
+  if(_curFolder){
+    // Papka ichidasiz - shu papkadagi mavzularni korsatamiz
+    var inFolder=topics.filter(function(t){return folderOf[t]===_curFolder;});
+    window._topicsListStudent=inFolder;
+    var html='<div class="tbtn" style="border-style:dashed" onclick="_curFolder=null;renderTopics()"><div style="font-weight:700">&#8592; Orqaga</div><div style="font-size:11px;color:var(--mut);margin-top:3px">Kitoblar royxatiga</div></div>';
+    html+=inFolder.map(function(t,i){
+      var qs=getQsByTopic(t),meta=getTopicMeta(t),ask=meta?meta.questionsToAsk:qs.length;
+      return '<div class="tbtn" onclick="selectTopic('+i+',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
+    }).join('');
+    grid.innerHTML=html||'<p class="ts tm">Bu papkada mavzular yoq</p>';
+    return;
+  }
+
+  // Ildiz korinish: papkalar + papkasiz mavzular
+  var folderNames=[];
+  topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0)folderNames.push(folderOf[t]); });
+  var unfoldered=topics.filter(function(t){return !folderOf[t];});
+  window._topicsListStudent=unfoldered;
+
+  var html='';
+  html+=folderNames.map(function(fn){
+    var cnt=topics.filter(function(t){return folderOf[t]===fn;}).length;
+    return '<div class="tbtn" style="background:#f5f3ff" onclick="_curFolder=\''+fn.replace(/'/g,"\\'")+'\';renderTopics()"><div style="font-weight:700">&#x1F4D8; '+fn+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+cnt+' ta mavzu</div></div>';
+  }).join('');
+  html+=unfoldered.map(function(t,i){
     var qs=getQsByTopic(t),meta=getTopicMeta(t),ask=meta?meta.questionsToAsk:qs.length;
     return '<div class="tbtn" onclick="selectTopic('+i+',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
-  }).join('')||'<p class="ts tm">Mavzular yo\'q</p>';
+  }).join('');
+  grid.innerHTML=html||'<p class="ts tm">Mavzular yo\'q</p>';
 }
-function filterBySubj(s){_curSubjFilter=s;renderTopics();}
+function filterBySubj(s){_curSubjFilter=s;_curFolder=null;renderTopics();}
 function selectTopic(idx,el){
   var topics=window._topicsListStudent||getTopics();
   selTopic=topics[idx];
@@ -1790,8 +1822,30 @@ da.addEventListener('drop',function(e){e.preventDefault();da.style.borderColor='
 document.getElementById('exe-inp').addEventListener('change',function(){if(this.files[0])importExe(this.files[0]);});
 document.getElementById('json-inp').addEventListener('change',function(){
   var f=this.files[0];if(!f)return;
+  var folderName=f.name.replace(/\.json$/i,'');
   var reader=new FileReader();
-  reader.onload=function(e){try{var qs=JSON.parse(e.target.result);if(!Array.isArray(qs))throw 0;qs.forEach(function(q){q.teacherId=ME.id;if(!q.subject)q.subject=ME.subject||'math';});var db=getDB();db.userQs=(db.userQs||[]).concat(qs);saveDB(db);renderQT();alert(qs.length+" ta savol qo'shildi!");}catch(ex){alert("Xatolik: JSON format noto'g'ri");}};
+  reader.onload=function(e){try{
+    var qs=JSON.parse(e.target.result);if(!Array.isArray(qs))throw 0;
+    var topicsInFile=[];
+    qs.forEach(function(q){
+      q.teacherId=ME.id;
+      if(!q.subject)q.subject=ME.subject||'math';
+      if(q.topic&&topicsInFile.indexOf(q.topic)<0)topicsInFile.push(q.topic);
+    });
+    var db=getDB();
+    db.userQs=(db.userQs||[]).concat(qs);
+    // Agar faylda 1 tadan kop mavzu bolsa - bu "kitob", barcha mavzularni bitta papkaga birlashtiramiz
+    if(topicsInFile.length>1){
+      db.topicsMeta=db.topicsMeta||[];
+      topicsInFile.forEach(function(t){
+        var found=false;
+        db.topicsMeta.forEach(function(m){if(m.topic===t&&m.teacherId===ME.id){m.folder=folderName;found=true;}});
+        if(!found)db.topicsMeta.push({topic:t,teacherId:ME.id,subject:ME.subject||'math',folder:folderName,questionsToAsk:qs.filter(function(q){return q.topic===t;}).length});
+      });
+    }
+    saveDB(db);renderQT();
+    alert(qs.length+" ta savol qo'shildi!"+(topicsInFile.length>1?" ("+topicsInFile.length+" ta mavzu, \""+folderName+"\" papkasiga birlashtirildi)":""));
+  }catch(ex){alert("Xatolik: JSON format noto'g'ri");}};
   reader.readAsText(f);
 });
 
@@ -2157,8 +2211,19 @@ function aiCheckTopic(topic) {
 }
 
 sbInit();
-// Pull latest data from cloud when page loads
-syncFromCloud().then(function(){});
+// Pull latest data from cloud when page loads - va shu tugagunicha kutamiz,
+// aks holda boshqa qurilmada qoshilgan malumot koринmasligi mumkin edi (race condition)
+(function(){
+  var overlay=document.createElement('div');
+  overlay.id='_bootSync';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(21,27,61,.92);z-index:9999;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Inter,sans-serif;font-size:14px;flex-direction:column;gap:10px';
+  overlay.innerHTML='<div style="font-size:32px">&#x1F4DA;</div><div>Malumotlar yuklanmoqda...</div>';
+  document.body.appendChild(overlay);
+  var done=false;
+  function finish(){ if(done)return; done=true; var el=document.getElementById('_bootSync'); if(el)el.remove(); }
+  syncFromCloud().then(finish).catch(finish);
+  setTimeout(finish,3500); // internet sekin bolsa 3.5s dan keyin baribir davom etadi
+})();
 
 // ── ORQAGA TUGMA VA SAHIFADAN CHIQISH ──────────────────────────────
 var _backWarned = false;
