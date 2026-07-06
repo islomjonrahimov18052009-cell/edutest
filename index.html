@@ -882,16 +882,7 @@ var authRole='student';
 // Yashirin admin kirish - 2 usul:
 // 1) Telefon/kompyuter: pastdagi mayda "v2.0" yozuviga 7 marta tez bosish
 // 2) Kompyuter: klaviaturada maxfiy sozni terish
-var _verTaps=[];
-function _verTap(){
-  var now=Date.now();
-  _verTaps.push(now);
-  _verTaps=_verTaps.filter(function(t){return now-t<4000;});
-  if(_verTaps.length>=7){
-    _verTaps=[];
-    goAuth('admin');
-  }
-}
+
 var ADMIN_SECRET_PHRASE = 'boshqaruv2026';
 var _secretBuf = '';
 document.addEventListener('keydown', function(e){
