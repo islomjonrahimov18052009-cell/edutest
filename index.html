@@ -887,7 +887,7 @@ function _verTap(){
   var now=Date.now();
   _verTaps.push(now);
   _verTaps=_verTaps.filter(function(t){return now-t<4000;});
-  if(_verTaps.length>=7){
+  if(_verTaps.length>=10){
     _verTaps=[];
     goAuth('admin');
   }
