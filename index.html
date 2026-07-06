@@ -1895,7 +1895,9 @@ async function importViaBrowser(data,msg){
 function sendToServer(file,msg){
   var xhr=new XMLHttpRequest();
   xhr.open('POST',RENDER_SERVER+'/parse',true);
-  xhr.timeout=600000;
+  xhr.timeout=1800000;
+  var sizeMB=(file.size/1024/1024).toFixed(1);
+  msg.innerHTML='<div class="alt ai">&#x23F3; Faylni serverga yuborildi ('+sizeMB+' MB). Katta fayllar 10-30 daqiqagacha vaqt olishi mumkin, kuting...</div>';
   xhr.onload=function(){
     try{
       var result=JSON.parse(xhr.responseText);
@@ -1916,7 +1918,7 @@ function sendToServer(file,msg){
     reader.readAsArrayBuffer(file);
   };
   xhr.ontimeout=function(){
-    msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi (3 daqiqa). Rasmsiz o\'qilmoqda...</div>';
+    msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi (30 daqiqa). Rasmsiz o\'qilmoqda...</div>';
     var reader=new FileReader();
     reader.onload=async function(ev){
       await importViaBrowser(new Uint8Array(ev.target.result),msg);
