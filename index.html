@@ -2007,41 +2007,61 @@ function importMultipleFiles(files,suggestedFolder){
     });
   })).then(function(fileDatas){
     fileDatas=fileDatas.filter(Boolean);
-    msg.innerHTML='<div class="alt ai">&#x23F3; '+fileDatas.length+' ta fayl serverga yuborildi. Barcha formulalar BITTA sessiyada ogirilmoqda - bu ketma-ket yuborishdan tezroq, lekin baribir bir necha daqiqa ketishi mumkin...</div>';
+    msg.innerHTML='<div class="alt ai">&#x23F3; '+fileDatas.length+' ta fayl serverga yuborildi, ish orqa fonda boshlandi...</div>';
 
-    var xhr=new XMLHttpRequest();
-    xhr.open('POST',RENDER_SERVER+'/parse_batch',true);
-    xhr.timeout=Math.max(1800000, fileDatas.length*90000); // har fayl uchun ~1.5 daq + zaxira
-    xhr.setRequestHeader('Content-Type','application/json');
-    xhr.onload=function(){
-      try{
-        var result=JSON.parse(xhr.responseText);
-        if(result.error)throw new Error(result.error);
-        var results=result.results||[];
-        var okCount=0, errCount=0;
-        results.forEach(function(r){
-          if(r.error){ errCount++; return; }
-          var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
-          saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},msg);
-          okCount++;
-        });
-        _pendingImportFolder=null;
-        msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okCount+' ta mavzu import qilindi!'+(errCount?' ('+errCount+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
-        renderQT();
-      }catch(e){
-        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server xatosi ('+e.message+'). Birma-bir (sekinroq) usulga otilmoqda...</div>';
+    fetch(RENDER_SERVER+'/parse_batch_start',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({files:fileDatas})
+    }).then(function(r){return r.json();}).then(function(startRes){
+      if(startRes.error)throw new Error(startRes.error);
+      var jobId=startRes.job_id;
+      pollJob(jobId);
+    }).catch(function(e){
+      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server xatosi ('+e.message+'). Birma-bir (sekinroq) usulga otilmoqda...</div>';
+      fallbackSequential();
+    });
+
+    var pollCount=0;
+    function pollJob(jobId){
+      pollCount++;
+      if(pollCount>600){ // ~30 daqiqa (3s * 600)
+        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Juda uzoq davom etdi. Birma-bir (sekinroq) usulga otilmoqda...</div>';
         fallbackSequential();
+        return;
       }
-    };
-    xhr.onerror=function(){
-      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server javob bermadi. Birma-bir (sekinroq) usulga otilmoqda...</div>';
-      fallbackSequential();
-    };
-    xhr.ontimeout=function(){
-      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi. Birma-bir (sekinroq) usulga otilmoqda...</div>';
-      fallbackSequential();
-    };
-    xhr.send(JSON.stringify({files:fileDatas}));
+      fetch(RENDER_SERVER+'/parse_batch_status/'+jobId).then(function(r){return r.json();}).then(function(st){
+        if(st.error){
+          msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server xatosi ('+st.error+'). Birma-bir (sekinroq) usulga otilmoqda...</div>';
+          fallbackSequential();
+          return;
+        }
+        if(st.status==='processing'){
+          msg.innerHTML='<div class="alt ai">&#x23F3; '+(st.progress||'qayta ishlanmoqda...')+'</div>';
+          setTimeout(function(){ pollJob(jobId); },3000);
+          return;
+        }
+        if(st.status==='done'){
+          var results=st.results||[];
+          var okCount=0, errCount=0;
+          results.forEach(function(r){
+            if(r.error){ errCount++; return; }
+            var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
+            saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},msg);
+            okCount++;
+          });
+          _pendingImportFolder=null;
+          msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okCount+' ta mavzu import qilindi!'+(errCount?' ('+errCount+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
+          renderQT();
+          return;
+        }
+        // status === 'error'
+        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server xatosi. Birma-bir (sekinroq) usulga otilmoqda...</div>';
+        fallbackSequential();
+      }).catch(function(){
+        setTimeout(function(){ pollJob(jobId); },3000); // vaqtincha tarmoq xatosi - qayta urinamiz
+      });
+    }
   });
 
   function fallbackSequential(){
