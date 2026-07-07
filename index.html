@@ -882,7 +882,16 @@ var authRole='student';
 // Yashirin admin kirish - 2 usul:
 // 1) Telefon/kompyuter: pastdagi mayda "v2.0" yozuviga 7 marta tez bosish
 // 2) Kompyuter: klaviaturada maxfiy sozni terish
-
+var _verTaps=[];
+function _verTap(){
+  var now=Date.now();
+  _verTaps.push(now);
+  _verTaps=_verTaps.filter(function(t){return now-t<4000;});
+  if(_verTaps.length>=7){
+    _verTaps=[];
+    goAuth('admin');
+  }
+}
 var ADMIN_SECRET_PHRASE = 'boshqaruv2026';
 var _secretBuf = '';
 document.addEventListener('keydown', function(e){
@@ -1063,11 +1072,11 @@ function renderTopics(){
   if(_curFolder){
     // Papka ichidasiz - shu papkadagi mavzularni korsatamiz
     var inFolder=topics.filter(function(t){return folderOf[t]===_curFolder;});
-    window._topicsListStudent=inFolder;
     var html='<div class="tbtn" style="border-style:dashed" onclick="_curFolder=null;renderTopics()"><div style="font-weight:700">&#8592; Orqaga</div><div style="font-size:11px;color:var(--mut);margin-top:3px">Kitoblar royxatiga</div></div>';
-    html+=inFolder.map(function(t,i){
+    html+=inFolder.map(function(t){
       var qs=getQsByTopic(t),meta=getTopicMeta(t),ask=meta?meta.questionsToAsk:qs.length;
-      return '<div class="tbtn" onclick="selectTopic('+i+',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
+      var tEsc=t.replace(/'/g,"\\'");
+      return '<div class="tbtn" onclick="selectTopicByName(\''+tEsc+'\',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
     }).join('');
     grid.innerHTML=html||'<p class="ts tm">Bu papkada mavzular yoq</p>';
     return;
@@ -1077,23 +1086,22 @@ function renderTopics(){
   var folderNames=[];
   topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0)folderNames.push(folderOf[t]); });
   var unfoldered=topics.filter(function(t){return !folderOf[t];});
-  window._topicsListStudent=unfoldered;
 
   var html='';
   html+=folderNames.map(function(fn){
     var cnt=topics.filter(function(t){return folderOf[t]===fn;}).length;
     return '<div class="tbtn" style="background:#f5f3ff" onclick="_curFolder=\''+fn.replace(/'/g,"\\'")+'\';renderTopics()"><div style="font-weight:700">&#x1F4D8; '+fn+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+cnt+' ta mavzu</div></div>';
   }).join('');
-  html+=unfoldered.map(function(t,i){
+  html+=unfoldered.map(function(t){
     var qs=getQsByTopic(t),meta=getTopicMeta(t),ask=meta?meta.questionsToAsk:qs.length;
-    return '<div class="tbtn" onclick="selectTopic('+i+',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
+    var tEsc=t.replace(/'/g,"\\'");
+    return '<div class="tbtn" onclick="selectTopicByName(\''+tEsc+'\',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
   }).join('');
   grid.innerHTML=html||'<p class="ts tm">Mavzular yo\'q</p>';
 }
 function filterBySubj(s){_curSubjFilter=s;_curFolder=null;renderTopics();}
-function selectTopic(idx,el){
-  var topics=window._topicsListStudent||getTopics();
-  selTopic=topics[idx];
+function selectTopicByName(t,el){
+  selTopic=t;
   document.querySelectorAll('.tbtn').forEach(function(b){b.classList.remove('on');});
   el.classList.add('on');
   var mc=document.getElementById('mode-card');
@@ -1313,31 +1321,26 @@ function renderQT(){
     list.innerHTML='<p style="color:var(--color-text-secondary);text-align:center;padding:20px">Hali savollar yoq. Import orqali qoshing.</p>';
     return;
   }
-  // Store topics globally for safe access by index
-  window._topicsList = topics;
-  list.innerHTML=topics.map(function(t,ti){
+  list.innerHTML=topics.map(function(t){
     var meta=getTopicMeta(t);
     var cnt=qs.filter(function(q){return q.topic===t;}).length;
     var ask=meta?meta.questionsToAsk:cnt;
     var timerOn=(!meta||meta.timerEnabled===undefined)?true:meta.timerEnabled;
     var timerMins=(meta&&meta.timerMinutes)||15;
+    var tEsc=t.replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--color-card);border:1px solid var(--color-border);border-radius:10px;gap:10px">'+
-      '<div style="flex:1;cursor:pointer" onclick="openTopicByIdx('+ti+')">'+
+      '<div style="flex:1;cursor:pointer" onclick="openTopicDetail(\''+tEsc+'\')">'+
         '<div style="font-weight:600;font-size:15px">'+t+'</div>'+
         '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">'+cnt+' ta savol &middot; '+ask+' ta beriladi &middot; '+(timerOn?timerMins+' daq':'Timersiz')+'</div>'+
       '</div>'+
       '<div style="display:flex;gap:6px">'+
-        '<button class="btn bpu bsm" onclick="openTopicByIdx('+ti+')" title="Savollarni korish">📋</button>'+
-        '<button class="btn bsm" style="background:#e8f4fd;color:#1565c0" onclick="aiCheckByIdx('+ti+')" title="AI tekshirish">🤖</button>'+
-        '<button class="btn bd bsm" onclick="deleteTopicByIdx('+ti+')" title="Mavzuni ochirish">🗑️</button>'+
+        '<button class="btn bpu bsm" onclick="openTopicDetail(\''+tEsc+'\')" title="Savollarni korish">📋</button>'+
+        '<button class="btn bsm" style="background:#e8f4fd;color:#1565c0" onclick="aiCheckTopic(\''+tEsc+'\')" title="AI tekshirish">🤖</button>'+
+        '<button class="btn bd bsm" onclick="deleteTopic(\''+tEsc+'\')" title="Mavzuni ochirish">🗑️</button>'+
       '</div>'+
     '</div>';
   }).join('');
 }
-
-function openTopicByIdx(i){ openTopicDetail(window._topicsList[i]); }
-function aiCheckByIdx(i){ aiCheckTopic(window._topicsList[i]); }
-function deleteTopicByIdx(i){ deleteTopic(window._topicsList[i]); }
 
 
 function deleteTopic(t){
@@ -1977,8 +1980,8 @@ function importMultipleFiles(files,suggestedFolder){
   // Papka tasodifan tanlangan bolsa (0 baytli yozuvlar) - otkazib yuboramiz
   var valid=files.filter(function(f){return f.size>0;});
   var skipped=files.length-valid.length;
+  var msg=document.getElementById('imp-msg');
   if(!valid.length){
-    var msg=document.getElementById('imp-msg');
     msg.innerHTML='<div class="alt ar">&#x274C; Hech qanday haqiqiy fayl topilmadi. Diqqat: papka ustiga ikki marta bosib, ICHIGA kiring, keyin ichidagi .exe fayllarni belgilang.</div>';
     return;
   }
@@ -1992,20 +1995,70 @@ function importMultipleFiles(files,suggestedFolder){
   if(folderName===null)return; // bekor qilindi
   folderName=folderName.trim()||'Kitob';
   _pendingImportFolder=folderName;
-  var msg=document.getElementById('imp-msg');
-  var idx=0;
-  function next(){
-    if(idx>=valid.length){
-      _pendingImportFolder=null;
-      msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+valid.length+' ta mavzu (fayl) import qilindi!'+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
-      renderQT();
-      return;
+
+  msg.innerHTML='<div class="alt ai">&#x23F3; '+valid.length+' ta fayl oqilmoqda...</div>';
+
+  Promise.all(valid.map(function(f){
+    return new Promise(function(res){
+      var r=new FileReader();
+      r.onload=function(e){ res({filename:f.name, data:e.target.result.split(',')[1]}); };
+      r.onerror=function(){ res(null); };
+      r.readAsDataURL(f);
+    });
+  })).then(function(fileDatas){
+    fileDatas=fileDatas.filter(Boolean);
+    msg.innerHTML='<div class="alt ai">&#x23F3; '+fileDatas.length+' ta fayl serverga yuborildi. Barcha formulalar BITTA sessiyada ogirilmoqda - bu ketma-ket yuborishdan tezroq, lekin baribir bir necha daqiqa ketishi mumkin...</div>';
+
+    var xhr=new XMLHttpRequest();
+    xhr.open('POST',RENDER_SERVER+'/parse_batch',true);
+    xhr.timeout=Math.max(1800000, fileDatas.length*90000); // har fayl uchun ~1.5 daq + zaxira
+    xhr.setRequestHeader('Content-Type','application/json');
+    xhr.onload=function(){
+      try{
+        var result=JSON.parse(xhr.responseText);
+        if(result.error)throw new Error(result.error);
+        var results=result.results||[];
+        var okCount=0, errCount=0;
+        results.forEach(function(r){
+          if(r.error){ errCount++; return; }
+          var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
+          saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},msg);
+          okCount++;
+        });
+        _pendingImportFolder=null;
+        msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okCount+' ta mavzu import qilindi!'+(errCount?' ('+errCount+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
+        renderQT();
+      }catch(e){
+        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server xatosi ('+e.message+'). Birma-bir (sekinroq) usulga otilmoqda...</div>';
+        fallbackSequential();
+      }
+    };
+    xhr.onerror=function(){
+      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server javob bermadi. Birma-bir (sekinroq) usulga otilmoqda...</div>';
+      fallbackSequential();
+    };
+    xhr.ontimeout=function(){
+      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi. Birma-bir (sekinroq) usulga otilmoqda...</div>';
+      fallbackSequential();
+    };
+    xhr.send(JSON.stringify({files:fileDatas}));
+  });
+
+  function fallbackSequential(){
+    var idx=0;
+    function next(){
+      if(idx>=valid.length){
+        _pendingImportFolder=null;
+        msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+valid.length+' ta mavzu (fayl) import qilindi!'+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
+        renderQT();
+        return;
+      }
+      var f=valid[idx];
+      msg.innerHTML='<div class="alt ai">&#x23F3; ('+(idx+1)+'/'+valid.length+') "'+f.name+'" qayta ishlanmoqda...</div>';
+      importExeAsync(f).then(function(){ idx++; next(); });
     }
-    var f=valid[idx];
-    msg.innerHTML='<div class="alt ai">&#x23F3; ('+(idx+1)+'/'+valid.length+') "'+f.name+'" qayta ishlanmoqda...</div>';
-    importExeAsync(f).then(function(){ idx++; next(); });
+    next();
   }
-  next();
 }
 function importExe(file){
   var msg=document.getElementById('imp-msg');
