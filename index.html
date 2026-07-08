@@ -210,7 +210,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       </div>
     </div>
     <div style="margin-top:26px;text-align:center">
-      <span id="ver-tap" onclick="_verTap()" style="font-size:10px;color:#cbd5e1;user-select:none;cursor:default">EduTest Pro &#183; v2.0</span>
+      <span style="font-size:10px;color:#cbd5e1;user-select:none">EduTest Pro &#183; v2.0</span>
     </div>
   </div>
 </div>
@@ -233,15 +233,15 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div id="form-rg" style="display:none">
         <div class="fg"><label>Ism Familiya</label><input type="text" id="rg-n" placeholder="Masalan: Abror Karimov"></div>
         <div class="fg">
-          <label>Viloyat</label>
+          <label>Viloyat *</label>
           <select id="rg-vil" onchange="onVilChange()"><option value="">-- Belgilanmagan --</option></select>
         </div>
         <div class="fg">
-          <label>Tuman/Shahar</label>
+          <label>Tuman/Shahar *</label>
           <select id="rg-tum" disabled><option value="">-- Avval viloyatni tanlang --</option></select>
         </div>
         <div class="fg">
-          <label>Maktab</label>
+          <label>Maktab *</label>
           <input type="text" id="rg-maktab" placeholder="Masalan: 21-maktab">
         </div>
         <div id="rg-cls-fg" class="fg">
@@ -313,7 +313,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <div class="ic">&#x1F9EA;</div>
         <h3>Sinov</h3><p class="ts tm">Natija saqlanmaydi</p>
       </div>
-      <div class="rcard" onclick="startTest('exam')">
+      <div class="rcard" id="exam-mode-card" onclick="startTest('exam')">
         <div class="ic">&#x1F3AF;</div>
         <h3>Imtihon</h3><p class="ts tm">Natija saqlanadi</p>
       </div>
@@ -440,7 +440,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         </select>
       </div>
       <div style="overflow-x:auto">
-        <table><thead><tr><th>#</th><th>O'quvchi</th><th>Sinf</th><th>Mavzu</th><th>Natija</th><th>Ball</th><th>Tur</th><th>Sana</th></tr></thead>
+        <table><thead><tr><th>#</th><th>O'quvchi</th><th>Sinf</th><th>Mavzu</th><th>Natija</th><th>Ball</th><th>Tur</th><th>Sana</th><th></th></tr></thead>
         <tbody id="r-tbody"></tbody></table>
       </div>
     </div>
@@ -479,6 +479,15 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   </div>
 
   <div class="tc" id="tc-s">
+    <div class="card">
+      <h3 style="margin-bottom:8px">&#x1F3AF; Imtihon rejimi</h3>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Ochirilsa, o'quvchilar sizning mavzularingizda faqat "Sinov" rejimida ishlaydi (natija saqlanmaydi) - "Imtihon" tugmasi ularga korinmaydi.</p>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="exam-toggle" checked onchange="toggleExamMode(this.checked)" style="width:20px;height:20px">
+        <span id="exam-toggle-label" style="font-size:14px;font-weight:600">Imtihon rejimi yoqilgan</span>
+      </label>
+      <div id="exam-toggle-msg"></div>
+    </div>
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
       <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Standart "admin / 1234" parolini o'zgartirib qo'ying — bu ma'lumot ko'pchilikka ma'lum bo'lishi mumkin.</p>
@@ -580,7 +589,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="card">
       <h2 style="margin-bottom:10px">Barcha natijalar</h2>
       <p class="ts tm" style="margin-bottom:12px">Faqat ko'rish uchun — bu yerdan hech narsani o'zgartirib bo'lmaydi.</p>
-      <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>O'quvchi</th><th>Sinf</th><th>Mavzu</th><th>Natija</th><th>Ball</th><th>Turi</th><th>Sana</th></tr></thead><tbody id="admin-results-tbody"></tbody></table></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>#</th><th>O'quvchi</th><th>Sinf</th><th>Mavzu</th><th>Natija</th><th>Ball</th><th>Turi</th><th>Sana</th><th></th></tr></thead><tbody id="admin-results-tbody"></tbody></table></div>
     </div>
   </div>
 
@@ -848,7 +857,20 @@ async function syncFromCloud() {
   }
 }
 
-function getAllQs() { var db=getDB(); return BQ.concat(db.userQs||[]); }
+function normSchool(s){ return (s||'').trim().toLowerCase(); }
+function isQVisibleToMe(q){
+  // Faqat oquvchilar uchun cheklov ishlaydi - ustoz va admin hammasini koradi
+  if(!ME || ME.role!=='student') return true;
+  var mySchool=normSchool(ME.maktab);
+  if(!mySchool) return true; // oquvchi maktabini kiritmagan - cheklanmaydi
+  if(!q.teacherId) return true; // tizim/eski savollar - hammaga ochiq
+  var db=getDB();
+  var t=(db.users||[]).find(function(u){return u.id===q.teacherId;});
+  var tSchool=normSchool(t&&t.maktab);
+  if(!tSchool) return true; // ustoz maktabini kiritmagan - umumiy hisoblanadi
+  return tSchool===mySchool;
+}
+function getAllQs() { var db=getDB(); return BQ.concat(db.userQs||[]).filter(isQVisibleToMe); }
 function getTopics() { var qs=getAllQs(),t=[]; qs.forEach(function(q){if(q.topic&&t.indexOf(q.topic)<0)t.push(q.topic);}); return t; }
 function getQsByTopic(t) { return getAllQs().filter(function(q){return q.topic===t;}); }
 // Ustoz panelida faqat OZ savollarini korsatish uchun (ustozlar orasida malumot ajratish)
@@ -879,19 +901,9 @@ function showPg(id){document.querySelectorAll('.pg').forEach(function(p){p.class
 function switchTab(id,el){document.querySelectorAll('.tc').forEach(function(t){t.classList.remove('on');});document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});document.getElementById(id).classList.add('on');el.classList.add('on');}
 
 var authRole='student';
-// Yashirin admin kirish - 2 usul:
-// 1) Telefon/kompyuter: pastdagi mayda "v2.0" yozuviga 7 marta tez bosish
-// 2) Kompyuter: klaviaturada maxfiy sozni terish
-var _verTaps=[];
-function _verTap(){
-  var now=Date.now();
-  _verTaps.push(now);
-  _verTaps=_verTaps.filter(function(t){return now-t<4000;});
-  if(_verTaps.length>=7){
-    _verTaps=[];
-    goAuth('admin');
-  }
-}
+// Yashirin admin kirish: bosh sahifada, hech qanday maydonga yozmasdan
+// shu maxfiy sozni tersa, admin login ochiladi.
+// MUHIM: quyidagi sozni ozingiz biladigan boshqa sozga almashtiring!
 var ADMIN_SECRET_PHRASE = 'boshqaruv2026';
 var _secretBuf = '';
 document.addEventListener('keydown', function(e){
@@ -986,6 +998,9 @@ function doRegister(){
   if(!name){showErr("Ism familiya kiriting!");return;}
   if(!user){showErr("Login kiriting!");return;}
   if(!pass){showErr("Parol kiriting!");return;}
+  if(!vil){showErr("Viloyatni tanlang!");return;}
+  if(!tum){showErr("Tuman/shaharni tanlang!");return;}
+  if(!maktab){showErr("Maktab nomini kiriting!");return;}
   if(authRole==='student'&&!cls){showErr("Sinf tanlang!");return;}
   if(authRole==='teacher'&&!subj){showErr("Fan tanlang!");return;}
   var db=getDB();
@@ -1112,6 +1127,15 @@ function selectTopicByName(t,el){
   var isTeacher=ME&&ME.role==='teacher';
   if(timerTeacher)timerTeacher.style.display=isTeacher?'flex':'none';
   if(timerTimeRow)timerTimeRow.style.display=(isTeacher&&document.getElementById('timer-toggle')&&document.getElementById('timer-toggle').checked)?'flex':'none';
+  // Agar shu mavzu egasi bolgan ustoz "Imtihon" rejimini ochirib qoygan bolsa - yashiramiz
+  var examCard=document.getElementById('exam-mode-card');
+  if(examCard){
+    var db=getDB();
+    var tq=(db.userQs||[]).find(function(q){return q.topic===t;});
+    var owner=tq&&tq.teacherId?(db.users||[]).find(function(u){return u.id===tq.teacherId;}):null;
+    var examOff=owner&&owner.examEnabled===false;
+    examCard.style.display=examOff?'none':'block';
+  }
   setTimeout(function(){mc.scrollIntoView({behavior:'smooth',block:'center'});},100);
 }
 function loadMyHist(){
@@ -1252,7 +1276,7 @@ function doSubmitTest(){
   }
   var correct=0,details=S.test.map(function(q,i){var ans=S.answers[i]||[],right=q.shuffledCorrect,ok=right.length>0&&right.every(function(r){return ans.indexOf(r)>=0;})&&ans.every(function(a){return right.indexOf(a)>=0;})&&ans.length>0;if(ok)correct++;return{text:q.text,options:q.options,userAns:ans,correct:right,ok:ok,img:q.img||q.image||''};});
   var pct=Math.round(correct/S.test.length*100);
-  var res={student:ME.name,cls:ME.cls,topic:selTopic,mode:S.mode,correct:correct,total:S.test.length,pct:pct,date:new Date().toLocaleDateString('uz-UZ'),time:new Date().toLocaleTimeString('uz-UZ'),details:details};
+  var res={id:'res'+Date.now()+'_'+Math.random().toString(36).slice(2,8),student:ME.name,cls:ME.cls,topic:selTopic,mode:S.mode,correct:correct,total:S.test.length,pct:pct,date:new Date().toLocaleDateString('uz-UZ'),time:new Date().toLocaleTimeString('uz-UZ'),details:details};
   S.lastRes=res;
   if(S.mode==='exam'){var db=getDB();db.results.push(res);saveDB(db);}
   S.mode='';S._blurWarnPending=false;
@@ -1543,8 +1567,33 @@ function loadResults(){
 function renderResults(){
   var db=getDB(),res=db.results||[],sn=(document.getElementById('rf-n').value||'').toLowerCase(),cl=document.getElementById('rf-c').value,mo=document.getElementById('rf-m').value;
   var f=res.filter(function(r){return(!sn||r.student.toLowerCase().indexOf(sn)>=0)&&(!cl||r.cls===cl||r.class===cl)&&(!mo||r.mode===mo);}).slice().reverse();
-  document.getElementById('r-tbody').innerHTML=f.slice(0,200).map(function(r,i){var bc=r.pct>=70?'bgr':r.pct>=50?'byl':'brd';var c=r.cls||r.class||'';return '<tr><td>'+(i+1)+'</td><td><strong>'+r.student+'</strong></td><td>'+c+'</td><td class="ts">'+r.topic+'</td><td>'+r.correct+'/'+r.total+'</td><td><span class="bdg '+bc+'">'+r.pct+'%</span></td><td><span class="bdg '+(r.mode==='exam'?'bbl':'bgy')+'">'+(r.mode==='exam'?'Imtihon':'Sinov')+'</span></td><td class="ts tm">'+r.date+'</td></tr>';}).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--mut)">Natijalar yo\'q</td></tr>';
+  document.getElementById('r-tbody').innerHTML=f.slice(0,200).map(function(r,i){var bc=r.pct>=70?'bgr':r.pct>=50?'byl':'brd';var c=r.cls||r.class||'';var idAttr=r.id?"'"+r.id+"'":'null';return '<tr><td>'+(i+1)+'</td><td><strong>'+r.student+'</strong></td><td>'+c+'</td><td class="ts">'+r.topic+'</td><td>'+r.correct+'/'+r.total+'</td><td><span class="bdg '+bc+'">'+r.pct+'%</span></td><td><span class="bdg '+(r.mode==='exam'?'bbl':'bgy')+'">'+(r.mode==='exam'?'Imtihon':'Sinov')+'</span></td><td class="ts tm">'+r.date+'</td><td>'+(r.details&&r.details.length?'<button class="btn bpu bsm" onclick="showResultDetail('+idAttr+')">&#x1F50D; Batafsil</button>':'<span class="ts tm">-</span>')+'</td></tr>';}).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--mut)">Natijalar yo\'q</td></tr>';
 }
+function showResultDetail(id){
+  if(!id){alert('Bu natija uchun batafsil malumot saqlanmagan (eski yozuv).');return;}
+  var db=getDB();
+  var r=(db.results||[]).find(function(x){return x.id===id;});
+  if(!r||!r.details){alert('Malumot topilmadi.');return;}
+  var body=document.getElementById('rd-modal-body');
+  body.innerHTML='<div style="margin-bottom:10px"><strong>'+r.student+'</strong> - '+(r.cls||'')+' &middot; <span class="ts tm">'+r.topic+' &middot; '+r.correct+'/'+r.total+' ('+r.pct+'%) &middot; '+r.date+'</span></div>'+
+    r.details.map(function(d,i){
+      var imgSrc=d.img||d.image||'';
+      return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px">'+
+        '<div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+
+        (imgSrc?'<img src="'+(imgSrc.indexOf('data:')===0?imgSrc:'data:image/png;base64,'+imgSrc)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+
+        (d.options||[]).map(function(opt,oi){
+          var isR=(d.correct||[]).indexOf(oi)>=0,isU=(d.userAns||[]).indexOf(oi)>=0;
+          var bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent';
+          var ic=isR?'&#9989;':(isU&&!isR)?'&#10060;':'&#11036;';
+          var isImg=opt&&(opt.indexOf('data:image')===0||opt.indexOf('/9j/')===0||opt.indexOf('iVBOR')===0);
+          var optContent=isImg?'<img src="'+(opt.indexOf('data:')===0?opt:'data:image/png;base64,'+opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;
+          return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';
+        }).join('')+
+      '</div>';
+    }).join('');
+  document.getElementById('rd-modal').style.display='flex';
+}
+function closeRD(){document.getElementById('rd-modal').style.display='none';}
 
 function loadClasses(){
   var db=getDB(),res=db.results||[],cls=db.classes||[];
@@ -1618,9 +1667,9 @@ function renderAdminOverview(){
 function renderAdminResults(){
   var db=getDB(),res=(db.results||[]).slice().reverse();
   document.getElementById('admin-results-tbody').innerHTML=res.slice(0,300).map(function(r,i){
-    var bc=r.pct>=70?'bgr':r.pct>=50?'byl':'brd';var c=r.cls||r.class||'';
-    return '<tr><td>'+(i+1)+'</td><td><strong>'+r.student+'</strong></td><td>'+c+'</td><td class="ts">'+r.topic+'</td><td>'+r.correct+'/'+r.total+'</td><td><span class="bdg '+bc+'">'+r.pct+'%</span></td><td><span class="bdg '+(r.mode==='exam'?'bbl':'bgy')+'">'+(r.mode==='exam'?'Imtihon':'Sinov')+'</span></td><td class="ts tm">'+r.date+'</td></tr>';
-  }).join('')||'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--mut)">Natijalar yoq</td></tr>';
+    var bc=r.pct>=70?'bgr':r.pct>=50?'byl':'brd';var c=r.cls||r.class||'';var idAttr=r.id?"'"+r.id+"'":'null';
+    return '<tr><td>'+(i+1)+'</td><td><strong>'+r.student+'</strong></td><td>'+c+'</td><td class="ts">'+r.topic+'</td><td>'+r.correct+'/'+r.total+'</td><td><span class="bdg '+bc+'">'+r.pct+'%</span></td><td><span class="bdg '+(r.mode==='exam'?'bbl':'bgy')+'">'+(r.mode==='exam'?'Imtihon':'Sinov')+'</span></td><td class="ts tm">'+r.date+'</td><td>'+(r.details&&r.details.length?'<button class="btn bpu bsm" onclick="showResultDetail('+idAttr+')">&#x1F50D;</button>':'')+'</td></tr>';
+  }).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--mut)">Natijalar yoq</td></tr>';
 }
 function renderAdminErrors(){
   var db=getDB(),res=db.results||[];
@@ -1669,10 +1718,21 @@ function genRandomTeacherCode(){
   initAdminSettings();
 }
 
+function toggleExamMode(on){
+  var db=getDB();
+  db.users.forEach(function(u){if(u.id===ME.id)u.examEnabled=on;});
+  saveDB(db);
+  ME.examEnabled=on;
+  document.getElementById('exam-toggle-label').textContent=on?'Imtihon rejimi yoqilgan':'Imtihon rejimi ochirilgan';
+  document.getElementById('exam-toggle-msg').innerHTML='<div class="alt as mt8">Saqlandi! '+(on?'O\'quvchilar yana "Imtihon" rejimidan foydalana oladi.':'O\'quvchilarga endi faqat "Sinov" rejimi korinadi.')+'</div>';
+}
 function initSettings(){
   var db=getDB();
   document.getElementById('cls-inp').value=(db.classes||[]).join(',');
   renderUsersT();
+  var examOn=ME.examEnabled!==false;
+  document.getElementById('exam-toggle').checked=examOn;
+  document.getElementById('exam-toggle-label').textContent=examOn?'Imtihon rejimi yoqilgan':'Imtihon rejimi ochirilgan';
   // Load saved Supabase config
   var savedUrl=localStorage.getItem('sb_url')||'';
   var savedKey=localStorage.getItem('sb_key')||'';
@@ -2448,6 +2508,13 @@ history.pushState(null, '', location.href);
 </script>
 
   <!-- EDIT Q MODAL -->
+  <div class="mbg" id="rd-modal" style="display:none;z-index:250">
+    <div class="modal" style="max-width:640px">
+      <div class="ch"><h3>O'quvchi javoblari (batafsil)</h3><button class="btn bg bsm" onclick="closeRD()">&#x2715;</button></div>
+      <div id="rd-modal-body"></div>
+    </div>
+  </div>
+
   <div class="mbg" id="finish-modal" style="display:none;z-index:300">
     <div class="modal" style="max-width:420px;text-align:center">
       <div id="finish-modal-body"></div>
@@ -2487,4 +2554,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-</html>
+                                                                                                  </html>
