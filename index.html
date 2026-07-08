@@ -710,7 +710,7 @@ async function sbPush(db) {
   if (!_sbReady || !_sb) return;
   try {
     await _sb.from('edutest_store').upsert({ key: SK, value: JSON.stringify(db) }, { onConflict: 'key' });
-  } catch(e) {}
+  } catch(e) { console.error('Supabase push xato (malumot juda katta bolishi mumkin):', e); }
 }
 
 async function sbPull() {
@@ -843,7 +843,14 @@ function defDB() {
 
 function saveDB(db) {
   db.v = (db.v||0)+1;
-  localStorage.setItem(SK, JSON.stringify(db));
+  try{
+    localStorage.setItem(SK, JSON.stringify(db));
+  }catch(e){
+    console.error('localStorage error:', e);
+    alert('⚠️ DIQQAT: Brauzer xotirasi TO\'LDI! Ma\'lumot saqlanmadi.\n\n'+
+      'Sabab: rasmlar/formulalar juda ko\'p bo\'lib ketdi, brauzer xotirasi (~5-10 MB) yetmayapti.\n\n'+
+      'Yechim: eski/kerak bolmagan mavzularni ochirib, joy boshating, yoki Supabase\'ga ulanib bulutga saqlashni sozlang (Sozlamalar bolimida).');
+  }
   sbPush(db); // async — doesn't block UI
 }
 
@@ -2554,4 +2561,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-                                                                                                  </html>
+  </html>
