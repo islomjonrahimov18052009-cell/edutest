@@ -254,6 +254,11 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
             <option value="">-- Fan tanlang --</option>
           </select>
         </div>
+        <div id="rg-tcls-fg" class="fg" style="display:none">
+          <label>Qaysi sinf(lar)ga dars berasiz</label>
+          <div id="rg-tcls-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;border:1.5px solid var(--bdr);border-radius:9px;max-height:150px;overflow-y:auto"></div>
+          <p class="ts tm" style="margin-top:5px">Bir nechtasini belgilashingiz mumkin - shu sinflar sizning testlaringizni ko'radi.</p>
+        </div>
         <div class="fg"><label>Login</label><input type="text" id="rg-u" placeholder="Foydalanuvchi nomi"></div>
         <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="rg-p" placeholder="Parol" style="padding-right:38px"><span onclick="togglePw('rg-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
         <div id="rg-code-fg" class="fg" style="display:none">
@@ -487,6 +492,13 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <span id="exam-toggle-label" style="font-size:14px;font-weight:600">Imtihon rejimi yoqilgan</span>
       </label>
       <div id="exam-toggle-msg"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">&#x1F3EB; Qaysi sinflarga dars berasiz</h3>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Faqat shu yerda belgilangan sinflardagi o'quvchilar sizning testlaringizni ko'radi. Boshqa sinflarga (va boshqa ustozlarning testlariga) ko'rinmaydi.</p>
+      <div id="settings-tcls-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;border:1.5px solid var(--bdr);border-radius:9px;max-height:180px;overflow-y:auto"></div>
+      <button class="btn bpu bsm mt8" onclick="saveMyClasses()">Saqlash</button>
+      <div id="tcls-msg"></div>
     </div>
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
@@ -770,6 +782,21 @@ function initMathBg(){
 initMathBg();
 
 // ── FANLAR VA VILOYAT/TUMAN MALUMOTLARI ────────────────────────────────────
+// ── RASM ANIQLASH VA MANZIL YASASH (umumiy yordamchi) ──────────────────────
+// Rasm endi 3 xil korinishda kelishi mumkin: to'liq data: URL, xom Base64,
+// yoki Supabase Storage havolasi (http/https). Shu funksiyalar hammasini
+// bitta joydan boshqaradi.
+function isImgVal(s){
+  if(!s || typeof s!=='string') return false;
+  return s.indexOf('data:image')===0 || s.indexOf('iVBOR')===0 || s.indexOf('/9j/')===0 ||
+         s.indexOf('http://')===0 || s.indexOf('https://')===0;
+}
+function imgSrcVal(s){
+  if(!s) return '';
+  if(s.indexOf('data:')===0 || s.indexOf('http://')===0 || s.indexOf('https://')===0) return s;
+  return 'data:image/png;base64,'+s;
+}
+
 var SUBJECTS=[
   {v:'math',n:'Matematika'},{v:'phys',n:'Fizika'},{v:'chem',n:'Kimyo'},
   {v:'bio',n:'Biologiya'},{v:'hist',n:'Tarix'},{v:'geo',n:'Geografiya'},
@@ -868,14 +895,21 @@ function normSchool(s){ return (s||'').trim().toLowerCase(); }
 function isQVisibleToMe(q){
   // Faqat oquvchilar uchun cheklov ishlaydi - ustoz va admin hammasini koradi
   if(!ME || ME.role!=='student') return true;
-  var mySchool=normSchool(ME.maktab);
-  if(!mySchool) return true; // oquvchi maktabini kiritmagan - cheklanmaydi
   if(!q.teacherId) return true; // tizim/eski savollar - hammaga ochiq
   var db=getDB();
   var t=(db.users||[]).find(function(u){return u.id===q.teacherId;});
-  var tSchool=normSchool(t&&t.maktab);
-  if(!tSchool) return true; // ustoz maktabini kiritmagan - umumiy hisoblanadi
-  return tSchool===mySchool;
+  if(!t) return true; // ustoz topilmadi (ochirilgan hisob) - eski malumot sifatida korsatamiz
+
+  // 1) Maktab mos kelishi kerak (agar ikkalasi ham korsatgan bolsa)
+  var mySchool=normSchool(ME.maktab), tSchool=normSchool(t.maktab);
+  if(mySchool && tSchool && mySchool!==tSchool) return false;
+
+  // 2) Ustoz aynan shu oquvchining sinfiga dars berishi kerak
+  // (agar ustoz oz sinflarini belgilagan bolsa - eski hisoblarda bolmasligi mumkin)
+  if(t.teachClasses && t.teachClasses.length){
+    if(!ME.cls || t.teachClasses.indexOf(ME.cls)<0) return false;
+  }
+  return true;
 }
 function getAllQs() { var db=getDB(); return BQ.concat(db.userQs||[]).filter(isQVisibleToMe); }
 function getTopics() { var qs=getAllQs(),t=[]; qs.forEach(function(q){if(q.topic&&t.indexOf(q.topic)<0)t.push(q.topic);}); return t; }
@@ -942,6 +976,7 @@ function goAuth(role){
   document.getElementById('auth-sub').textContent=isA?'Boshqaruv paneli':(isT?'Ustoz paneli':"Test ishlash");
   document.getElementById('rg-cls-fg').style.display=isT?'none':'block';
   document.getElementById('rg-subj-fg').style.display=isT?'block':'none';
+  document.getElementById('rg-tcls-fg').style.display=isT?'block':'none';
   document.getElementById('rg-code-fg').style.display=isT?'block':'none';
   document.getElementById('tab-rg').style.display=isA?'none':'flex';
   document.getElementById('auth-err').innerHTML='';
@@ -950,6 +985,11 @@ function goAuth(role){
   sel.innerHTML='<option value="">-- Sinf tanlang --</option>'+db.classes.map(function(c){return '<option>'+c+'</option>';}).join('');
   var subjSel=document.getElementById('rg-subj');
   subjSel.innerHTML='<option value="">-- Fan tanlang --</option>'+SUBJECTS.map(function(s){return '<option value="'+s.v+'">'+s.n+'</option>';}).join('');
+  var tclsList=document.getElementById('rg-tcls-list');
+  tclsList.innerHTML=db.classes.map(function(c){
+    var cEsc=c.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return '<label style="display:flex;align-items:center;gap:5px;padding:5px 9px;background:#f1f5f9;border-radius:7px;cursor:pointer;font-size:13px"><input type="checkbox" class="rg-tcls-chk" value="'+cEsc+'"> '+c+'</label>';
+  }).join('');
   var vilSel=document.getElementById('rg-vil');
   vilSel.innerHTML='<option value="">-- Belgilanmagan --</option>'+Object.keys(UZ_REGIONS).map(function(v){return '<option>'+v+'</option>';}).join('');
   document.getElementById('rg-tum').innerHTML='<option value="">-- Avval viloyatni tanlang --</option>';
@@ -998,6 +1038,7 @@ function doRegister(){
   var pass=document.getElementById('rg-p').value;
   var cls=authRole==='student'?document.getElementById('rg-cls').value:'';
   var subj=authRole==='teacher'?document.getElementById('rg-subj').value:'';
+  var tclasses=authRole==='teacher'?Array.prototype.slice.call(document.querySelectorAll('.rg-tcls-chk:checked')).map(function(c){return c.value;}):[];
   var vil=document.getElementById('rg-vil').value;
   var tum=document.getElementById('rg-tum').value;
   var maktab=document.getElementById('rg-maktab').value.trim();
@@ -1010,6 +1051,7 @@ function doRegister(){
   if(!maktab){showErr("Maktab nomini kiriting!");return;}
   if(authRole==='student'&&!cls){showErr("Sinf tanlang!");return;}
   if(authRole==='teacher'&&!subj){showErr("Fan tanlang!");return;}
+  if(authRole==='teacher'&&!tclasses.length){showErr("Kamida bitta sinfni belgilang!");return;}
   var db=getDB();
   if(authRole==='teacher'){
     if(db.teacherCodeUsed){showErr("Bu kod allaqachon ishlatilgan! Yangi kod olish uchun admin bilan boglaning.");return;}
@@ -1019,7 +1061,7 @@ function doRegister(){
   }
   var dup=db.users.filter(function(x){return x.login===user;});
   if(dup.length){showErr("Bu login band! Boshqa login tanlang.");return;}
-  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,viloyat:vil,tuman:tum,maktab:maktab};
+  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,teachClasses:tclasses,viloyat:vil,tuman:tum,maktab:maktab};
   db.users.push(nu);
   if(authRole==='teacher'){db.teacherCodeUsed=true;}
   saveDB(db);ME=nu;afterLogin();
@@ -1221,10 +1263,10 @@ function renderQ(){
       btnSub.style.opacity='1';
     }
   }
-  var imgSrc = q.img ? (q.img.startsWith('data:') ? q.img : 'data:image/jpeg;base64,'+q.img) : '';
+  var imgSrc = q.img ? imgSrcVal(q.img) : '';
   var imgHtml = imgSrc ? '<div style="text-align:center;margin:10px 0"><img src="'+imgSrc+'" style="max-width:100%;max-height:200px;border-radius:8px;background:#fff;padding:4px"></div>' : '';
   document.getElementById('t-qbody').innerHTML='<div style="font-weight:700;font-size:17px;margin-bottom:8px;line-height:1.6">'+(S.idx+1)+'. '+q.text+'</div>'+imgHtml+(q.isMulti?'<div class="alt ai ts" style="margin-bottom:10px">Ko\'p javobli: bir nechta to\'g\'ri</div>':'')+
-    q.options.map(function(opt,i){var sel=ans.indexOf(i)>=0;var ctrl=q.isMulti?'<div class="chk'+(sel?' on':'')+'"><span>'+(sel?'&#x2713;':'')+'</span></div>':'<div class="radio'+(sel?' on':'')+'"></div>';var isImg=opt&&(opt.startsWith('data:image')||opt.startsWith('/9j/')||opt.startsWith('iVBOR'));var optContent=isImg?'<img src="'+(opt.startsWith('data:')?opt:'data:image/png;base64,'+opt)+'" style="max-width:100%;max-height:150px;display:block;margin:6px 0 2px 0;background:#fff;border-radius:6px;padding:4px">':'<span> '+opt+'</span>';return '<div class="opt'+(sel?' sel':'')+'" onclick="selAns('+i+')">'+ctrl+'<div style="flex:1"><span>'+String.fromCharCode(65+i)+'.</span>'+optContent+'</div></div>';}).join('');
+    q.options.map(function(opt,i){var sel=ans.indexOf(i)>=0;var ctrl=q.isMulti?'<div class="chk'+(sel?' on':'')+'"><span>'+(sel?'&#x2713;':'')+'</span></div>':'<div class="radio'+(sel?' on':'')+'"></div>';var isImg=isImgVal(opt);var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-width:100%;max-height:150px;display:block;margin:6px 0 2px 0;background:#fff;border-radius:6px;padding:4px">':'<span> '+opt+'</span>';return '<div class="opt'+(sel?' sel':'')+'" onclick="selAns('+i+')">'+ctrl+'<div style="flex:1"><span>'+String.fromCharCode(65+i)+'.</span>'+optContent+'</div></div>';}).join('');
 }
 function goQ(d){S.idx=Math.max(0,Math.min(S.test.length-1,S.idx+d));renderQ();}
 function selAns(i){var q=S.test[S.idx],ans=(S.answers[S.idx]||[]).slice();if(q.isMulti){var x=ans.indexOf(i);if(x>=0)ans.splice(x,1);else ans.push(i);}else{ans=[i];}S.answers[S.idx]=ans;renderQ();}
@@ -1339,7 +1381,7 @@ function fireConfetti(count){
 }
 function toggleDetail(){
   showDet=!showDet;var el=document.getElementById('r-det');el.style.display=showDet?'block':'none';
-  if(showDet&&S.lastRes){document.getElementById('r-det-body').innerHTML=S.lastRes.details.map(function(d,i){return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px"><div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+(d.img||d.image?'<img src="'+((d.img||d.image).startsWith('data:')?(d.img||d.image):'data:image/png;base64,'+(d.img||d.image))+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+d.options.map(function(opt,oi){var isR=d.correct.indexOf(oi)>=0,isU=d.userAns.indexOf(oi)>=0,bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent',ic=isR?'✅':(isU&&!isR)?'❌':'⬜';var isImg=opt&&(opt.startsWith('data:image')||opt.startsWith('/9j/')||opt.startsWith('iVBOR'));var optContent=isImg?'<img src="'+(opt.startsWith('data:')?opt:'data:image/png;base64,'+opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';}).join('')+'</div>';}).join('');}
+  if(showDet&&S.lastRes){document.getElementById('r-det-body').innerHTML=S.lastRes.details.map(function(d,i){return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px"><div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+((d.img||d.image)?'<img src="'+imgSrcVal(d.img||d.image)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+d.options.map(function(opt,oi){var isR=d.correct.indexOf(oi)>=0,isU=d.userAns.indexOf(oi)>=0,bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent',ic=isR?'✅':(isU&&!isR)?'❌':'⬜';var isImg=isImgVal(opt);var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';}).join('')+'</div>';}).join('');}
 }
 
 function renderQT(){
@@ -1429,7 +1471,7 @@ function renderTopicDetail(t){
   window._detailQs = qs;
   tbody.innerHTML=qs.map(function(q,qi){
     var opts=(q.options||[]).map(function(o,oi){
-      var isImg=o&&(o.indexOf('data:image')===0||o.indexOf('iVBOR')===0);
+      var isImg=isImgVal(o);
       return String.fromCharCode(65+oi)+(isImg?'.[rasm]':'. '+o.substring(0,30));
     }).join('<br>');
     var correctOpts=(q.correct||[]).map(function(ci){return String.fromCharCode(65+ci);}).join(',');
@@ -1474,7 +1516,7 @@ function editQ(qid,topic){
   if(eqImgDiv){
     var qImg=q.img||q.image||'';
     if(qImg){
-      eqImgDiv.innerHTML='<img src="'+(qImg.startsWith('data:')?qImg:'data:image/png;base64,'+qImg)+'" style="max-width:100%;max-height:180px;border-radius:8px;margin-bottom:8px;display:block;background:#fff;padding:6px">';
+      eqImgDiv.innerHTML='<img src="'+imgSrcVal(qImg)+'" style="max-width:100%;max-height:180px;border-radius:8px;margin-bottom:8px;display:block;background:#fff;padding:6px">';
     } else {
       eqImgDiv.innerHTML='';
     }
@@ -1484,9 +1526,9 @@ function editQ(qid,topic){
   var correct=q.correct||[];
   var container=document.getElementById('eq-opts');
   container.innerHTML=opts.map(function(o,i){
-    var isImg=o&&(o.startsWith('data:image')||o.startsWith('/9j/')||o.startsWith('iVBOR'));
+    var isImg=isImgVal(o);
     var isCorrect=correct.indexOf(i)>=0;
-    var imgPart=isImg?'<img src="'+(o.startsWith('data:')?o:'data:image/png;base64,'+o)+'" style="max-height:80px;border-radius:6px;margin:4px 0;display:block">':'';
+    var imgPart=isImg?'<img src="'+imgSrcVal(o)+'" style="max-height:80px;border-radius:6px;margin:4px 0;display:block">':'';
     return '<div style="margin-bottom:10px;border:1px solid var(--color-border);border-radius:8px;padding:8px">'+
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
         '<span style="font-weight:600;min-width:20px">'+String.fromCharCode(65+i)+'.</span>'+
@@ -1587,13 +1629,13 @@ function showResultDetail(id){
       var imgSrc=d.img||d.image||'';
       return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px">'+
         '<div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+
-        (imgSrc?'<img src="'+(imgSrc.indexOf('data:')===0?imgSrc:'data:image/png;base64,'+imgSrc)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+
+        (imgSrc?'<img src="'+imgSrcVal(imgSrc)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+
         (d.options||[]).map(function(opt,oi){
           var isR=(d.correct||[]).indexOf(oi)>=0,isU=(d.userAns||[]).indexOf(oi)>=0;
           var bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent';
           var ic=isR?'&#9989;':(isU&&!isR)?'&#10060;':'&#11036;';
-          var isImg=opt&&(opt.indexOf('data:image')===0||opt.indexOf('/9j/')===0||opt.indexOf('iVBOR')===0);
-          var optContent=isImg?'<img src="'+(opt.indexOf('data:')===0?opt:'data:image/png;base64,'+opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;
+          var isImg=isImgVal(opt);
+          var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;
           return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';
         }).join('')+
       '</div>';
@@ -1740,6 +1782,12 @@ function initSettings(){
   var examOn=ME.examEnabled!==false;
   document.getElementById('exam-toggle').checked=examOn;
   document.getElementById('exam-toggle-label').textContent=examOn?'Imtihon rejimi yoqilgan':'Imtihon rejimi ochirilgan';
+  var myClasses=ME.teachClasses||[];
+  document.getElementById('settings-tcls-list').innerHTML=(db.classes||[]).map(function(c){
+    var cEsc=c.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    var checked=myClasses.indexOf(c)>=0?'checked':'';
+    return '<label style="display:flex;align-items:center;gap:5px;padding:5px 9px;background:#f1f5f9;border-radius:7px;cursor:pointer;font-size:13px"><input type="checkbox" class="settings-tcls-chk" value="'+cEsc+'" '+checked+'> '+c+'</label>';
+  }).join('');
   // Load saved Supabase config
   var savedUrl=localStorage.getItem('sb_url')||'';
   var savedKey=localStorage.getItem('sb_key')||'';
@@ -1753,6 +1801,15 @@ function initSettings(){
   }
 }
 
+function saveMyClasses(){
+  var selected=Array.prototype.slice.call(document.querySelectorAll('.settings-tcls-chk:checked')).map(function(c){return c.value;});
+  if(!selected.length){document.getElementById('tcls-msg').innerHTML='<div class="alt ar mt8">Kamida bitta sinfni belgilang!</div>';return;}
+  var db=getDB();
+  db.users.forEach(function(u){if(u.id===ME.id)u.teachClasses=selected;});
+  saveDB(db);
+  ME.teachClasses=selected;
+  document.getElementById('tcls-msg').innerHTML='<div class="alt as mt8">Saqlandi! Endi faqat '+selected.join(', ')+' sinflari sizning testlaringizni koradi.</div>';
+}
 function saveSbConfig(){
   var url=(document.getElementById('sb-url-inp').value||'').trim();
   var key=(document.getElementById('sb-key-inp').value||'').trim();
@@ -2065,6 +2122,13 @@ function importMultipleFiles(files,suggestedFolder){
 
   msg.innerHTML='<div class="alt ai">&#x23F3; '+valid.length+' ta fayl oqilmoqda...</div>';
 
+  // Fayllarni KICHIK GURUHLARGA bolib, ketma-ket yuboramiz - shunda bitta
+  // sorov hech qachon juda katta bolib ketmaydi (bu ba'zi hosting/tarmoq
+  // sozlamalarida sorov hajmi chegarasiga urilib qolishning oldini oladi,
+  // va telefon/kompyuterda bir xil, barqaror ishlashini taminlaydi).
+  var GROUP_SIZE=5;
+  var okTotal=0, errTotal=0;
+
   Promise.all(valid.map(function(f){
     return new Promise(function(res){
       var r=new FileReader();
@@ -2072,80 +2136,97 @@ function importMultipleFiles(files,suggestedFolder){
       r.onerror=function(){ res(null); };
       r.readAsDataURL(f);
     });
-  })).then(function(fileDatas){
-    fileDatas=fileDatas.filter(Boolean);
-    msg.innerHTML='<div class="alt ai">&#x23F3; '+fileDatas.length+' ta fayl serverga yuborildi, ish orqa fonda boshlandi...</div>';
+  })).then(function(allFileDatas){
+    allFileDatas=allFileDatas.filter(Boolean);
+    var groups=[];
+    for(var i=0;i<allFileDatas.length;i+=GROUP_SIZE){
+      groups.push(allFileDatas.slice(i,i+GROUP_SIZE));
+    }
+    processGroup(0);
 
-    fetch(RENDER_SERVER+'/parse_batch_start',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({files:fileDatas})
-    }).then(function(r){return r.json();}).then(function(startRes){
-      if(startRes.error)throw new Error(startRes.error);
-      var jobId=startRes.job_id;
-      pollJob(jobId);
-    }).catch(function(e){
-      msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server xatosi ('+e.message+'). Birma-bir (sekinroq) usulga otilmoqda...</div>';
-      fallbackSequential();
-    });
+    function processGroup(gi){
+      if(gi>=groups.length){
+        _pendingImportFolder=null;
+        msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
+        renderQT();
+        return;
+      }
+      var group=groups[gi];
+      msg.innerHTML='<div class="alt ai">&#x23F3; Guruh '+(gi+1)+'/'+groups.length+' ('+group.length+' fayl) serverga yuborildi...</div>';
+
+      fetch(RENDER_SERVER+'/parse_batch_start',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({files:group})
+      }).then(function(r){return r.json();}).then(function(startRes){
+        if(startRes.error)throw new Error(startRes.error);
+        pollJob(startRes.job_id, gi, group);
+      }).catch(function(e){
+        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' xatosi ('+e.message+'). Shu guruhni birma-bir usulga otkazamiz...</div>';
+        fallbackGroup(group, function(){ processGroup(gi+1); });
+      });
+    }
 
     var pollCount=0;
-    function pollJob(jobId){
+    function pollJob(jobId, gi, group){
       pollCount++;
-      if(pollCount>600){ // ~30 daqiqa (3s * 600)
-        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Juda uzoq davom etdi. Birma-bir (sekinroq) usulga otilmoqda...</div>';
-        fallbackSequential();
+      if(pollCount>400){ // ~20 daqiqa (3s * 400) - shu guruh uchun
+        pollCount=0;
+        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' juda uzoq davom etdi. Birma-bir usulga otkazamiz...</div>';
+        fallbackGroup(group, function(){ processGroup(gi+1); });
         return;
       }
       fetch(RENDER_SERVER+'/parse_batch_status/'+jobId).then(function(r){return r.json();}).then(function(st){
         if(st.error){
-          msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server xatosi ('+st.error+'). Birma-bir (sekinroq) usulga otilmoqda...</div>';
-          fallbackSequential();
+          pollCount=0;
+          msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' xatosi ('+st.error+'). Birma-bir usulga otkazamiz...</div>';
+          fallbackGroup(group, function(){ processGroup(gi+1); });
           return;
         }
         if(st.status==='processing'){
-          msg.innerHTML='<div class="alt ai">&#x23F3; '+(st.progress||'qayta ishlanmoqda...')+'</div>';
-          setTimeout(function(){ pollJob(jobId); },3000);
+          msg.innerHTML='<div class="alt ai">&#x23F3; Guruh '+(gi+1)+'/'+Math.ceil(valid.length/GROUP_SIZE)+': '+(st.progress||'qayta ishlanmoqda...')+'</div>';
+          setTimeout(function(){ pollJob(jobId, gi, group); },3000);
           return;
         }
         if(st.status==='done'){
           var results=st.results||[];
-          var okCount=0, errCount=0;
           results.forEach(function(r){
-            if(r.error){ errCount++; return; }
+            if(r.error){ errTotal++; return; }
             var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
             saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},msg);
-            okCount++;
+            okTotal++;
           });
-          _pendingImportFolder=null;
-          msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okCount+' ta mavzu import qilindi!'+(errCount?' ('+errCount+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
-          renderQT();
+          pollCount=0;
+          processGroup(gi+1);
           return;
         }
-        // status === 'error'
-        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server xatosi. Birma-bir (sekinroq) usulga otilmoqda...</div>';
-        fallbackSequential();
+        pollCount=0;
+        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' xatosi. Birma-bir usulga otkazamiz...</div>';
+        fallbackGroup(group, function(){ processGroup(gi+1); });
       }).catch(function(){
-        setTimeout(function(){ pollJob(jobId); },3000); // vaqtincha tarmoq xatosi - qayta urinamiz
+        setTimeout(function(){ pollJob(jobId, gi, group); },3000); // vaqtincha tarmoq xatosi - qayta urinamiz
       });
     }
-  });
 
-  function fallbackSequential(){
-    var idx=0;
-    function next(){
-      if(idx>=valid.length){
-        _pendingImportFolder=null;
-        msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+valid.length+' ta mavzu (fayl) import qilindi!'+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
-        renderQT();
-        return;
+    function fallbackGroup(group, doneCb){
+      // Shu guruhdagi fayllarni bittalab (eski, sekinroq) usulda ozbeticha jonatamiz
+      var idx=0;
+      function next(){
+        if(idx>=group.length){ doneCb(); return; }
+        var fd=group[idx];
+        msg.innerHTML='<div class="alt ai">&#x23F3; ('+(idx+1)+'/'+group.length+') "'+fd.filename+'" birma-bir qayta ishlanmoqda...</div>';
+        // Base64 malumotdan qayta File-ga oxshash obyekt yasab, sendToServer orqali yuboramiz
+        var byteChars=atob(fd.data);
+        var byteNums=new Array(byteChars.length);
+        for(var i=0;i<byteChars.length;i++) byteNums[i]=byteChars.charCodeAt(i);
+        var byteArray=new Uint8Array(byteNums);
+        var blob=new Blob([byteArray]);
+        blob.name=fd.filename;
+        sendToServer(blob,msg).then(function(){ okTotal++; idx++; next(); });
       }
-      var f=valid[idx];
-      msg.innerHTML='<div class="alt ai">&#x23F3; ('+(idx+1)+'/'+valid.length+') "'+f.name+'" qayta ishlanmoqda...</div>';
-      importExeAsync(f).then(function(){ idx++; next(); });
+      next();
     }
-    next();
-  }
+  });
 }
 function importExe(file){
   var msg=document.getElementById('imp-msg');
@@ -2260,7 +2341,7 @@ function _aiEsc(s) {
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 function _aiIsImg(o) {
-  return !!(o && (o.indexOf('data:image') === 0 || o.indexOf('iVBOR') === 0));
+  return isImgVal(o);
 }
 function _aiOptHtml(o) {
   if (_aiIsImg(o)) return '<img src="' + o + '" style="max-width:100%;max-height:110px;border-radius:6px">';
