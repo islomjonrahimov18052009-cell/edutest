@@ -892,26 +892,31 @@ async function syncFromCloud() {
 }
 
 function normSchool(s){ return (s||'').trim().toLowerCase(); }
-function isQVisibleToMe(q){
-  // Faqat oquvchilar uchun cheklov ishlaydi - ustoz va admin hammasini koradi
-  if(!ME || ME.role!=='student') return true;
-  if(!q.teacherId) return true; // tizim/eski savollar - hammaga ochiq
+function getAllQs() {
   var db=getDB();
-  var t=(db.users||[]).find(function(u){return u.id===q.teacherId;});
-  if(!t) return true; // ustoz topilmadi (ochirilgan hisob) - eski malumot sifatida korsatamiz
-
-  // 1) Maktab mos kelishi kerak (agar ikkalasi ham korsatgan bolsa)
-  var mySchool=normSchool(ME.maktab), tSchool=normSchool(t.maktab);
-  if(mySchool && tSchool && mySchool!==tSchool) return false;
-
-  // 2) Ustoz aynan shu oquvchining sinfiga dars berishi kerak
-  // (agar ustoz oz sinflarini belgilagan bolsa - eski hisoblarda bolmasligi mumkin)
-  if(t.teachClasses && t.teachClasses.length){
-    if(!ME.cls || t.teachClasses.indexOf(ME.cls)<0) return false;
-  }
-  return true;
+  var all=BQ.concat(db.userQs||[]);
+  // Faqat oquvchilar uchun cheklov ishlaydi - ustoz va admin hammasini koradi
+  if(!ME || ME.role!=='student') return all;
+  // MUHIM: getDB() ni har bir savol uchun emas, FAQAT BIR MARTA chaqiramiz
+  // va ustozlar xaritasini oldindan tuzamiz - aks holda minglab savolda
+  // sayt juda sekinlashib qolar edi (bu avvalgi jiddiy sekinlik sababi edi).
+  var teacherMap={};
+  (db.users||[]).forEach(function(u){ teacherMap[u.id]=u; });
+  var mySchool=normSchool(ME.maktab);
+  return all.filter(function(q){
+    if(!q.teacherId) return true; // tizim/eski savollar - hammaga ochiq
+    var t=teacherMap[q.teacherId];
+    if(!t) return true; // ustoz topilmadi (ochirilgan hisob) - eski malumot sifatida korsatamiz
+    // 1) Maktab mos kelishi kerak (agar ikkalasi ham korsatgan bolsa)
+    var tSchool=normSchool(t.maktab);
+    if(mySchool && tSchool && mySchool!==tSchool) return false;
+    // 2) Ustoz aynan shu oquvchining sinfiga dars berishi kerak
+    if(t.teachClasses && t.teachClasses.length){
+      if(!ME.cls || t.teachClasses.indexOf(ME.cls)<0) return false;
+    }
+    return true;
+  });
 }
-function getAllQs() { var db=getDB(); return BQ.concat(db.userQs||[]).filter(isQVisibleToMe); }
 function getTopics() { var qs=getAllQs(),t=[]; qs.forEach(function(q){if(q.topic&&t.indexOf(q.topic)<0)t.push(q.topic);}); return t; }
 function getQsByTopic(t) { return getAllQs().filter(function(q){return q.topic===t;}); }
 // Ustoz panelida faqat OZ savollarini korsatish uchun (ustozlar orasida malumot ajratish)
@@ -1131,6 +1136,13 @@ function renderTopics(){
   var folderOf={};
   (db.topicsMeta||[]).forEach(function(m){ if(m.folder && !folderOf[m.topic]) folderOf[m.topic]=m.folder; });
 
+  // Har bir mavzu uchun savollar sonini va metani BIR MARTA hisoblab olamiz
+  // (aks holda har mavzu uchun butun royxatni qayta aylanib chiqish kerak bolar edi - sekin)
+  var qsCountByTopic={};
+  allQs.forEach(function(q){ if(q.topic) qsCountByTopic[q.topic]=(qsCountByTopic[q.topic]||0)+1; });
+  var metaByTopic={};
+  (db.topicsMeta||[]).concat(INIT_META).forEach(function(m){ if(m.topic && !metaByTopic[m.topic]) metaByTopic[m.topic]=m; });
+
   var grid=document.getElementById('topic-grid');
 
   if(_curFolder){
@@ -1138,9 +1150,9 @@ function renderTopics(){
     var inFolder=topics.filter(function(t){return folderOf[t]===_curFolder;});
     var html='<div class="tbtn" style="border-style:dashed" onclick="_curFolder=null;renderTopics()"><div style="font-weight:700">&#8592; Orqaga</div><div style="font-size:11px;color:var(--mut);margin-top:3px">Kitoblar royxatiga</div></div>';
     html+=inFolder.map(function(t){
-      var qs=getQsByTopic(t),meta=getTopicMeta(t),ask=meta?meta.questionsToAsk:qs.length;
+      var cnt=qsCountByTopic[t]||0,meta=metaByTopic[t],ask=meta?meta.questionsToAsk:cnt;
       var tEsc=t.replace(/'/g,"\\'");
-      return '<div class="tbtn" onclick="selectTopicByName(\''+tEsc+'\',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
+      return '<div class="tbtn" onclick="selectTopicByName(\''+tEsc+'\',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,cnt)+' ta savol</div></div>';
     }).join('');
     grid.innerHTML=html||'<p class="ts tm">Bu papkada mavzular yoq</p>';
     return;
@@ -1157,9 +1169,9 @@ function renderTopics(){
     return '<div class="tbtn" style="background:#f5f3ff" onclick="_curFolder=\''+fn.replace(/'/g,"\\'")+'\';renderTopics()"><div style="font-weight:700">&#x1F4D8; '+fn+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+cnt+' ta mavzu</div></div>';
   }).join('');
   html+=unfoldered.map(function(t){
-    var qs=getQsByTopic(t),meta=getTopicMeta(t),ask=meta?meta.questionsToAsk:qs.length;
+    var cnt=qsCountByTopic[t]||0,meta=metaByTopic[t],ask=meta?meta.questionsToAsk:cnt;
     var tEsc=t.replace(/'/g,"\\'");
-    return '<div class="tbtn" onclick="selectTopicByName(\''+tEsc+'\',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,qs.length)+' ta savol</div></div>';
+    return '<div class="tbtn" onclick="selectTopicByName(\''+tEsc+'\',this)"><div style="font-weight:700">'+t+'</div><div style="font-size:11px;color:var(--mut);margin-top:3px">'+Math.min(ask,cnt)+' ta savol</div></div>';
   }).join('');
   grid.innerHTML=html||'<p class="ts tm">Mavzular yo\'q</p>';
 }
