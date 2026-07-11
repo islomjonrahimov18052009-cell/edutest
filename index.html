@@ -1501,13 +1501,26 @@ function renderTopicDetail(t){
 }
 
 function editQByIdx(qi){ var q=window._detailQs[qi]; if(q) editQ(q.id, _curTopicDetail); }
-function deleteQByIdx(qi){ var q=window._detailQs[qi]; if(q) deleteQ(q.id); }
+function deleteQByIdx(qi){ var q=window._detailQs[qi]; if(q) deleteQ(q.id,_curTopicDetail); }
 
 
-function deleteQ(qid){
+function deleteQ(qid,topic){
   if(!confirm('Savolni o\'chirasizmi?'))return;
   var db=getDB();
-  db.userQs=(db.userQs||[]).filter(function(q){return !(q.id===qid&&q.teacherId===ME.id);});
+  var before=(db.userQs||[]).length;
+  // Xavfsizlik uchun: agar topic berilgan bolsa, faqat SHU mavzudagi mos ID ochiriladi
+  // (import qilingan fayllarda ID lar turli mavzularda takrorlanishi mumkin edi)
+  var matched=(db.userQs||[]).filter(function(q){return q.id===qid&&q.teacherId===ME.id&&(!topic||q.topic===topic);});
+  if(matched.length>1){
+    // Bir nechta mos keldi - faqat birinchisini ochiramiz (xavfsizroq)
+    var removedOne=false;
+    db.userQs=(db.userQs||[]).filter(function(q){
+      if(!removedOne && q.id===qid && q.teacherId===ME.id && (!topic||q.topic===topic)){ removedOne=true; return false; }
+      return true;
+    });
+  } else {
+    db.userQs=(db.userQs||[]).filter(function(q){return !(q.id===qid&&q.teacherId===ME.id&&(!topic||q.topic===topic));});
+  }
   saveDB(db);
   renderTopicDetail(_curTopicDetail);
   renderQT();
@@ -1515,7 +1528,10 @@ function deleteQ(qid){
 
 function editQ(qid,topic){
   var qs=getMyQs();
-  var q=qs.find(function(x){return x.id===qid;});
+  // Xavfsizlik uchun: faqat id emas, mavzu ham mos kelishi kerak
+  // (import qilingan fayllarda ID lar turli mavzularda takrorlanishi mumkin edi)
+  var q=qs.find(function(x){return x.id===qid && x.topic===topic;});
+  if(!q) q=qs.find(function(x){return x.id===qid;}); // zaxira: eski malumotlar uchun
   if(!q)return;
   
   // Modal ochish
@@ -1558,7 +1574,8 @@ function saveEditQ(){
   var topic=document.getElementById('eq-topic').value;
   var newText=document.getElementById('eq-text').value.trim();
   var db=getDB();
-  var uq=db.userQs.find(function(x){return x.id===qid;});
+  var uq=db.userQs.find(function(x){return x.id===qid && x.topic===topic && x.teacherId===ME.id;});
+  if(!uq) uq=db.userQs.find(function(x){return x.id===qid;}); // zaxira: eski malumotlar uchun
   if(!uq){closeEditQ();return;}
   if(newText)uq.text=newText;
   // Javoblarni yangilash
@@ -2018,7 +2035,15 @@ var RENDER_SERVER='https://edutest-server.onrender.com';
 function saveImportedQs(parsed,msg){
   var db=getDB();
   db.userQs=db.userQs||[];
-  parsed.qs.forEach(function(q){q.teacherId=ME.id;if(!q.subject)q.subject=ME.subject||'math';});
+  // MUHIM: server har bir faylning savollariga 0,1,2,... kabi kichik
+  // raqamlar beradi - agar bir nechta mavzu import qilinsa, ID lar
+  // takrorlanib, tahrirlash/ochirishda notogri savolga tegishi mumkin
+  // edi. Shuning uchun har bir savolga GLOBAL nodir ID beramiz.
+  parsed.qs.forEach(function(q,idx){
+    q.id=Date.now()+'_'+idx+'_'+Math.random().toString(36).slice(2,8);
+    q.teacherId=ME.id;
+    if(!q.subject)q.subject=ME.subject||'math';
+  });
   db.userQs=db.userQs.filter(function(q){return !(q.topic===parsed.topic&&q.teacherId===ME.id);});
   db.userQs=db.userQs.concat(parsed.qs);
   db.topicsMeta=db.topicsMeta||[];
