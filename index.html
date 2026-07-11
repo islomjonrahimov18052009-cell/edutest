@@ -873,10 +873,11 @@ function saveDB(db) {
   try{
     localStorage.setItem(SK, JSON.stringify(db));
   }catch(e){
-    console.error('localStorage error:', e);
-    alert('⚠️ DIQQAT: Brauzer xotirasi TO\'LDI! Ma\'lumot saqlanmadi.\n\n'+
-      'Sabab: rasmlar/formulalar juda ko\'p bo\'lib ketdi, brauzer xotirasi (~5-10 MB) yetmayapti.\n\n'+
-      'Yechim: eski/kerak bolmagan mavzularni ochirib, joy boshating, yoki Supabase\'ga ulanib bulutga saqlashni sozlang (Sozlamalar bolimida).');
+    // Brauzer xotirasi (localStorage) tolib qolgan bolishi mumkin - lekin bu
+    // muammo emas, chunki asosiy malumot baribir Supabase'ga (serverga)
+    // saqlanadi (pastdagi sbPush). Faqat konsolga yozib qoyamiz, foydalanuvchini
+    // bezovta qilmaymiz.
+    console.error('localStorage toldi (Supabase orqali baribir saqlanadi):', e);
   }
   sbPush(db); // async — doesn't block UI
 }
