@@ -680,10 +680,55 @@ var SK = 'edutest_v3';
 // Supabase sozlamalari — bu yerga o'z kalitlaringizni kiriting:
 var SB_URL = 'https://ykpegjtexjwddsfgwwpw.supabase.co';
 var SB_KEY = 'sb_publishable_sU45gZYAtOGHx2SLnZfC_A_JqKLqLry';
+var SB_STORAGE_BUCKET = 'edutest-images';
 
 var _sb = null;
 var _sbReady = false;
 var _realtimeCh = null;
+
+// ── RASMLARNI SUPABASE STORAGE'GA YUKLASH ──────────────────────────────────
+// Rasmlarni asosiy ma'lumotlar bazasi (JSON) ichida Base64 sifatida saqlash
+// o'rniga, alohida fayl saqlash xizmatiga (Storage) yuklaymiz va faqat
+// QISQA HAVOLANI saqlaymiz. Bu asosiy JSON hajmini yuzlab marta kichraytiradi
+// va Supabase'ning kichik serverini haddan tashqari band qilib qoymaydi.
+async function uploadImageToStorage(dataUrl, keyHint){
+  if(!_sbReady || !_sb) return dataUrl; // Supabase ulanmagan - eski usulda qoladi
+  try{
+    var match = dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
+    if(!match) return dataUrl; // notanish format yoki allaqachon URL
+    var mime = match[1], b64 = match[2];
+    var ext = (mime.split('/')[1] || 'png').replace('jpeg','jpg');
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    var blob = new Blob([bytes], {type: mime});
+    var path = (keyHint||'img') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.' + ext;
+    var res = await _sb.storage.from(SB_STORAGE_BUCKET).upload(path, blob, {contentType: mime, upsert:false});
+    if(res.error){ console.error('Storage upload xato:', res.error); return dataUrl; }
+    var pub = _sb.storage.from(SB_STORAGE_BUCKET).getPublicUrl(path);
+    return (pub.data && pub.data.publicUrl) ? pub.data.publicUrl : dataUrl;
+  }catch(e){ console.error('uploadImageToStorage xato:', e); return dataUrl; }
+}
+// Kop rasmni bir vaqtda (lekin cheklangan miqdorda parallel) yuklash -
+// minglab rasm bolganda ham brauzerni "qotirmaydi" va tezroq ishlaydi.
+async function uploadAllImages(items){
+  if(!_sbReady || !_sb || !items.length) return;
+  var CONCURRENCY = 8;
+  var idx = 0;
+  async function worker(){
+    while(idx < items.length){
+      var i = idx++;
+      var item = items[i];
+      var val = item.get();
+      if(val && typeof val==='string' && val.indexOf('data:image')===0){
+        try{ item.set(await uploadImageToStorage(val, item.hint)); }catch(e){}
+      }
+    }
+  }
+  var workers = [];
+  for(var w=0; w<CONCURRENCY && w<items.length; w++) workers.push(worker());
+  await Promise.all(workers);
+}
 
 function sbInit() {
   if (!SB_URL || !SB_KEY) { _sbReady = false; return; }
@@ -1429,9 +1474,32 @@ function renderQT(){
 }
 
 
+// Ochirilgan savol/mavzuga tegishli Supabase Storage'dagi rasmlarni ham
+// ochiradi - aks holda ular "etim" (hech kim ishlatmaydigan) fayllar
+// bolib serverda joy band qilib qolaveradi.
+function deleteStorageImagesFor(questions){
+  if(!_sbReady || !_sb) return;
+  var paths=[];
+  function extractPath(url){
+    if(!url || typeof url!=='string') return null;
+    var marker='/storage/v1/object/public/'+SB_STORAGE_BUCKET+'/';
+    var idx=url.indexOf(marker);
+    if(idx<0) return null;
+    return url.slice(idx+marker.length);
+  }
+  (questions||[]).forEach(function(q){
+    var p1=extractPath(q.img); if(p1) paths.push(p1);
+    (q.options||[]).forEach(function(opt){ var p2=extractPath(opt); if(p2) paths.push(p2); });
+  });
+  if(paths.length){
+    _sb.storage.from(SB_STORAGE_BUCKET).remove(paths).catch(function(e){console.error('Storage ochirish xato:',e);});
+  }
+}
 function deleteTopic(t){
   if(!confirm('\''+t+'\'mavzusini va uning barcha savollarini o\'chirasizmi?'))return;
   var db=getDB();
+  var toDelete=(db.userQs||[]).filter(function(q){return q.topic===t&&q.teacherId===ME.id;});
+  deleteStorageImagesFor(toDelete);
   db.userQs=(db.userQs||[]).filter(function(q){return !(q.topic===t&&q.teacherId===ME.id);});
   db.topicsMeta=(db.topicsMeta||[]).filter(function(m){return !(m.topic===t&&m.teacherId===ME.id);});
   saveDB(db);
@@ -1512,6 +1580,7 @@ function deleteQ(qid,topic){
   // Xavfsizlik uchun: agar topic berilgan bolsa, faqat SHU mavzudagi mos ID ochiriladi
   // (import qilingan fayllarda ID lar turli mavzularda takrorlanishi mumkin edi)
   var matched=(db.userQs||[]).filter(function(q){return q.id===qid&&q.teacherId===ME.id&&(!topic||q.topic===topic);});
+  deleteStorageImagesFor(matched.slice(0,1));
   if(matched.length>1){
     // Bir nechta mos keldi - faqat birinchisini ochiramiz (xavfsizroq)
     var removedOne=false;
@@ -2033,18 +2102,36 @@ document.getElementById('json-inp').addEventListener('change',function(){
 
 var RENDER_SERVER='https://edutest-server.onrender.com';
 
-function saveImportedQs(parsed,msg){
-  var db=getDB();
-  db.userQs=db.userQs||[];
-  // MUHIM: server har bir faylning savollariga 0,1,2,... kabi kichik
-  // raqamlar beradi - agar bir nechta mavzu import qilinsa, ID lar
-  // takrorlanib, tahrirlash/ochirishda notogri savolga tegishi mumkin
-  // edi. Shuning uchun har bir savolga GLOBAL nodir ID beramiz.
+async function saveImportedQs(parsed,msg){
+  // MUHIM: har bir savolga GLOBAL nodir ID beramiz (bir nechta mavzu
+  // import qilinganda ID lar takrorlanib qolmasligi uchun)
   parsed.qs.forEach(function(q,idx){
     q.id=Date.now()+'_'+idx+'_'+Math.random().toString(36).slice(2,8);
     q.teacherId=ME.id;
     if(!q.subject)q.subject=ME.subject||'math';
   });
+
+  // Rasmlarni Supabase Storage'ga yuklab, asosiy JSON ichida
+  // faqat qisqa havolalarni qoldiramiz (localStorage/Supabase
+  // ma'lumot bazasi tolib-toshib ketmasligi uchun)
+  if(_sbReady && _sb){
+    var items=[];
+    parsed.qs.forEach(function(q){
+      if(q.img) items.push({get:function(){return q.img;}, set:function(v){q.img=v;}, hint:'q'});
+      (q.options||[]).forEach(function(opt,oi){
+        if(opt && typeof opt==='string' && opt.indexOf('data:image')===0){
+          items.push({get:function(){return q.options[oi];}, set:function(v){q.options[oi]=v;}, hint:'opt'});
+        }
+      });
+    });
+    if(items.length){
+      msg.innerHTML='<div class="alt ai">&#x2601;&#xFE0F; '+items.length+' ta rasm bulutga (Storage) yuklanmoqda...</div>';
+      await uploadAllImages(items);
+    }
+  }
+
+  var db=getDB();
+  db.userQs=db.userQs||[];
   db.userQs=db.userQs.filter(function(q){return !(q.topic===parsed.topic&&q.teacherId===ME.id);});
   db.userQs=db.userQs.concat(parsed.qs);
   db.topicsMeta=db.topicsMeta||[];
@@ -2073,7 +2160,7 @@ async function importViaBrowser(data,msg){
         if(text.indexOf('QuestionBlock')<0)continue;
         var parsed=parseEQ(text);
         if(parsed.qs.length){
-          saveImportedQs(parsed,msg);
+          await saveImportedQs(parsed,msg);
           return;
         }
       }catch(ex){}
@@ -2095,13 +2182,13 @@ function sendToServer(file,msg){
       xhr.timeout=1800000;
       xhr.setRequestHeader('Content-Type','application/json');
       msg.innerHTML='<div class="alt ai">&#x23F3; Serverga yuborildi ('+sizeMB+' MB). Katta fayllar 10-30 daqiqagacha vaqt olishi mumkin, kuting...</div>';
-      xhr.onload=function(){
+      xhr.onload=async function(){
         try{
           var result=JSON.parse(xhr.responseText);
           if(result.error)throw new Error(result.error);
           if(!result.questions||!result.questions.length)throw new Error('Savollar topilmadi');
           var qs=result.questions.map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
-          saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
+          await saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
         }catch(e){
           msg.innerHTML='<div class="alt ar">&#x274C; Server xatosi ('+file.name+'): '+e.message+'</div>';
         }
@@ -2214,7 +2301,7 @@ function importMultipleFiles(files,suggestedFolder){
         fallbackGroup(group, function(){ processGroup(gi+1); });
         return;
       }
-      fetch(RENDER_SERVER+'/parse_batch_status/'+jobId).then(function(r){return r.json();}).then(function(st){
+      fetch(RENDER_SERVER+'/parse_batch_status/'+jobId).then(function(r){return r.json();}).then(async function(st){
         if(st.error){
           pollCount=0;
           msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' xatosi ('+st.error+'). Birma-bir usulga otkazamiz...</div>';
@@ -2228,12 +2315,13 @@ function importMultipleFiles(files,suggestedFolder){
         }
         if(st.status==='done'){
           var results=st.results||[];
-          results.forEach(function(r){
-            if(r.error){ errTotal++; return; }
+          for(var ri=0;ri<results.length;ri++){
+            var r=results[ri];
+            if(r.error){ errTotal++; continue; }
             var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
-            saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},msg);
+            await saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},msg);
             okTotal++;
-          });
+          }
           pollCount=0;
           processGroup(gi+1);
           return;
@@ -2680,4 +2768,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-</html>
+      </html>
