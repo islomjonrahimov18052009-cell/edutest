@@ -1075,9 +1075,14 @@ function showAuthTab(tab){
   document.getElementById('auth-err').innerHTML='';
 }
 function showErr(m){document.getElementById('auth-err').innerHTML='<div class="alt ar mt8">'+m+'</div>';}
-function doLogin(){
+async function doLogin(){
   var u=document.getElementById('li-u').value.trim(),p=document.getElementById('li-p').value;
   if(!u||!p){showErr("Login va parol kiriting!");return;}
+  // MUHIM: login qilishdan oldin bulutdagi ENG SO'NGGI holatni tortib olamiz -
+  // aks holda boshqa qurilmada parol/malumot ozgargan bolsa, bu yerda hali
+  // eski (keshlangan) nusxa bilan tekshirilib qolishi mumkin edi.
+  document.getElementById('auth-err').innerHTML='<div class="alt ai">&#x23F3; Tekshirilmoqda...</div>';
+  try{ await syncFromCloud(); }catch(e){}
   var db=getDB(),found=null;
   db.users.forEach(function(x){if(x.login===u&&x.pass===p&&x.role===authRole)found=x;});
   if(!found){showErr("Login yoki parol noto'g'ri!");return;}
