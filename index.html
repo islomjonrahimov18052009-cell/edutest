@@ -657,7 +657,23 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 
 </div>
 
+<!-- FOLDER PICK MODAL (bitta test yuklanganda qaysi faylga/papkaga qo'shishni tanlash) -->
+<div class="mbg" id="fp-modal" style="display:none">
+  <div class="modal">
+    <div class="mh"><h3>Qaysi faylga qo'shamiz?</h3><button class="xb" onclick="closeFP()">&#x2715;</button></div>
+    <p class="ts tm" style="margin-bottom:10px">Har bir test albatta biror faylga (kitobga) tegishli bo'lishi kerak. Mavjud fayllardan birini tanlang yoki yangisini yarating.</p>
+    <div id="fp-existing" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:14px"></div>
+    <div class="fg"><label>Yangi fayl yaratish</label>
+      <div class="fx" style="gap:8px">
+        <input type="text" id="fp-newname" placeholder="Yangi fayl nomi" style="flex:1">
+        <button class="btn bpu bsm" onclick="submitFP(null,true)">&#x2795; Yaratish</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ADD Q MODAL -->
+
 <div class="mbg" id="aq-modal" style="display:none">
   <div class="modal">
     <div class="mh"><h3>Savol qo'shish</h3><button class="xb" onclick="closeAQ()">&#x2715;</button></div>
@@ -670,6 +686,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <label>Savol matni</label>
       <textarea id="aq-text" placeholder="Savolni yozing..."></textarea>
       <div class="sarea" id="aq-syms"></div>
+      <div class="ts tm" style="margin-top:4px">&#x1F4A1; Ichma-ich yozish uchun: ichki qismini yozib, <b>belgilab (select qilib)</b> oling, so'ng kerakli belgini (√, xⁿ, qavs) bosing — u shu qismni avtomatik o'rab oladi. Shu usulda ildiz ichida ildiz, daraja ustiga daraja yozish mumkin.</div>
     </div>
     <div class="fg">
       <label>Test turi</label>
@@ -871,21 +888,93 @@ var SUBJECTS=[
 function subjName(v){var s=SUBJECTS.find(function(x){return x.v===v;});return s?s.n:v;}
 
 var SYMBOLS_BY_SUBJECT={
-  math:['=','±','√','∛','∜','π','∞','≤','≥','≠','≈','∑','∫','÷','×','∆','∈','∉','∅','∪','∩','→','⇒','⇔','∀','∃','⊂','⊆','%','∠','⊥','∥','!','(',')','[',']','{','}',
+  math:['=','≠','≈','≡','±','∓','√','∛','∜','ⁿ√','xⁿ','π','∞','≤','≥','∑','∏','∫','∮','÷','×','∆','∇','∈','∉','∪','∩','⊂','⊆','⊄','→','⇒','⇔','↦','∀','∃','∴','∵','¬','∧','∨','⊕','%','‰','∠','⊥','∥','!','|','(',')','[',']','{','}','ℝ','ℕ','ℤ','ℚ','ℂ',
+    'α','β','γ','δ','ε','θ','λ','μ','ν','ξ','ρ','σ','τ','φ','χ','ψ','ω','Γ','Δ','Θ','Λ','Ξ','Π','Σ','Φ','Ψ','Ω',
     '⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹','⁺','⁻',
     '₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'],
-  phys:['Δ','Ω','λ','μ','ν','θ','ρ','ω','α','β','γ','→','⇌','∝','·','²','³','°','°C','∥','⊥','∫','∑','×','÷','≈','≤','≥','√','∞','⁺','⁻','₀','₁','₂'],
-  chem:['→','⇌','↑','↓','²','³','⁺','⁻','₀','₁','₂','₃','₄','₅','₆','₇','₈','·','°C','Δ','%','≈','pH','⇋','═'],
-  bio:['°C','×','²','³','→','↔','↑','↓','♀','♂','±','%','∆','≈','µm','×10'],
-  hist:['№','§','—','«','»','...','†','г.','в.','н.э.','до н.э.','↔','→'],
-  geo:['°','′','″','≈','→','%','²','³','км²','км','м','±','↔','↑','↓'],
-  lit:['«','»','—','...','№','!','?','...','–'],
-  lang:['«','»','—','?!','...','–','№'],
-  eng:['«','»','...','?!','–','—',"'",'"'],
+  phys:['Δ','∇','Ω','λ','μ','ν','θ','ρ','ω','σ','τ','φ','χ','ψ','α','β','γ','ε','ħ','π',
+    '→','⇌','⇒','↑','↓','∝','·','×','÷','±','≈','≠','≤','≥','≡',
+    '√','ⁿ√','xⁿ','∑','∏','∫','∮','∆','∇',
+    '°','°C','°F','‰','%',
+    '∥','⊥','∠',
+    '⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹','⁺','⁻',
+    '₀','₁','₂','₃','₄','₅','₆','₇','₈','₉',
+    'N','J','W','A','V','C','Hz','T','Pa','kg','m/s','m/s²'],
+  chem:['→','⇌','⇋','⇒','↑','↓','⇅','≡','≈','±','·','∆',
+    '⁺','⁻','²⁺','³⁺','⁻²','⁻³',
+    '₀','₁','₂','₃','₄','₅','₆','₇','₈','₉',
+    '°C','%','pH','pOH','mol','M','[',']','(',')',
+    'H₂O','CO₂','O₂','H⁺','OH⁻','Na⁺','Cl⁻'],
+  bio:['°C','×','²','³','→','↔','↑','↓','♀','♂','±','%','‰','∆','≈','≠','≤','≥',
+    'α','β','γ','µm','mm','cm','×10',
+    'n','2n','ДНК','РНК','ATP',
+    '₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'],
+  hist:['№','§','—','–','«','»','...','†','гг.','в.','аср','йил','э.а.','эрамиздан аввал','эрамиз','↔','→','≈','°'],
+  geo:['°','′','″','≈','→','↔','↑','↓','%','²','³','км²','км','м','м/сек','±',
+    'Ш','Ж','Ш.к.','Ж.к.','Ш.у.','Ш.д.','денгиз сатҳидан'],
+  lit:['«','»','—','–','...','№','!','?','?!','ʻ','ʼ'],
+  lang:['«','»','—','–','...','№','?!','ʻ','ʼ'],
+  eng:['«','»','...','?!','–','—',"'",'"','ʼ'],
   rus:['«','»','...','?!','–','—','№'],
-  info:['≠','==','===','&&','||','!','→','∑','%','²','{}','[]','()','<=','>=','++','--','::'],
-  other:['±','→','°','%','...','«','»','№','–','×','÷','²']
+  info:['≠','==','===','!=','&&','||','!','->','=>','→','↔','∑','∏','%','²','³',
+    '{}','[]','()','<=','>=','<','>','++','--','::','&','|','^','~','<<','>>',
+    '∀','∃','∈','∉','¬','∧','∨','⊕','∅',
+    '₂','₈','₁₆','O(n)','O(log n)','O(n²)','log₂'],
+  other:['±','→','↔','°','%','‰','...','«','»','№','–','×','÷','²','³','≈','≠','≤','≥']
 };
+
+// Ildiz belgisidagi darajani (kichik raqamni) o'zi xohlagancha kiritish -
+// masalan 5-daraja ildiz, 7-daraja ildiz va hokazo (faqat 2 va 3 emas).
+var SUP_DIGITS={'0':'\u2070','1':'\u00B9','2':'\u00B2','3':'\u00B3','4':'\u2074','5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079'};
+var SUP_LETTERS={'n':'\u207F','i':'\u2071'};
+function toSuperscript(v){
+  var neg=v.charAt(0)==='-';
+  var body=neg?v.slice(1):v;
+  var out='';
+  for(var i=0;i<body.length;i++){
+    var ch=body.charAt(i).toLowerCase();
+    out+=SUP_DIGITS[ch]||SUP_LETTERS[ch]||body.charAt(i);
+  }
+  return (neg?'\u207B':'')+out;
+}
+// Belgilangan (select qilingan) matnni qavs bilan o'rab, oldiga prefiks qo'shadi -
+// shu tufayli "ildiz ichida ildiz", "daraja ustiga daraja" kabi ICHMA-ICH
+// ifodalarni yozish mumkin: avval ichki qismini yozib, belgilab olib, kerakli
+// tugmani bosaverish kifoya - istalgan chuqurlikda.
+function insWrapped(prefix){
+  var ta=document.getElementById('aq-text');
+  var st=ta.selectionStart,en=ta.selectionEnd;
+  var sel=ta.value.slice(st,en);
+  var out=prefix+'('+sel+')';
+  ta.value=ta.value.slice(0,st)+out+ta.value.slice(en);
+  if(sel){
+    // ichki qismni yana belgilab qo'yamiz - darhol yana bir tugma bosib, yanada
+    // chuqurroq ichma-ich yozish uchun qulay
+    ta.selectionStart=st+prefix.length+1;
+    ta.selectionEnd=st+prefix.length+1+sel.length;
+  } else {
+    ta.selectionStart=ta.selectionEnd=st+prefix.length+1;
+  }
+  ta.focus();
+}
+function insNthRoot(){
+  var n=prompt("Ildiz darajasini kiriting:\n\u2022 Oddiy son uchun: 3, 5, 7\n\u2022 Harf uchun: n\n(bekor qilish uchun bo'sh qoldiring)","3");
+  if(n===null)return;
+  n=n.trim();
+  if(!n){insWrapped('\u221A');return;}
+  insWrapped(toSuperscript(n)+'\u221A');
+}
+function insCustomExp(){
+  var v=prompt("Daraja qiymatini kiriting:\n\u2022 Oddiy son uchun: 2, 3, -1, 10\n\u2022 Harf uchun: n\n\u2022 Murakkab ifoda uchun (masalan daraja ustiga daraja): 2n, x+1","2");
+  if(v===null)return;
+  v=v.trim();
+  if(!v)return;
+  if(/^-?[0-9]+$/.test(v)||/^n$/i.test(v)){
+    insSym(toSuperscript(v));
+  } else {
+    insWrapped('^');
+  }
+}
 
 var UZ_REGIONS={
   'Toshkent shahri':['Bektemir','Chilonzor','Yakkasaroy','Mirobod','Mirzo Ulugbek','Olmazor','Sergeli','Shayxontohur','Uchtepa','Yashnobod','Yunusobod','Yangihayot'],
@@ -1467,6 +1556,7 @@ function toggleDetail(){
   if(showDet&&S.lastRes){document.getElementById('r-det-body').innerHTML=S.lastRes.details.map(function(d,i){return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px"><div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+((d.img||d.image)?'<img src="'+imgSrcVal(d.img||d.image)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+d.options.map(function(opt,oi){var isR=d.correct.indexOf(oi)>=0,isU=d.userAns.indexOf(oi)>=0,bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent',ic=isR?'✅':(isU&&!isR)?'❌':'⬜';var isImg=isImgVal(opt);var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';}).join('')+'</div>';}).join('');}
 }
 
+var _curQFolder=null;
 function renderQT(){
   var qs=getMyQs();
   var topics=[];
@@ -1474,12 +1564,19 @@ function renderQT(){
   var list=document.getElementById('q-topics-list');
   if(!list)return;
   if(!topics.length){
+    _curQFolder=null;
     list.innerHTML='<p style="color:var(--color-text-secondary);text-align:center;padding:20px">Hali savollar yoq. Import orqali qoshing.</p>';
     return;
   }
-  list.innerHTML=topics.map(function(t){
+  var db=getDB();
+  var folderOf={};
+  (db.topicsMeta||[]).forEach(function(m){ if(m.teacherId===ME.id && m.folder) folderOf[m.topic]=m.folder; });
+  var cntOf={};
+  qs.forEach(function(q){ cntOf[q.topic]=(cntOf[q.topic]||0)+1; });
+
+  function topicRow(t){
     var meta=getTopicMeta(t);
-    var cnt=qs.filter(function(q){return q.topic===t;}).length;
+    var cnt=cntOf[t]||0;
     var ask=meta?meta.questionsToAsk:cnt;
     var timerOn=(!meta||meta.timerEnabled===undefined)?true:meta.timerEnabled;
     var timerMins=(meta&&meta.timerMinutes)||15;
@@ -1490,12 +1587,69 @@ function renderQT(){
         '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">'+cnt+' ta savol &middot; '+ask+' ta beriladi &middot; '+(timerOn?timerMins+' daq':'Timersiz')+'</div>'+
       '</div>'+
       '<div style="display:flex;gap:6px">'+
-        '<button class="btn bpu bsm" onclick="openTopicDetail(\''+tEsc+'\')" title="Savollarni korish">📋</button>'+
-        '<button class="btn bsm" style="background:#e8f4fd;color:#1565c0" onclick="aiCheckTopic(\''+tEsc+'\')" title="AI tekshirish">🤖</button>'+
-        '<button class="btn bd bsm" onclick="deleteTopic(\''+tEsc+'\')" title="Mavzuni ochirish">🗑️</button>'+
+        '<button class="btn bpu bsm" onclick="openTopicDetail(\''+tEsc+'\')" title="Savollarni korish">&#x1F4CB;</button>'+
+        '<button class="btn bsm" style="background:#e8f4fd;color:#1565c0" onclick="aiCheckTopic(\''+tEsc+'\')" title="AI tekshirish">&#x1F916;</button>'+
+        '<button class="btn bs bsm" onclick="renameTopic(\''+tEsc+'\')" title="Nomini ozgartirish">&#x270F;&#65039;</button>'+
+        '<button class="btn bd bsm" onclick="deleteTopic(\''+tEsc+'\')" title="Mavzuni ochirish">&#x1F5D1;&#65039;</button>'+
       '</div>'+
     '</div>';
+  }
+
+  if(_curQFolder){
+    var inFolder=topics.filter(function(t){return folderOf[t]===_curQFolder;});
+    var fEsc=_curQFolder.replace(/'/g,"\\'");
+    var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+      '<button class="btn bg bsm" onclick="_curQFolder=null;renderQT()">&#8592; Fayllar</button>'+
+      '<h3 style="flex:1;margin:0">&#x1F4D8; '+_curQFolder+'</h3>'+
+      '<button class="btn bs bsm" onclick="renameFolder(\''+fEsc+'\')" title="Fayl nomini ozgartirish">&#x270F;&#65039; Nomini ozgartirish</button>'+
+    '</div>';
+    html+=inFolder.length?inFolder.map(topicRow).join(''):'<p class="ts tm" style="text-align:center;padding:14px">Bu faylda mavzular yoq</p>';
+    list.innerHTML=html;
+    return;
+  }
+
+  var folderNames=[];
+  topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0)folderNames.push(folderOf[t]); });
+  var unfoldered=topics.filter(function(t){return !folderOf[t];});
+
+  var html='';
+  html+=folderNames.map(function(fn){
+    var cnt=topics.filter(function(t){return folderOf[t]===fn;}).length;
+    var fEsc=fn.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f5f3ff;border:1px solid var(--color-border);border-radius:10px;gap:10px">'+
+      '<div style="flex:1;cursor:pointer" onclick="_curQFolder=\''+fEsc+'\';renderQT()">'+
+        '<div style="font-weight:700">&#x1F4D8; '+fn+'</div>'+
+        '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">'+cnt+' ta mavzu</div>'+
+      '</div>'+
+      '<button class="btn bs bsm" onclick="renameFolder(\''+fEsc+'\')" title="Nomini ozgartirish">&#x270F;&#65039;</button>'+
+    '</div>';
   }).join('');
+  html+=unfoldered.map(topicRow).join('');
+  list.innerHTML=html;
+}
+function renameTopic(t){
+  var newName=prompt('Test (mavzu) uchun yangi nom kiriting:',t);
+  if(newName===null)return;
+  newName=newName.trim();
+  if(!newName||newName===t)return;
+  var db=getDB();
+  var dup=(db.userQs||[]).some(function(q){return q.teacherId===ME.id&&q.topic===newName;});
+  if(dup){alert('Bu nomda test allaqachon bor, boshqa nom tanlang!');return;}
+  (db.userQs||[]).forEach(function(q){ if(q.teacherId===ME.id&&q.topic===t) q.topic=newName; });
+  (db.topicsMeta||[]).forEach(function(m){ if(m.teacherId===ME.id&&m.topic===t) m.topic=newName; });
+  saveDB(db);
+  renderQT();
+}
+function renameFolder(fn){
+  var newName=prompt('Fayl (kitob) uchun yangi nom kiriting:',fn);
+  if(newName===null)return;
+  newName=newName.trim();
+  if(!newName||newName===fn)return;
+  var db=getDB();
+  (db.topicsMeta||[]).forEach(function(m){ if(m.teacherId===ME.id&&m.folder===fn) m.folder=newName; });
+  saveDB(db);
+  _curQFolder=newName;
+  renderQT();
 }
 
 
@@ -1708,7 +1862,18 @@ function openAddQ(){
 function refreshSyms(){
   var subj=document.getElementById('aq-subj').value||'math';
   var syms=SYMBOLS_BY_SUBJECT[subj]||SYMBOLS_BY_SUBJECT.math;
-  document.getElementById('aq-syms').innerHTML=syms.map(function(s){return '<button class="symb" onclick="insSym(\''+s+'\')">'+s+'</button>';}).join('');
+  var special={
+    'ⁿ√':['insNthRoot()','Ildiz darajasini o\'zingiz kiriting'],
+    'xⁿ':['insCustomExp()','Daraja qiymatini o\'zingiz kiriting'],
+    '√':['insWrapped(\'\\u221A\')','Ildiz (belgilab olingan qism ichiga qo\'yiladi)'],
+    '∛':['insWrapped(\'\\u00B3\\u221A\')','Kub ildiz'],
+    '∜':['insWrapped(\'\\u2074\\u221A\')','4-daraja ildiz'],
+    '(':['insWrapAny()','Belgilangan qismni qavsga oladi']
+  };
+  document.getElementById('aq-syms').innerHTML=syms.map(function(s){
+    if(special[s])return '<button class="symb" onclick="'+special[s][0]+'" title="'+special[s][1]+'">'+s+'</button>';
+    return '<button class="symb" onclick="insSym(\''+s+'\')">'+s+'</button>';
+  }).join('');
 }
 function closeAQ(){document.getElementById('aq-modal').style.display='none';}
 document.querySelectorAll('input[name="aqtype"]').forEach(function(r){r.addEventListener('change',function(){aqIsM=this.value==='multi';aqCorr=[];renderAQO();});});
@@ -1718,6 +1883,14 @@ function stC(i){aqCorr=[i];renderAQO();}
 function addOpt(){aqOpts.push('');renderAQO();}
 function rmO(i){aqOpts.splice(i,1);aqCorr=aqCorr.filter(function(c){return c!==i;}).map(function(c){return c>i?c-1:c;});renderAQO();}
 function insSym(s){var ta=document.getElementById('aq-text');var st=ta.selectionStart,en=ta.selectionEnd;ta.value=ta.value.slice(0,st)+s+ta.value.slice(en);ta.selectionStart=ta.selectionEnd=st+s.length;ta.focus();}
+function insWrapAny(){
+  var ta=document.getElementById('aq-text');
+  var st=ta.selectionStart,en=ta.selectionEnd;
+  var sel=ta.value.slice(st,en);
+  ta.value=ta.value.slice(0,st)+'('+sel+')'+ta.value.slice(en);
+  ta.selectionStart=st+1;ta.selectionEnd=st+1+sel.length;
+  ta.focus();
+}
 function saveQ(){
   var topic=document.getElementById('aq-topic').value.trim(),text=document.getElementById('aq-text').value.trim(),subj=document.getElementById('aq-subj').value,qcount=parseInt(document.getElementById('aq-qcount').value)||null;
   if(!topic){alert("Mavzu kiriting!");return;}if(!text){alert("Savol matnini kiriting!");return;}
@@ -2252,70 +2425,118 @@ async function importViaBrowser(data,msg){
         var parsed=parseEQ(text);
         if(parsed.qs.length){
           await saveImportedQs(parsed,msg);
-          return;
+          return true;
         }
       }catch(ex){}
     }
   }
   msg.innerHTML='<div class="alt ar">&#x274C; EasyQuizzy fayli tanilmadi.</div>';
+  return false;
 }
 
 function sendToServer(file,msg){
-  return new Promise(function(resolve){
-    var sizeMB=(file.size/1024/1024).toFixed(1);
-    msg.innerHTML='<div class="alt ai">&#x23F3; Fayl tayyorlanmoqda ('+sizeMB+' MB)...</div>';
-    var freader=new FileReader();
-    freader.onload=function(fe){
-      var dataUrl=fe.target.result;
-      var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
-      var xhr=new XMLHttpRequest();
-      xhr.open('POST',RENDER_SERVER+'/parse',true);
-      xhr.timeout=1800000;
-      xhr.setRequestHeader('Content-Type','application/json');
-      msg.innerHTML='<div class="alt ai">&#x23F3; Serverga yuborildi ('+sizeMB+' MB). Katta fayllar 10-30 daqiqagacha vaqt olishi mumkin, kuting...</div>';
-      xhr.onload=async function(){
-        try{
-          var result=JSON.parse(xhr.responseText);
-          if(result.error)throw new Error(result.error);
-          if(!result.questions||!result.questions.length)throw new Error('Savollar topilmadi');
-          var qs=result.questions.map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
-          await saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
-        }catch(e){
-          msg.innerHTML='<div class="alt ar">&#x274C; Server xatosi ('+file.name+'): '+e.message+'</div>';
+  var MAX_RETRIES=4; // jami 5 marta (1 + 4 qayta urinish) haqiqiy serverga - rasmlar bilan
+  var RETRY_DELAYS=[5000,15000,30000,60000]; // 5s, 15s, 30s, 1 daqiqa - sekin-asta ko'proq kutamiz
+  return attempt(0);
+
+  function attempt(retryCount){
+    return new Promise(function(resolve){
+      var sizeMB=(file.size/1024/1024).toFixed(1);
+      var freader=new FileReader();
+      freader.onload=function(fe){
+        var dataUrl=fe.target.result;
+        var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
+        var xhr=new XMLHttpRequest();
+        xhr.open('POST',RENDER_SERVER+'/parse',true);
+        xhr.timeout=1800000;
+        xhr.setRequestHeader('Content-Type','application/json');
+        var retryNote=retryCount?(' ('+(retryCount+1)+'-urinish)'):'';
+        msg.innerHTML='<div class="alt ai">&#x23F3; "'+file.name+'" serverga yuborildi ('+sizeMB+' MB)'+retryNote+'. Katta fayllar 10-30 daqiqagacha vaqt olishi mumkin, kuting...</div>';
+        function retryOrGiveUp(reasonMsg){
+          if(retryCount<MAX_RETRIES){
+            var delay=RETRY_DELAYS[retryCount]||60000;
+            var secs=Math.round(delay/1000);
+            msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; '+reasonMsg+' "'+file.name+'" uchun '+secs+' soniyadan keyin qayta uriniladi ('+(retryCount+1)+'/'+MAX_RETRIES+')...</div>';
+            setTimeout(function(){ attempt(retryCount+1).then(resolve); },delay);
+          } else {
+            // Hammasi behuda ketdi - rasmsiz usulga o'tmaymiz (sifat pasayib ketmasin),
+            // shunchaki bu faylni MUVAFFAQIYATSIZ deb hisoblab, ustozga aniq xabar beramiz.
+            msg.innerHTML='<div class="alt ar">&#x274C; "'+file.name+'" import qilinmadi ('+MAX_RETRIES+' marta urinildi, server javob bermadi).</div>';
+            resolve(false);
+          }
         }
-        resolve();
-      };
-      xhr.onerror=function(){
-        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server javob bermadi. Rasmsiz o\'qilmoqda...</div>';
-        var reader=new FileReader();
-        reader.onload=async function(ev){
-          await importViaBrowser(new Uint8Array(ev.target.result),msg);
-          resolve();
+        xhr.onload=async function(){
+          // Server 200 dan boshqa kod qaytarsa (masalan 502/503/504 - hosting vaqtincha
+          // ishlamay qolgani) - buni haqiqiy serverga qayta urinib ko'ramiz, chunki
+          // odatda bir necha soniyadan keyin server o'ziga keladi va rasm bilan to'liq
+          // natija beradi.
+          if(xhr.status<200||xhr.status>=300){
+            retryOrGiveUp('Server xatosi qaytardi (kod: '+xhr.status+').');
+            return;
+          }
+          try{
+            var result=JSON.parse(xhr.responseText);
+            if(result.error)throw new Error(result.error);
+            if(!result.questions||!result.questions.length)throw new Error('Savollar topilmadi');
+            var qs=result.questions.map(function(q){if(q.image){q.img=q.image;delete q.image;}if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1;return q;});
+            await saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
+            resolve(true);
+          }catch(e){
+            retryOrGiveUp('Server javobini o\'qib bo\'lmadi ('+e.message+').');
+          }
         };
-        reader.onerror=function(){resolve();};
-        reader.readAsArrayBuffer(file);
+        xhr.onerror=function(){ retryOrGiveUp('Server javob bermadi.'); };
+        xhr.ontimeout=function(){ retryOrGiveUp('Server vaqt tugadi (30 daqiqa).'); };
+        xhr.send(JSON.stringify({data:base64,filename:file.name}));
       };
-      xhr.ontimeout=function(){
-        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Server vaqt tugadi (30 daqiqa). Rasmsiz o\'qilmoqda...</div>';
-        var reader=new FileReader();
-        reader.onload=async function(ev){
-          await importViaBrowser(new Uint8Array(ev.target.result),msg);
-          resolve();
-        };
-        reader.onerror=function(){resolve();};
-        reader.readAsArrayBuffer(file);
+      freader.onerror=function(){
+        msg.innerHTML='<div class="alt ar">&#x274C; Faylni oqib bolmadi ('+file.name+').</div>';
+        resolve(false);
       };
-      xhr.send(JSON.stringify({data:base64,filename:file.name}));
-    };
-    freader.onerror=function(){
-      msg.innerHTML='<div class="alt ar">&#x274C; Faylni oqib bolmadi ('+file.name+').</div>';
-      resolve();
-    };
-    freader.readAsDataURL(file);
-  });
+      freader.readAsDataURL(file);
+    });
+  }
 }
 
 var _pendingImportFolder=null;
+function getMyFolders(){
+  var db=getDB();
+  var names=[];
+  (db.topicsMeta||[]).forEach(function(m){
+    if(m.teacherId===ME.id && m.folder && names.indexOf(m.folder)<0) names.push(m.folder);
+  });
+  return names.sort();
+}
+var _fpPendingFile=null;
+function askFolderThenImport(file){
+  _fpPendingFile=file;
+  var folders=getMyFolders();
+  var box=document.getElementById('fp-existing');
+  if(!folders.length){
+    box.innerHTML='<div class="ts tm" style="text-align:center;padding:8px">Hali fayl (kitob) yaratilmagan. Pastda yangisini yarating.</div>';
+  } else {
+    box.innerHTML=folders.map(function(fn){
+      var esc=fn.replace(/'/g,"\\'");
+      return '<div class="tbtn" style="text-align:left;padding:10px 12px" onclick="submitFP(\''+esc+'\',false)">&#x1F4D8; '+fn+'</div>';
+    }).join('');
+  }
+  var defaultName=file.name.replace(/\.exe$/i,'').replace(/[\s_-]*\d+$/,'')||'Yangi fayl';
+  document.getElementById('fp-newname').value=defaultName;
+  document.getElementById('fp-modal').style.display='flex';
+}
+function closeFP(){document.getElementById('fp-modal').style.display='none';_fpPendingFile=null;}
+function submitFP(folderName,isNew){
+  var file=_fpPendingFile;
+  if(!file)return;
+  if(isNew){
+    folderName=(document.getElementById('fp-newname').value||'').trim();
+    if(!folderName){alert('Fayl nomini kiriting!');return;}
+  }
+  document.getElementById('fp-modal').style.display='none';
+  _fpPendingFile=null;
+  _pendingImportFolder=folderName;
+  importExe(file);
+}
 function importMultipleFiles(files,suggestedFolder){
   // Papka tasodifan tanlangan bolsa (0 baytli yozuvlar) - otkazib yuboramiz
   var valid=files.filter(function(f){return f.size>0;});
@@ -2326,8 +2547,7 @@ function importMultipleFiles(files,suggestedFolder){
     return;
   }
   if(valid.length===1 && !suggestedFolder){
-    _pendingImportFolder=null;
-    importExe(valid[0]);
+    askFolderThenImport(valid[0]);
     return;
   }
   var defaultName=suggestedFolder||valid[0].name.replace(/\.exe$/i,'').replace(/[\s_-]*\d+$/,'')||'Kitob 1';
@@ -2343,7 +2563,7 @@ function importMultipleFiles(files,suggestedFolder){
   // sozlamalarida sorov hajmi chegarasiga urilib qolishning oldini oladi,
   // va telefon/kompyuterda bir xil, barqaror ishlashini taminlaydi).
   var GROUP_SIZE=5;
-  var okTotal=0, errTotal=0;
+  var okTotal=0, errTotal=0, failedNames=[];
 
   Promise.all(valid.map(function(f){
     return new Promise(function(res){
@@ -2363,7 +2583,7 @@ function importMultipleFiles(files,suggestedFolder){
     function processGroup(gi){
       if(gi>=groups.length){
         _pendingImportFolder=null;
-        msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+'</div>';
+        msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+(failedNames.length?'<br>&#x274C; Import bolmadi ('+failedNames.length+' ta): '+failedNames.join(', ')+' &#8212; bularni qayta yuklab koring.':'')+'</div>';
         renderQT();
         return;
       }
@@ -2406,15 +2626,26 @@ function importMultipleFiles(files,suggestedFolder){
         }
         if(st.status==='done'){
           var results=st.results||[];
+          var retryFiles=[]; // batchda xato bergan fayllarni ham qattiq qayta urinamiz
           for(var ri=0;ri<results.length;ri++){
             var r=results[ri];
-            if(r.error){ errTotal++; continue; }
-            var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}return q;});
+            if(r.error){
+              var origFd=group.find(function(g){return g.filename===r.filename;});
+              if(origFd) retryFiles.push(origFd);
+              else { errTotal++; failedNames.push(r.filename||('fayl '+(ri+1))); }
+              continue;
+            }
+            var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1;return q;});
             await saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},msg);
             okTotal++;
           }
           pollCount=0;
-          processGroup(gi+1);
+          if(retryFiles.length){
+            msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; '+retryFiles.length+' ta fayl guruh usulida xato berdi, alohida qattiq qayta uriniladi...</div>';
+            fallbackGroup(retryFiles, function(){ processGroup(gi+1); });
+          } else {
+            processGroup(gi+1);
+          }
           return;
         }
         pollCount=0;
@@ -2439,7 +2670,10 @@ function importMultipleFiles(files,suggestedFolder){
         var byteArray=new Uint8Array(byteNums);
         var blob=new Blob([byteArray]);
         blob.name=fd.filename;
-        sendToServer(blob,msg).then(function(){ okTotal++; idx++; next(); });
+        sendToServer(blob,msg).then(function(ok){
+          if(ok)okTotal++; else { errTotal++; failedNames.push(fd.filename); }
+          idx++; next();
+        });
       }
       next();
     }
