@@ -403,7 +403,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <!-- Mavzular ko'rinishi -->
     <div id="q-topics-view">
       <div class="card">
-        <div class="ch"><h2>Mavzular</h2><button class="btn bpu bsm" onclick="openAddQ()">+ Savol qo'shish</button></div>
+        <div class="ch"><h2>Mavzular</h2><button class="btn bpu bsm" id="q-header-btn" onclick="headerBtnClick()">+ Fayl qo'shish</button></div>
         <div id="q-topics-list" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
       </div>
     </div>
@@ -1557,20 +1557,40 @@ function toggleDetail(){
 }
 
 var _curQFolder=null;
+function headerBtnClick(){
+  if(_curQFolder) openAddQ();
+  else createNewFolder();
+}
+function createNewFolder(){
+  var name=prompt('Yangi fayl (kitob) nomini kiriting:','');
+  if(name===null)return;
+  name=name.trim();
+  if(!name)return;
+  var db=getDB();
+  db.qFolders=db.qFolders||[];
+  var dup=db.qFolders.some(function(f){return f.teacherId===ME.id&&f.name===name;});
+  if(!dup) db.qFolders.push({name:name,teacherId:ME.id});
+  saveDB(db);
+  _curQFolder=name;
+  renderQT();
+}
 function renderQT(){
   var qs=getMyQs();
   var topics=[];
   qs.forEach(function(q){if(q.topic&&topics.indexOf(q.topic)<0)topics.push(q.topic);});
   var list=document.getElementById('q-topics-list');
   if(!list)return;
-  if(!topics.length){
-    _curQFolder=null;
-    list.innerHTML='<p style="color:var(--color-text-secondary);text-align:center;padding:20px">Hali savollar yoq. Import orqali qoshing.</p>';
-    return;
-  }
   var db=getDB();
+  var hBtn=document.getElementById('q-header-btn');
+  if(hBtn) hBtn.textContent=_curQFolder?"+ Savol qo'shish":"+ Fayl qo'shish";
   var folderOf={};
   (db.topicsMeta||[]).forEach(function(m){ if(m.teacherId===ME.id && m.folder) folderOf[m.topic]=m.folder; });
+  var emptyFolders=(db.qFolders||[]).filter(function(f){return f.teacherId===ME.id;}).map(function(f){return f.name;});
+  if(!topics.length && !emptyFolders.length){
+    _curQFolder=null;
+    list.innerHTML='<p style="color:var(--color-text-secondary);text-align:center;padding:20px">Hali fayl yoq. Avval "+ Fayl qo\'shish" bilan fayl yarating, keyin ichiga savol qo\'shing.</p>';
+    return;
+  }
   var cntOf={};
   qs.forEach(function(q){ cntOf[q.topic]=(cntOf[q.topic]||0)+1; });
 
@@ -1598,17 +1618,17 @@ function renderQT(){
   if(_curQFolder){
     var inFolder=topics.filter(function(t){return folderOf[t]===_curQFolder;});
     var fEsc=_curQFolder.replace(/'/g,"\\'");
-    var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+    var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'+
       '<button class="btn bg bsm" onclick="_curQFolder=null;renderQT()">&#8592; Fayllar</button>'+
       '<h3 style="flex:1;margin:0">&#x1F4D8; '+_curQFolder+'</h3>'+
       '<button class="btn bs bsm" onclick="renameFolder(\''+fEsc+'\')" title="Fayl nomini ozgartirish">&#x270F;&#65039; Nomini ozgartirish</button>'+
     '</div>';
-    html+=inFolder.length?inFolder.map(topicRow).join(''):'<p class="ts tm" style="text-align:center;padding:14px">Bu faylda mavzular yoq</p>';
+    html+=inFolder.length?inFolder.map(topicRow).join(''):'<p class="ts tm" style="text-align:center;padding:14px">Bu faylda hali test yoq. "+ Savol qo\'shish" bilan qoshing.</p>';
     list.innerHTML=html;
     return;
   }
 
-  var folderNames=[];
+  var folderNames=emptyFolders.slice();
   topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0)folderNames.push(folderOf[t]); });
   var unfoldered=topics.filter(function(t){return !folderOf[t];});
 
@@ -1647,6 +1667,8 @@ function renameFolder(fn){
   if(!newName||newName===fn)return;
   var db=getDB();
   (db.topicsMeta||[]).forEach(function(m){ if(m.teacherId===ME.id&&m.folder===fn) m.folder=newName; });
+  db.qFolders=db.qFolders||[];
+  db.qFolders.forEach(function(f){ if(f.teacherId===ME.id&&f.name===fn) f.name=newName; });
   saveDB(db);
   _curQFolder=newName;
   renderQT();
@@ -1897,7 +1919,7 @@ function saveQ(){
   var opts=aqOpts.filter(function(o){return o.trim();});if(opts.length<2){alert("Kamida 2 ta variant!");return;}if(!aqCorr.length){alert("To'g'ri javobni belgilang!");return;}
   var q={id:Date.now(),subject:subj,topic:topic,text:text,options:opts,correct:aqCorr.filter(function(c){return c<opts.length;}),isMulti:aqIsM,teacherId:ME.id};
   var db=getDB();db.userQs=db.userQs||[];db.userQs.push(q);
-  if(qcount){db.topicsMeta=db.topicsMeta||[];var f=false;db.topicsMeta.forEach(function(m){if(m.topic===topic){m.questionsToAsk=qcount;f=true;}});if(!f)db.topicsMeta.push({topic:topic,questionsToAsk:qcount,teacherId:ME.id,subject:subj});}
+  if(qcount||_curQFolder){db.topicsMeta=db.topicsMeta||[];var f=false;db.topicsMeta.forEach(function(m){if(m.topic===topic&&m.teacherId===ME.id){if(qcount)m.questionsToAsk=qcount;if(_curQFolder)m.folder=_curQFolder;f=true;}});if(!f)db.topicsMeta.push({topic:topic,questionsToAsk:qcount||1,teacherId:ME.id,subject:subj,folder:_curQFolder||undefined});}
   saveDB(db);closeAQ();renderQT();
 }
 function delQ(idx){if(idx<BQ.length){alert("Bu savol o'zgarmas!");return;}if(!confirm("O'chirasizmi?"))return;var db=getDB();db.userQs.splice(idx-BQ.length,1);saveDB(db);renderQT();}
