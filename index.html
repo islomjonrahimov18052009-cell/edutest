@@ -328,6 +328,15 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <h3 style="margin-bottom:11px">&#x1F4CA; Mening natijalarim</h3>
     <div id="my-hist-body"></div>
   </div>
+  <div class="card">
+    <h3 style="margin-bottom:8px">&#x1F510; Mening hisobim</h3>
+    <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Login yoki parolingizni bu yerdan o'zgartirishingiz mumkin.</p>
+    <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="spw-old" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('spw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+    <div class="fg"><label>Yangi login (ixtiyoriy)</label><input type="text" id="spw-login" autocomplete="off" placeholder="Yangi login"></div>
+    <div class="fg"><label>Yangi parol (ixtiyoriy)</label><div style="position:relative"><input type="password" id="spw-new" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('spw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+    <button class="btn bpu bsm" onclick="changeMyPassword('spw')">Saqlash</button>
+    <div id="spw-msg"></div>
+  </div>
 </div>
 
 <!-- TEST -->
@@ -501,11 +510,12 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div id="tcls-msg"></div>
     </div>
     <div class="card">
-      <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
-      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Standart "admin / 1234" parolini o'zgartirib qo'ying — bu ma'lumot ko'pchilikka ma'lum bo'lishi mumkin.</p>
+      <h3 style="margin-bottom:8px">&#x1F510; Mening hisobim</h3>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Standart "admin / 1234" parolini o'zgartirib qo'ying — bu ma'lumot ko'pchilikka ma'lum bo'lishi mumkin. Loginni ham xohlasangiz o'zgartirishingiz mumkin.</p>
       <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="pw-old" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('pw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
-      <div class="fg"><label>Yangi parol</label><div style="position:relative"><input type="password" id="pw-new" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('pw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
-      <button class="btn bpu bsm" onclick="changeMyPassword()">Parolni yangilash</button>
+      <div class="fg"><label>Yangi login (ixtiyoriy)</label><input type="text" id="pw-login" autocomplete="off" placeholder="Yangi login"></div>
+      <div class="fg"><label>Yangi parol (ixtiyoriy)</label><div style="position:relative"><input type="password" id="pw-new" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('pw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+      <button class="btn bpu bsm" onclick="changeMyPassword()">Saqlash</button>
       <div id="pw-msg"></div>
     </div>
     <div class="card">
@@ -626,11 +636,21 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div id="admin-tcode-msg"></div>
     </div>
     <div class="card">
-      <h3 style="margin-bottom:8px">&#x1F510; Mening parolim</h3>
+      <h3 style="margin-bottom:8px">&#x1F510; Mening hisobim</h3>
       <div class="fg"><label>Joriy parol</label><div style="position:relative"><input type="password" id="apw-old" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Joriy parol" style="padding-right:38px"><span onclick="togglePw('apw-old',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
-      <div class="fg"><label>Yangi parol</label><div style="position:relative"><input type="password" id="apw-new" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('apw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
-      <button class="btn bpu bsm" onclick="changeMyPassword('apw')">Parolni yangilash</button>
+      <div class="fg"><label>Yangi login (ixtiyoriy)</label><input type="text" id="apw-login" autocomplete="off" placeholder="Yangi login"></div>
+      <div class="fg"><label>Yangi parol (ixtiyoriy)</label><div style="position:relative"><input type="password" id="apw-new" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="Yangi parol" style="padding-right:38px"><span onclick="togglePw('apw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
+      <button class="btn bpu bsm" onclick="changeMyPassword('apw')">Saqlash</button>
       <div id="apw-msg"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:12px">&#x1F465; Barcha foydalanuvchilar</h3>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Barcha o'quvchi va ustozlarning login va parollari. Kerak bo'lsa o'zgartirishingiz yoki o'chirishingiz mumkin.</p>
+      <button class="btn bg bsm" id="admin-allusers-toggle" onclick="toggleAdminPass()" style="margin-bottom:10px">&#x1F441; Parollarni ko'rsatish</button>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>Ism</th><th>Login</th><th>Parol</th><th>Rol</th><th>Sinf/Fan</th><th>Amal</th></tr></thead>
+        <tbody id="admin-allusers-tbody"></tbody></table>
+      </div>
     </div>
   </div>
 </div>
@@ -1779,17 +1799,29 @@ function changeMyPassword(prefix){
   prefix=prefix||'pw';
   var oldP=document.getElementById(prefix+'-old').value;
   var newP=document.getElementById(prefix+'-new').value;
+  var loginEl=document.getElementById(prefix+'-login');
+  var newLogin=loginEl?loginEl.value.trim():'';
   var msg=document.getElementById(prefix+'-msg');
-  if(!oldP||!newP){msg.innerHTML='<div class="alt ar mt8">Ikkala maydonni ham toldiring!</div>';return;}
+  if(!oldP){msg.innerHTML='<div class="alt ar mt8">Joriy parolni kiriting!</div>';return;}
   if(oldP!==ME.pass){msg.innerHTML='<div class="alt ar mt8">Joriy parol notogri!</div>';return;}
-  if(newP.length<4){msg.innerHTML='<div class="alt ar mt8">Yangi parol kamida 4 belgi bolsin!</div>';return;}
+  if(!newP&&!newLogin){msg.innerHTML='<div class="alt ar mt8">Yangi login yoki yangi parolni kiriting!</div>';return;}
+  if(newP&&newP.length<4){msg.innerHTML='<div class="alt ar mt8">Yangi parol kamida 4 belgi bolsin!</div>';return;}
   var db=getDB();
-  db.users.forEach(function(u){if(u.id===ME.id)u.pass=newP;});
+  if(newLogin){
+    var dup=db.users.some(function(u){return u.login===newLogin&&u.id!==ME.id;});
+    if(dup){msg.innerHTML='<div class="alt ar mt8">Bu login band, boshqasini tanlang!</div>';return;}
+  }
+  db.users.forEach(function(u){if(u.id===ME.id){if(newP)u.pass=newP;if(newLogin)u.login=newLogin;}});
   saveDB(db);
-  ME.pass=newP;
+  if(newP)ME.pass=newP;
+  if(newLogin)ME.login=newLogin;
   document.getElementById(prefix+'-old').value='';
   document.getElementById(prefix+'-new').value='';
-  msg.innerHTML='<div class="alt as mt8">Parol muvaffaqiyatli yangilandi!</div>';
+  if(loginEl)loginEl.value='';
+  document.getElementById('nav-user').textContent=ME.name+(ME.cls?' - '+ME.cls:'')+(ME.role==='teacher'?' (Ustoz)':ME.role==='admin'?' (Admin)':'');
+  msg.innerHTML='<div class="alt as mt8">Muvaffaqiyatli yangilandi!'+(newLogin?' Yangi login: <b>'+newLogin+'</b>':'')+'</div>';
+  if(ME.role==='teacher'&&typeof renderUsersT==='function')renderUsersT();
+  if(ME.role==='admin'&&typeof renderAdminAllUsers==='function')renderAdminAllUsers();
 }
 function initAdmin(){
   renderAdminOverview();
@@ -1854,6 +1886,60 @@ function initAdminSettings(){
   stEl.innerHTML=db.teacherCodeUsed
     ? '<span class="bdg brd">Ishlatilgan &#8212; yangi kod yarating</span>'
     : '<span class="bdg bgr">Faol &#8212; hali ishlatilmagan</span>';
+  renderAdminAllUsers();
+}
+var _adminShowPass=false;
+function toggleAdminPass(){
+  _adminShowPass=!_adminShowPass;
+  renderAdminAllUsers();
+}
+function renderAdminAllUsers(){
+  var db=getDB();
+  var users=db.users.filter(function(u){return u.role==='teacher'||u.role==='student';});
+  var btn=document.getElementById('admin-allusers-toggle');
+  if(btn)btn.innerHTML=_adminShowPass?'&#x1F648; Parollarni berkitish':'&#x1F441; Parollarni ko\'rsatish';
+  var tbody=document.getElementById('admin-allusers-tbody');
+  if(!tbody)return;
+  tbody.innerHTML=users.map(function(u){
+    var roleLbl=u.role==='teacher'?'Ustoz':'O\'quvchi';
+    var extra=u.role==='teacher'?(u.subject||''):(u.cls||'');
+    var passShown=_adminShowPass?u.pass:'&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;';
+    return '<tr><td><strong>'+u.name+'</strong></td><td>'+u.login+'</td><td class="ts tm" style="font-family:monospace">'+passShown+'</td><td><span class="bdg '+(u.role==='teacher'?'bbl':'bgy')+'">'+roleLbl+'</span></td><td class="ts">'+extra+'</td><td style="display:flex;gap:4px"><button class="btn bp bsm" onclick="adminEditUser(\''+u.id+'\')">&#x270F;&#65039;</button><button class="btn bd bsm" onclick="adminDelUser(\''+u.id+'\')">&#x1F5D1;&#65039;</button></td></tr>';
+  }).join('')||'<tr><td colspan="6" style="text-align:center;padding:14px;color:var(--mut)">Foydalanuvchilar yoq</td></tr>';
+}
+function adminEditUser(uid){
+  var db=getDB();
+  var u=db.users.find(function(x){return x.id===uid;});
+  if(!u)return;
+  var newName=prompt('Ism:',u.name);
+  if(newName===null)return;
+  var newLogin=prompt('Login:',u.login);
+  if(newLogin===null)return;
+  newLogin=newLogin.trim();
+  if(newLogin&&newLogin!==u.login){
+    var dup=db.users.some(function(x){return x.login===newLogin&&x.id!==u.id;});
+    if(dup){alert('Bu login band, boshqasini tanlang!');return;}
+  }
+  var newPass=prompt('Parol (o\'zgartirmaslik uchun bo\'sh qoldiring):','');
+  if(newPass===null)return;
+  u.name=newName.trim()||u.name;
+  u.login=newLogin||u.login;
+  if(newPass.trim())u.pass=newPass.trim();
+  saveDB(db);
+  if(ME&&ME.id===u.id){ME.name=u.name;ME.login=u.login;ME.pass=u.pass;}
+  renderAdminAllUsers();
+  renderAdminOverview();
+  alert('Saqlandi!');
+}
+function adminDelUser(uid){
+  var db=getDB();
+  var u=db.users.find(function(x){return x.id===uid;});
+  if(!u)return;
+  if(!confirm(u.name+' ('+(u.role==='teacher'?'ustoz':'o\'quvchi')+') ni o\'chirasizmi?'))return;
+  db.users=db.users.filter(function(x){return x.id!==uid;});
+  saveDB(db);
+  renderAdminAllUsers();
+  renderAdminOverview();
 }
 function saveTeacherCode(){
   var v=document.getElementById('admin-tcode').value.trim();
@@ -2773,4 +2859,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-      </html>
+</html>
