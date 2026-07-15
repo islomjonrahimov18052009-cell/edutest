@@ -2629,8 +2629,13 @@ function importMultipleFiles(files,suggestedFolder){
   // sorov hech qachon juda katta bolib ketmaydi (bu ba'zi hosting/tarmoq
   // sozlamalarida sorov hajmi chegarasiga urilib qolishning oldini oladi,
   // va telefon/kompyuterda bir xil, barqaror ishlashini taminlaydi).
-  var GROUP_SIZE=5;
+  // Fayllarni KICHIK GURUHLARGA bolib, BIR NECHTASINI BIR VAQTDA (parallel)
+  // serverga yuboramiz - shunda server imkoniyatidan maksimal foydalanib,
+  // import sezilarli tezlashadi (avval faqat bitta guruh navbat bilan ishlar edi).
+  var GROUP_SIZE=8;
+  var GROUP_CONCURRENCY=3; // bir vaqtda nechta guruh serverga yuborilishi
   var okTotal=0, errTotal=0, failedNames=[];
+  function sleepMs(ms){return new Promise(function(res){setTimeout(res,ms);});}
 
   Promise.all(valid.map(function(f){
     return new Promise(function(res){
@@ -2639,61 +2644,92 @@ function importMultipleFiles(files,suggestedFolder){
       r.onerror=function(){ res(null); };
       r.readAsDataURL(f);
     });
-  })).then(function(allFileDatas){
+  })).then(async function(allFileDatas){
     allFileDatas=allFileDatas.filter(Boolean);
     var groups=[];
     for(var i=0;i<allFileDatas.length;i+=GROUP_SIZE){
       groups.push(allFileDatas.slice(i,i+GROUP_SIZE));
     }
-    processGroup(0);
-
-    function processGroup(gi){
-      if(gi>=groups.length){
-        _pendingImportFolder=null;
-        msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+(failedNames.length?'<br>&#x274C; Import bolmadi ('+failedNames.length+' ta): '+failedNames.join(', ')+' &#8212; bularni qayta yuklab koring.':'')+'</div>';
-        renderQT();
-        return;
-      }
-      var group=groups[gi];
-      msg.innerHTML='<div class="alt ai">&#x23F3; Guruh '+(gi+1)+'/'+groups.length+' ('+group.length+' fayl) serverga yuborildi...</div>';
-
-      fetch(RENDER_SERVER+'/parse_batch_start',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({files:group})
-      }).then(function(r){return r.json();}).then(function(startRes){
-        if(startRes.error)throw new Error(startRes.error);
-        pollJob(startRes.job_id, gi, group);
-      }).catch(function(e){
-        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' xatosi ('+e.message+'). Shu guruhni birma-bir usulga otkazamiz...</div>';
-        fallbackGroup(group, function(){ processGroup(gi+1); });
-      });
+    var groupStatus=groups.map(function(){return '';});
+    function renderStatus(){
+      var lines=groupStatus.filter(Boolean);
+      msg.innerHTML='<div class="alt ai">'+(lines.length?lines.join('<br>'):'&#x23F3; Boshlanmoqda...')+'</div>';
     }
 
-    var pollCount=0;
-    function pollJob(jobId, gi, group){
-      pollCount++;
-      if(pollCount>400){ // ~20 daqiqa (3s * 400) - shu guruh uchun
-        pollCount=0;
-        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' juda uzoq davom etdi. Birma-bir usulga otkazamiz...</div>';
-        fallbackGroup(group, function(){ processGroup(gi+1); });
+    async function fallbackGroupAsync(group,gi){
+      // Shu guruhdagi fayllarni ozbeticha (lekin 3 tasini bir vaqtda) qayta yuboramiz
+      var fidx=0;
+      async function worker(){
+        while(fidx<group.length){
+          var i=fidx++;
+          var fd=group[i];
+          groupStatus[gi]='Guruh '+(gi+1)+': ('+(i+1)+'/'+group.length+') "'+fd.filename+'" alohida qayta ishlanmoqda...';
+          renderStatus();
+          var byteChars=atob(fd.data);
+          var byteNums=new Array(byteChars.length);
+          for(var b=0;b<byteChars.length;b++) byteNums[b]=byteChars.charCodeAt(b);
+          var blob=new Blob([new Uint8Array(byteNums)]);
+          blob.name=fd.filename;
+          var msgProxy={set innerHTML(html){groupStatus[gi]='Guruh '+(gi+1)+': ('+(i+1)+'/'+group.length+') '+html.replace(/<[^>]+>/g,'');renderStatus();}};
+          var ok=await sendToServer(blob,msgProxy);
+          if(ok)okTotal++; else { errTotal++; failedNames.push(fd.filename); }
+        }
+      }
+      var ws=[];
+      for(var w=0;w<Math.min(3,group.length);w++) ws.push(worker());
+      await Promise.all(ws);
+    }
+
+    async function processOneGroup(gi){
+      var group=groups[gi];
+      groupStatus[gi]='Guruh '+(gi+1)+'/'+groups.length+': serverga yuborilmoqda ('+group.length+' fayl)...';
+      renderStatus();
+      var jobId;
+      try{
+        var startRes=await fetch(RENDER_SERVER+'/parse_batch_start',{
+          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({files:group})
+        }).then(function(r){return r.json();});
+        if(startRes.error)throw new Error(startRes.error);
+        jobId=startRes.job_id;
+      }catch(e){
+        groupStatus[gi]='Guruh '+(gi+1)+': xatosi ('+e.message+'), birma-bir otkazilmoqda...';
+        renderStatus();
+        await fallbackGroupAsync(group,gi);
+        groupStatus[gi]='';renderStatus();
         return;
       }
-      fetch(RENDER_SERVER+'/parse_batch_status/'+jobId).then(function(r){return r.json();}).then(async function(st){
+      var pollCount=0;
+      while(true){
+        pollCount++;
+        if(pollCount>400){
+          groupStatus[gi]='Guruh '+(gi+1)+': juda uzoq davom etdi, birma-bir otkazilmoqda...';
+          renderStatus();
+          await fallbackGroupAsync(group,gi);
+          groupStatus[gi]='';renderStatus();
+          return;
+        }
+        var st;
+        try{
+          st=await fetch(RENDER_SERVER+'/parse_batch_status/'+jobId).then(function(r){return r.json();});
+        }catch(e){
+          await sleepMs(3000); continue; // vaqtincha tarmoq xatosi - qayta urinamiz
+        }
         if(st.error){
-          pollCount=0;
-          msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' xatosi ('+st.error+'). Birma-bir usulga otkazamiz...</div>';
-          fallbackGroup(group, function(){ processGroup(gi+1); });
+          groupStatus[gi]='Guruh '+(gi+1)+': xatosi ('+st.error+'), birma-bir otkazilmoqda...';
+          renderStatus();
+          await fallbackGroupAsync(group,gi);
+          groupStatus[gi]='';renderStatus();
           return;
         }
         if(st.status==='processing'){
-          msg.innerHTML='<div class="alt ai">&#x23F3; Guruh '+(gi+1)+'/'+Math.ceil(valid.length/GROUP_SIZE)+': '+(st.progress||'qayta ishlanmoqda...')+'</div>';
-          setTimeout(function(){ pollJob(jobId, gi, group); },3000);
-          return;
+          groupStatus[gi]='Guruh '+(gi+1)+'/'+groups.length+': '+(st.progress||'qayta ishlanmoqda...');
+          renderStatus();
+          await sleepMs(3000);
+          continue;
         }
         if(st.status==='done'){
           var results=st.results||[];
-          var retryFiles=[]; // batchda xato bergan fayllarni ham qattiq qayta urinamiz
+          var retryFiles=[];
           for(var ri=0;ri<results.length;ri++){
             var r=results[ri];
             if(r.error){
@@ -2703,47 +2739,38 @@ function importMultipleFiles(files,suggestedFolder){
               continue;
             }
             var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1;return q;});
-            await saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},msg);
+            var qMsgProxy={set innerHTML(html){groupStatus[gi]='Guruh '+(gi+1)+': '+html.replace(/<[^>]+>/g,'');renderStatus();}};
+            await saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},qMsgProxy);
             okTotal++;
           }
-          pollCount=0;
           if(retryFiles.length){
-            msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; '+retryFiles.length+' ta fayl guruh usulida xato berdi, alohida qattiq qayta uriniladi...</div>';
-            fallbackGroup(retryFiles, function(){ processGroup(gi+1); });
-          } else {
-            processGroup(gi+1);
+            groupStatus[gi]='Guruh '+(gi+1)+': '+retryFiles.length+' ta fayl alohida qayta uriniladi...';
+            renderStatus();
+            await fallbackGroupAsync(retryFiles,gi);
           }
+          groupStatus[gi]='';renderStatus();
           return;
         }
-        pollCount=0;
-        msg.innerHTML='<div class="alt ai">&#x26A0;&#xFE0F; Guruh '+(gi+1)+' xatosi. Birma-bir usulga otkazamiz...</div>';
-        fallbackGroup(group, function(){ processGroup(gi+1); });
-      }).catch(function(){
-        setTimeout(function(){ pollJob(jobId, gi, group); },3000); // vaqtincha tarmoq xatosi - qayta urinamiz
-      });
+      }
     }
 
-    function fallbackGroup(group, doneCb){
-      // Shu guruhdagi fayllarni bittalab (eski, sekinroq) usulda ozbeticha jonatamiz
-      var idx=0;
-      function next(){
-        if(idx>=group.length){ doneCb(); return; }
-        var fd=group[idx];
-        msg.innerHTML='<div class="alt ai">&#x23F3; ('+(idx+1)+'/'+group.length+') "'+fd.filename+'" birma-bir qayta ishlanmoqda...</div>';
-        // Base64 malumotdan qayta File-ga oxshash obyekt yasab, sendToServer orqali yuboramiz
-        var byteChars=atob(fd.data);
-        var byteNums=new Array(byteChars.length);
-        for(var i=0;i<byteChars.length;i++) byteNums[i]=byteChars.charCodeAt(i);
-        var byteArray=new Uint8Array(byteNums);
-        var blob=new Blob([byteArray]);
-        blob.name=fd.filename;
-        sendToServer(blob,msg).then(function(ok){
-          if(ok)okTotal++; else { errTotal++; failedNames.push(fd.filename); }
-          idx++; next();
-        });
+    // GROUP_CONCURRENCY tagacha guruhni BIR VAQTDA ishga tushiramiz - shunda
+    // server bir vaqtning ozida bir nechta guruh ustida ishlaydi, jami vaqt
+    // sezilarli qisqaradi (avval har bir guruh oldingisi tugashini kutar edi).
+    var nextIdx=0;
+    async function groupWorker(){
+      while(nextIdx<groups.length){
+        var gi=nextIdx++;
+        await processOneGroup(gi);
       }
-      next();
     }
+    var gws=[];
+    for(var gw=0;gw<Math.min(GROUP_CONCURRENCY,groups.length);gw++) gws.push(groupWorker());
+    await Promise.all(gws);
+
+    _pendingImportFolder=null;
+    msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+(failedNames.length?'<br>&#x274C; Import bolmadi ('+failedNames.length+' ta): '+failedNames.join(', ')+' &#8212; bularni qayta yuklab koring.':'')+'</div>';
+    renderQT();
   });
 }
 function importExe(file){
