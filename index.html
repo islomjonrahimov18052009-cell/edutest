@@ -283,7 +283,10 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   <div class="card">
     <div class="ch">
       <div><h2 id="tp-gr"></h2><p class="ts tm" id="tp-sub"></p></div>
-      <button class="btn bg bsm" onclick="logout();showPg('pg-home')">Chiqish</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs bsm" onclick="showPg('pg-profile')">&#x1F464; Mening profilim</button>
+        <button class="btn bg bsm" onclick="logout();showPg('pg-home')">Chiqish</button>
+      </div>
     </div>
     <div class="fg">
       <label>Fan</label>
@@ -331,6 +334,16 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <h3 style="margin-bottom:11px">&#x1F4CA; Mening natijalarim</h3>
     <div id="my-hist-body"></div>
   </div>
+</div>
+
+<!-- MENING PROFILIM (alohida sahifa) -->
+<div class="pg" id="pg-profile">
+  <div class="card">
+    <div class="ch">
+      <button class="btn bg bsm" onclick="showPg('pg-topic')">&#8592; Orqaga</button>
+      <h2 style="margin:0">&#x1F464; Mening profilim</h2>
+    </div>
+  </div>
   <div class="card">
     <h3 style="margin-bottom:8px">&#x1F510; Mening hisobim</h3>
     <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Login yoki parolingizni bu yerdan o'zgartirishingiz mumkin.</p>
@@ -341,6 +354,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div id="spw-msg"></div>
   </div>
 </div>
+
 
 <!-- TEST -->
 <div class="pg" id="pg-test">
