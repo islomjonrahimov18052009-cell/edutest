@@ -886,11 +886,30 @@ function getDB() {
 }
 
 // ── SUZUVCHI MATEMATIK BELGILAR (fon dizayni) ──────────────────────────────
-function initMathBg(){
-  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+function initMathBg(){renderFloatingBg('math');}
+// Har bir fan uchun ozining "suzib yuruvchi" belgi/emoji toplami - diqqatni
+// tortadigan, harakatlanadigan fon. Fan ozgarganda (applySubjectTheme orqali)
+// bu ham yangilanadi.
+var SUBJECT_BG_SYMBOLS={
+  math:['π','√','∑','∞','×','÷','+','−','%','∆','∫','θ','α','β','°','=','≠','½'],
+  phys:['⚛️','⚡','🔬','🌀','∇','λ','Ω','🧲','💡','🔭','📡'],
+  chem:['⚗️','🧪','🧫','🔥','💧','⚛️','pH','H₂O','🧯'],
+  bio: ['🌿','🧬','🦠','🍃','🌱','🌻','🐝','🐛','🍄'],
+  hist:['📜','⚔️','🏛️','👑','⏳','🗿','🏺'],
+  geo: ['🌍','🗺️','🧭','⛰️','🌋','🏝️','🌐','🏔️'],
+  lit: ['📖','🖋️','📚','✒️','📝','🎭','🪶'],
+  lang:['ʻ','ʼ','Ў','Қ','Ғ','Ҳ','✍️','📝','🔤'],
+  eng: ['🇬🇧','A','B','C','abc','📘','✉️','🔠'],
+  rus: ['Ё','Ж','Щ','Ъ','Ы','📕','✎','🔤'],
+  info:['💻','⌨️','01','{}','</>','🖥️','⚙️','🔌'],
+  other:['π','√','∑','∞','×','÷','+','−','%','∆']
+};
+function renderFloatingBg(subjectKey){
   var host=document.getElementById('mathBg');
   if(!host)return;
-  var symbols=['π','√','∑','∞','×','÷','+','−','%','∆','∫','θ','α','β','°','=','≠','½'];
+  host.innerHTML='';
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var symbols=SUBJECT_BG_SYMBOLS[subjectKey]||SUBJECT_BG_SYMBOLS.math;
   var n=22;
   for(var i=0;i<n;i++){
     var el=document.createElement('span');
@@ -930,6 +949,35 @@ var SUBJECTS=[
   {v:'rus',n:'Rus tili'},{v:'info',n:'Informatika'},{v:'other',n:'Boshqa fan'}
 ];
 function subjName(v){var s=SUBJECTS.find(function(x){return x.v===v;});return s?s.n:v;}
+
+// ── FANGA QARAB DIZAYN (RANG) O'ZGARISHI ───────────────────────────────────
+// Har bir fan uchun oz rang uslubi: sayt kirish sahifasi doim neytral/umumiy
+// bolib qoladi, lekin kirgandan keyin (ustoz - oz faniga qarab, oquvchi -
+// tanlagan fan filtri boyicha) rang sxemasi shu fanga mos ozgaradi.
+var DEFAULT_THEME={pri:'#25316d',purd:'#5b3ea6',accent:'#f0b429'};
+var SUBJECT_THEMES={
+  math:{pri:'#2554c7',purd:'#6d3fc9',accent:'#f0b429'},
+  phys:{pri:'#6d28d9',purd:'#9333ea',accent:'#22d3ee'},
+  chem:{pri:'#059669',purd:'#0d9488',accent:'#a3e635'},
+  bio: {pri:'#16a34a',purd:'#15803d',accent:'#eab308'},
+  hist:{pri:'#92400e',purd:'#78350f',accent:'#fbbf24'},
+  geo: {pri:'#0369a1',purd:'#0e7490',accent:'#34d399'},
+  lit: {pri:'#9d174d',purd:'#831843',accent:'#fb7185'},
+  lang:{pri:'#c2410c',purd:'#9a3412',accent:'#fbbf24'},
+  eng: {pri:'#1e3a8a',purd:'#b91c1c',accent:'#fbbf24'},
+  rus: {pri:'#b91c1c',purd:'#1e3a8a',accent:'#fbbf24'},
+  info:{pri:'#4338ca',purd:'#6366f1',accent:'#22d3ee'},
+  other:DEFAULT_THEME
+};
+function applySubjectTheme(subjectKey){
+  var t=(subjectKey&&SUBJECT_THEMES[subjectKey])?SUBJECT_THEMES[subjectKey]:DEFAULT_THEME;
+  var root=document.documentElement.style;
+  root.setProperty('--pri',t.pri);
+  root.setProperty('--purd',t.purd);
+  root.setProperty('--accent',t.accent);
+  renderFloatingBg(subjectKey||'math');
+}
+function resetTheme(){applySubjectTheme(null);}
 
 var SYMBOLS_BY_SUBJECT={
   math:['=','≠','≈','≡','±','∓','a/b','√','∛','∜','ⁿ√','xⁿ','π','∞','≤','≥','∑','∏','∫','∮','÷','×','∆','∇','∈','∉','∪','∩','⊂','⊆','⊄','→','⇒','⇔','↦','∀','∃','∴','∵','¬','∧','∨','⊕','%','‰','∠','⊥','∥','!','|','(',')','[',']','{','}','ℝ','ℕ','ℤ','ℚ','ℂ',
@@ -1326,9 +1374,9 @@ function afterLogin(){
   document.getElementById('nav-user').textContent=ME.name+(ME.cls?' - '+ME.cls:'')+(ME.role==='teacher'?' (Ustoz)':ME.role==='admin'?' (Admin)':'');
   document.getElementById('btn-out').style.display='inline-flex';
   document.getElementById('auth-err').innerHTML='';
-  if(ME.role==='admin'){showPg('pg-admin');initAdmin();}
-  else if(ME.role==='teacher'){showPg('pg-teacher');renderQT();}
-  else{selTopic=null;_curFolder=null;showPg('pg-topic');renderTopics();loadMyHist();}
+  if(ME.role==='admin'){resetTheme();showPg('pg-admin');initAdmin();}
+  else if(ME.role==='teacher'){applySubjectTheme(ME.subject);showPg('pg-teacher');renderQT();}
+  else{resetTheme();selTopic=null;_curFolder=null;showPg('pg-topic');renderTopics();loadMyHist();}
 }
 var _logoutWarned = false;
 function safeLogout(){
@@ -1356,7 +1404,7 @@ function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
     else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
     else if(document.mozCancelFullScreen)document.mozCancelFullScreen();
   }
-  document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';showPg('pg-home');}
+  document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';resetTheme();showPg('pg-home');}
 
 var _curSubjFilter='';
 var _curFolder=null;
@@ -1426,7 +1474,7 @@ function renderTopics(){
   }).join('');
   grid.innerHTML=html||'<p class="ts tm">Mavzular yo\'q</p>';
 }
-function filterBySubj(s){_curSubjFilter=s;_curFolder=null;renderTopics();}
+function filterBySubj(s){_curSubjFilter=s;_curFolder=null;renderTopics();applySubjectTheme(s);}
 function selectTopicByName(t,el){
   selTopic=t;
   document.querySelectorAll('.tbtn').forEach(function(b){b.classList.remove('on');});
@@ -3401,4 +3449,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-      </html>
+  </html>
