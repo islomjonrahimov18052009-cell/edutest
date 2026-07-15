@@ -298,13 +298,13 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div id="timer-teacher-only" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <label style="font-size:14px;font-weight:500">⏱ Timer:</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-          <input type="checkbox" id="timer-toggle" checked onchange="saveTimerPref(this.checked)" style="width:18px;height:18px">
-          <span id="timer-label" style="font-size:13px">Yoqiq</span>
+          <input type="checkbox" id="timer-toggle-preview" checked onchange="saveTimerPref(this.checked)" style="width:18px;height:18px">
+          <span id="timer-label-preview" style="font-size:13px">Yoqiq</span>
         </label>
       </div>
-      <div id="timer-time-row" style="display:flex;align-items:center;gap:8px">
+      <div id="timer-time-row-preview" style="display:flex;align-items:center;gap:8px">
         <label style="font-size:13px">Vaqt:</label>
-        <select id="timer-minutes" onchange="saveTimerMinutes(this.value)" style="padding:4px 8px;border-radius:6px;border:1px solid var(--color-border);font-size:13px">
+        <select id="timer-minutes-preview" onchange="saveTimerMinutes(this.value)" style="padding:4px 8px;border-radius:6px;border:1px solid var(--color-border);font-size:13px">
           <option value="5">5 daqiqa</option>
           <option value="10">10 daqiqa</option>
           <option value="15" selected>15 daqiqa</option>
@@ -418,7 +418,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
           <h2 id="q-detail-title" style="margin:0"></h2>
           <div style="display:flex;gap:8px;align-items:center">
             <button class="btn bsm" style="background:#e8f4fd;color:#1565c0;font-size:13px" onclick="aiCheckTopic(_curTopicDetail)">🤖 Mavzuni tekshirish</button>
-            <label style="font-size:13px;font-weight:500">⏱ Timer:</label>
+            <label style="font-size:13px;font-weight:500" title="Faqat shu mavzu uchun, umumiy standartni ustidan bosib qoyadi">⏱ Timer (shu mavzu uchun):</label>
             <input type="checkbox" id="topic-timer-toggle" onchange="saveTopicTimer(this.checked)" style="width:16px;height:16px">
             <span id="topic-timer-label" style="font-size:12px">Yoqiq</span>
             <select id="topic-timer-mins" onchange="saveTopicTimerMins(this.value)" style="padding:3px 6px;border-radius:6px;border:1px solid var(--color-border);font-size:12px">
@@ -535,7 +535,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div id="cls-msg"></div>
     </div>
     <div class="card">
-      <h3 style="margin-bottom:12px">⏱ Timer sozlamalari</h3>
+      <h3 style="margin-bottom:6px">⏱ Timer sozlamalari (standart)</h3>
+      <p class="ts tm" style="margin-bottom:10px">Bu &#8212; barcha mavzular uchun umumiy standart qiymat. Agar biror mavzuda alohida timer belgilangan bo'lsa (mavzu ichidagi "TIMER:" sozlamasi), o'sha mavzu uchun ANIQ shu belgilangan qiymat ishlatiladi, bu yerdagi umumiy sozlama emas.</p>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <label style="font-size:14px;font-weight:500">Timer:</label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
@@ -555,7 +556,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
           <option value="60">60 daqiqa</option>
           <option value="90">90 daqiqa</option>
         </select>
-        <span style="font-size:12px;color:var(--color-text-secondary)">— barcha mavzular uchun</span>
+        <span style="font-size:12px;color:var(--color-text-secondary)">&#8212; alohida belgilanmagan mavzular uchun</span>
       </div>
     </div>
 
@@ -655,8 +656,33 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <tbody id="admin-allusers-tbody"></tbody></table>
       </div>
     </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <h3 style="margin:0">&#x1F4BE; Xotira holati (Supabase Storage)</h3>
+        <button class="btn bg bsm" onclick="loadStorageStats()" id="storage-refresh-btn">&#x1F504; Yangilash</button>
+      </div>
+      <div class="fg" style="max-width:260px">
+        <label>Reja (Supabase avtomatik bermaydi, qo'lda tanlang)</label>
+        <select id="storage-plan-select" onchange="onStoragePlanChange()">
+          <option value="free">Bepul &#8212; 1 GB</option>
+          <option value="pro">Pullik (Pro) &#8212; 100 GB</option>
+        </select>
+      </div>
+      <div id="storage-stats-body"><p class="ts tm" style="text-align:center;padding:14px">&#x23F3; Yuklanmoqda...</p></div>
+    </div>
   </div>
 </div>
+
+<!-- IMAGE PICKER MODAL (admin uchun - rasmlarni korish/ochirish) -->
+<div class="mbg" id="img-picker-modal" style="display:none">
+  <div class="modal" style="max-width:640px">
+    <div class="mh"><h3>Suratlar (Storage)</h3><button class="xb" onclick="closeImgPicker()">&#x2715;</button></div>
+    <p class="ts tm" style="margin-bottom:10px">Eng katta hajmli suratlar yuqorida. O'chirilganda rasm avval savolning ichiga saqlab qo'yiladi (savolda rasm ko'rinishda qoladi), faqat Supabase Storage'dagi joy bo'shaydi.</p>
+    <div id="img-picker-body" style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
+    <div id="img-picker-loadmore" style="text-align:center;margin-top:10px"></div>
+  </div>
+</div>
+
 
 </div>
 
@@ -1127,6 +1153,14 @@ function getTopicMeta(topic) {
   for(var i=0;i<all.length;i++){if(all[i].topic===topic)return all[i];}
   return null;
 }
+// Timer: avval MAVZUGA XOS sozlama (agar aniq belgilangan bolsa), aks holda
+// UMUMIY (Sozlamalar bolimidagi) standart qiymat ishlatiladi.
+function resolveTimer(meta){
+  var db=getDB();
+  var on=(meta&&meta.timerEnabled!==undefined)?meta.timerEnabled:(db.timerEnabled!==undefined?db.timerEnabled:true);
+  var mins=(meta&&meta.timerMinutes)?meta.timerMinutes:(db.timerMinutes||15);
+  return {on:on,mins:mins};
+}
 function initMeta() {
   var db=getDB();
   if(!db.topicsMeta)db.topicsMeta=[];
@@ -1387,10 +1421,10 @@ function selectTopicByName(t,el){
   mc.style.display='block';
   // Timer - faqat ustoz ko'rsin
   var timerTeacher=document.getElementById('timer-teacher-only');
-  var timerTimeRow=document.getElementById('timer-time-row');
+  var timerTimeRow=document.getElementById('timer-time-row-preview');
   var isTeacher=ME&&ME.role==='teacher';
   if(timerTeacher)timerTeacher.style.display=isTeacher?'flex':'none';
-  if(timerTimeRow)timerTimeRow.style.display=(isTeacher&&document.getElementById('timer-toggle')&&document.getElementById('timer-toggle').checked)?'flex':'none';
+  if(timerTimeRow)timerTimeRow.style.display=(isTeacher&&document.getElementById('timer-toggle-preview')&&document.getElementById('timer-toggle-preview').checked)?'flex':'none';
   // Agar shu mavzu egasi bolgan ustoz "Imtihon" rejimini ochirib qoygan bolsa - yashiramiz
   var examCard=document.getElementById('exam-mode-card');
   if(examCard){
@@ -1416,13 +1450,15 @@ function saveTimerPref(val){
   var db=getDB();
   db.timerEnabled=val;
   saveDB(db);
-  document.getElementById('timer-label').textContent=val?'Yoqiq':'O\'chiq';
-  document.getElementById('timer-time-row').style.display=val?'flex':'none';
+  ['timer-toggle','timer-toggle-preview'].forEach(function(id){var el=document.getElementById(id);if(el)el.checked=val;});
+  ['timer-label','timer-label-preview'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=val?'Yoqiq':'O\'chiq';});
+  ['timer-time-row','timer-time-row-preview'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=val?'flex':'none';});
 }
 function saveTimerMinutes(val){
   var db=getDB();
   db.timerMinutes=parseInt(val);
   saveDB(db);
+  ['timer-minutes','timer-minutes-preview'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=val;});
 }
 function startTest(mode){
   if(!selTopic){alert("Mavzu tanlang!");return;}
@@ -1444,8 +1480,8 @@ function startTest(mode){
   if(el.requestFullscreen)el.requestFullscreen();
   else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
   else if(el.mozRequestFullScreen)el.mozRequestFullScreen();var _meta=getTopicMeta(selTopic);
-  var timerOn=(!_meta||_meta.timerEnabled===undefined)?true:_meta.timerEnabled;
-  var timerMins=(_meta&&_meta.timerMinutes)||15;
+  var _t=resolveTimer(_meta);
+  var timerOn=_t.on, timerMins=_t.mins;
   S.timeLeft=timerOn?timerMins*60:0;showDet=false;
   document.getElementById('tb-name').textContent=ME.name;
   document.getElementById('tb-cls').textContent=ME.cls;
@@ -1642,8 +1678,8 @@ function renderQT(){
     var meta=getTopicMeta(t);
     var cnt=cntOf[t]||0;
     var ask=meta?meta.questionsToAsk:cnt;
-    var timerOn=(!meta||meta.timerEnabled===undefined)?true:meta.timerEnabled;
-    var timerMins=(meta&&meta.timerMinutes)||15;
+    var _t=resolveTimer(meta);
+    var timerOn=_t.on, timerMins=_t.mins;
     var tEsc=t.replace(/'/g,"\\'").replace(/"/g,'&quot;');
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--color-card);border:1px solid var(--color-border);border-radius:10px;gap:10px">'+
       '<div style="flex:1;cursor:pointer" onclick="openTopicDetail(\''+tEsc+'\')">'+
@@ -1759,8 +1795,9 @@ function openTopicDetail(t){
   document.getElementById('q-detail-title').textContent=t;
   // Timer holatini yukla
   var meta=getTopicMeta(t);
-  var timerOn=(!meta||meta.timerEnabled===undefined)?true:meta.timerEnabled;
-  var timerMins=(meta&&meta.timerMinutes)||15;
+  var _t=resolveTimer(meta);
+  var timerOn=_t.on;
+  var timerMins=_t.mins;
   var tog=document.getElementById('topic-timer-toggle');
   if(tog){tog.checked=timerOn;document.getElementById('topic-timer-label').textContent=timerOn?'Yoqiq':'O\'chiq';}
   var sel=document.getElementById('topic-timer-mins');
@@ -1776,17 +1813,25 @@ function backToTopics(){
 
 function saveTopicTimer(val){
   var db=getDB();
-  var meta=getTopicMeta(_curTopicDetail);
-  if(meta){meta.timerEnabled=val;}
+  db.topicsMeta=db.topicsMeta||[];
+  var meta=null;
+  db.topicsMeta.forEach(function(m){if(m.topic===_curTopicDetail)meta=m;});
+  if(!meta){meta={topic:_curTopicDetail};db.topicsMeta.push(meta);}
+  meta.timerEnabled=val;
   saveDB(db);
   document.getElementById('topic-timer-label').textContent=val?'Yoqiq':'O\'chiq';
+  renderQT();
 }
 
 function saveTopicTimerMins(val){
   var db=getDB();
-  var meta=getTopicMeta(_curTopicDetail);
-  if(meta){meta.timerMinutes=parseInt(val);}
+  db.topicsMeta=db.topicsMeta||[];
+  var meta=null;
+  db.topicsMeta.forEach(function(m){if(m.topic===_curTopicDetail)meta=m;});
+  if(!meta){meta={topic:_curTopicDetail};db.topicsMeta.push(meta);}
+  meta.timerMinutes=parseInt(val);
   saveDB(db);
+  renderQT();
 }
 
 function renderTopicDetail(t){
@@ -2127,8 +2172,138 @@ function initAdminSettings(){
     ? '<span class="bdg brd">Ishlatilgan &#8212; yangi kod yarating</span>'
     : '<span class="bdg bgr">Faol &#8212; hali ishlatilmagan</span>';
   renderAdminAllUsers();
+  document.getElementById('storage-plan-select').value=db.storagePlan||'free';
+  loadStorageStats();
 }
 var _adminShowPass=false;
+var STORAGE_PLAN_MB={free:1024,pro:1024*100};
+var _storageCache=null;
+async function loadStorageStats(){
+  var body=document.getElementById('storage-stats-body');
+  var btn=document.getElementById('storage-refresh-btn');
+  if(!body)return;
+  if(!_sbReady||!_sb){ body.innerHTML='<p class="ts tm" style="text-align:center;padding:14px">Supabase ulanmagan.</p>'; return; }
+  if(btn){btn.disabled=true;btn.textContent='\u23F3 Yuklanmoqda...';}
+  body.innerHTML='<p class="ts tm" style="text-align:center;padding:14px">\u23F3 Supabase\'dan malumot olinmoqda (real vaqtda)...</p>';
+  try{
+    var all=[];
+    var offset=0, pageSize=1000, guard=0;
+    while(true){
+      guard++;
+      var res=await _sb.storage.from(SB_STORAGE_BUCKET).list('',{limit:pageSize,offset:offset,sortBy:{column:'name',order:'asc'}});
+      if(res.error) throw new Error(res.error.message);
+      var page=res.data||[];
+      all=all.concat(page);
+      if(page.length<pageSize || guard>200) break;
+      offset+=pageSize;
+    }
+    var files=all.filter(function(f){return f.name && f.metadata;}).map(function(f){return {name:f.name, size:(f.metadata&&f.metadata.size)||0};});
+    var totalBytes=files.reduce(function(s,f){return s+f.size;},0);
+    var largest=files.reduce(function(m,f){return f.size>m?f.size:m;},0);
+    _storageCache={files:files,totalBytes:totalBytes,largest:largest};
+    renderStorageBars();
+  }catch(e){
+    body.innerHTML='<p class="ts" style="color:#b91c1c;text-align:center;padding:14px">Xato: '+e.message+'</p>';
+  }
+  if(btn){btn.disabled=false;btn.textContent='\uD83D\uDD04 Yangilash';}
+}
+function onStoragePlanChange(){
+  var db=getDB();
+  db.storagePlan=document.getElementById('storage-plan-select').value;
+  saveDB(db);
+  renderStorageBars();
+}
+function renderStorageBars(){
+  if(!_storageCache)return;
+  var db=getDB();
+  var plan=db.storagePlan||'free';
+  var limitMB=STORAGE_PLAN_MB[plan];
+  var usedMB=_storageCache.totalBytes/1024/1024;
+  var pct=Math.min(100,(usedMB/limitMB*100));
+  var pctStr=pct<0.1?pct.toFixed(3):pct.toFixed(1);
+  var largestMB=_storageCache.largest/1024/1024;
+  var largestPct=Math.min(100,(largestMB/50*100));
+  var color=pct>90?'#dc2626':pct>70?'#f59e0b':'#16a34a';
+  var html='';
+  html+='<div style="margin-bottom:16px">';
+  html+='<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><b>Umumiy joy</b><span>'+usedMB.toFixed(1)+' MB / '+(limitMB>=1024?(limitMB/1024)+' GB':limitMB+' MB')+' ('+pctStr+'%)</span></div>';
+  html+='<div style="height:16px;background:#eef0f5;border-radius:8px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:8px;transition:width .4s"></div></div>';
+  html+='</div>';
+  html+='<div style="margin-bottom:16px">';
+  html+='<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><b>Eng katta fayl (bitta fayl limiti: 50 MB)</b><span>'+largestMB.toFixed(2)+' MB / 50 MB ('+largestPct.toFixed(2)+'%)</span></div>';
+  html+='<div style="height:16px;background:#eef0f5;border-radius:8px;overflow:hidden"><div style="height:100%;width:'+largestPct+'%;background:#6366f1;border-radius:8px;transition:width .4s"></div></div>';
+  html+='</div>';
+  html+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-bottom:12px">';
+  html+='<div>\uD83D\uDDBC\uFE0F Jami fayllar: <b>'+_storageCache.files.length+'</b></div>';
+  html+='<div>\uD83D\uDCC8 O\'rtacha hajm: <b>'+(_storageCache.files.length?(_storageCache.totalBytes/_storageCache.files.length/1024).toFixed(1):'0')+' KB</b></div>';
+  html+='</div>';
+  html+='<button class="btn bpu bsm" onclick="openImgPicker()">\uD83D\uDDBC\uFE0F Suratlarni ko\'rish / o\'chirish</button>';
+  document.getElementById('storage-stats-body').innerHTML=html;
+}
+var _imgPickerPage=0;
+var IMG_PAGE_SIZE=20;
+function openImgPicker(){
+  if(!_storageCache||!_storageCache.files.length){alert('Suratlar topilmadi yoki hali yuklanmagan.');return;}
+  _imgPickerPage=0;
+  document.getElementById('img-picker-modal').style.display='flex';
+  renderImgPickerPage();
+}
+function closeImgPicker(){document.getElementById('img-picker-modal').style.display='none';}
+function renderImgPickerPage(){
+  var sorted=_storageCache.files.slice().sort(function(a,b){return b.size-a.size;});
+  var pageItems=sorted.slice(0,(_imgPickerPage+1)*IMG_PAGE_SIZE);
+  var body=document.getElementById('img-picker-body');
+  body.innerHTML=pageItems.map(function(f){
+    var url=SB_URL+'/storage/v1/object/public/'+SB_STORAGE_BUCKET+'/'+f.name;
+    var kb=(f.size/1024).toFixed(1);
+    var nameEsc=f.name.replace(/'/g,"\\'");
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--color-border);border-radius:8px">'+
+      '<img src="'+url+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;background:#f2f2f2" loading="lazy" onerror="this.style.opacity=0.2">'+
+      '<div style="flex:1;min-width:0"><div style="font-size:12px;word-break:break-all">'+f.name+'</div><div class="ts tm">'+kb+' KB</div></div>'+
+      '<button class="btn bd bsm" onclick="deleteStorageImageByName(\''+nameEsc+'\')">\uD83D\uDDD1\uFE0F</button>'+
+    '</div>';
+  }).join('');
+  var lm=document.getElementById('img-picker-loadmore');
+  if(pageItems.length<sorted.length){
+    lm.innerHTML='<button class="btn bg bsm" onclick="_imgPickerPage++;renderImgPickerPage()">Yana yuklash ('+(sorted.length-pageItems.length)+' ta qoldi)</button>';
+  } else { lm.innerHTML=''; }
+}
+function blobToDataUrl(blob){
+  return new Promise(function(res,rej){
+    var r=new FileReader();
+    r.onload=function(){res(r.result);};
+    r.onerror=rej;
+    r.readAsDataURL(blob);
+  });
+}
+async function deleteStorageImageByName(name){
+  if(!confirm('Bu suratni Supabase Storage\'dan o\'chirasizmi?\nRasm avval savolning ichiga (bazaga) saqlab qo\'yiladi - shuning uchun sayt/savolda rasm baribir ko\'rinishda qoladi, faqat Supabase\'dagi joy bo\'shaydi.\n\nDavom etasizmi?'))return;
+  var url=SB_URL+'/storage/v1/object/public/'+SB_STORAGE_BUCKET+'/'+name;
+  var dataUrl;
+  try{
+    var resp=await fetch(url);
+    if(!resp.ok) throw new Error('Rasmni yuklab bo\'lmadi (kod: '+resp.status+')');
+    var blob=await resp.blob();
+    dataUrl=await blobToDataUrl(blob);
+  }catch(e){ alert('Rasmni saqlashdan oldin xato: '+e.message+'\nO\'chirish bekor qilindi (rasm yo\'qolib qolmasin uchun).'); return; }
+  var db=getDB();
+  (db.userQs||[]).forEach(function(q){
+    if(q.img && q.img.indexOf(name)>=0) q.img=dataUrl;
+    if(q.options) q.options=q.options.map(function(o){ return (o&&typeof o==='string'&&o.indexOf(name)>=0)?dataUrl:o; });
+  });
+  saveDB(db);
+  try{
+    var r=await _sb.storage.from(SB_STORAGE_BUCKET).remove([name]);
+    if(r.error) throw new Error(r.error.message);
+  }catch(e){ alert('Rasm bazaga saqlandi, lekin Supabase\'dan o\'chirishda xato: '+e.message+'\nQaytadan "Yangilash" qilib, yana urinib ko\'ring.'); }
+  if(_storageCache){
+    _storageCache.files=_storageCache.files.filter(function(f){return f.name!==name;});
+    _storageCache.totalBytes=_storageCache.files.reduce(function(s,f){return s+f.size;},0);
+    _storageCache.largest=_storageCache.files.reduce(function(m,f){return f.size>m?f.size:m;},0);
+  }
+  renderStorageBars();
+  renderImgPickerPage();
+}
 function toggleAdminPass(){
   _adminShowPass=!_adminShowPass;
   renderAdminAllUsers();
@@ -2212,6 +2387,16 @@ function initSettings(){
   var examOn=ME.examEnabled!==false;
   document.getElementById('exam-toggle').checked=examOn;
   document.getElementById('exam-toggle-label').textContent=examOn?'Imtihon rejimi yoqilgan':'Imtihon rejimi ochirilgan';
+  // Umumiy (standart) timer holatini HAQIQIY saqlangan qiymatdan yuklaymiz -
+  // avval bu qadam yoq edi, shuning uchun checkbox har doim "Yoqiq" korsatardi,
+  // hatto siz avval ochirib qoygan bolsangiz ham (haqiqiy qiymat togri saqlanar,
+  // lekin ekranda notogri korinardi).
+  var tOn=db.timerEnabled!==false;
+  var tMins=db.timerMinutes||15;
+  ['timer-toggle','timer-toggle-preview'].forEach(function(id){var el=document.getElementById(id);if(el)el.checked=tOn;});
+  ['timer-label','timer-label-preview'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=tOn?'Yoqiq':'O\'chiq';});
+  ['timer-time-row'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=tOn?'flex':'none';});
+  ['timer-minutes','timer-minutes-preview'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=String(tMins);});
   var myClasses=ME.teachClasses||[];
   document.getElementById('settings-tcls-list').innerHTML=(db.classes||[]).map(function(c){
     var cEsc=c.replace(/'/g,"\\'").replace(/"/g,'&quot;');
@@ -3187,4 +3372,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-</html>
+  </html>
