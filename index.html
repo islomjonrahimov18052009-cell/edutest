@@ -323,7 +323,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       </div>
       <div class="rcard" id="exam-mode-card" onclick="startTest('exam')">
         <div class="ic">&#x1F3AF;</div>
-        <h3>Imtihon</h3><p class="ts tm">Natija saqlanadi</p>
+        <h3>Imtihon</h3><p class="ts tm" id="exam-mode-desc">Natija saqlanadi</p>
       </div>
     </div>
   </div>
@@ -1425,14 +1425,29 @@ function selectTopicByName(t,el){
   var isTeacher=ME&&ME.role==='teacher';
   if(timerTeacher)timerTeacher.style.display=isTeacher?'flex':'none';
   if(timerTimeRow)timerTimeRow.style.display=(isTeacher&&document.getElementById('timer-toggle-preview')&&document.getElementById('timer-toggle-preview').checked)?'flex':'none';
-  // Agar shu mavzu egasi bolgan ustoz "Imtihon" rejimini ochirib qoygan bolsa - yashiramiz
+  // Agar shu mavzu egasi bolgan ustoz "Imtihon" rejimini ochirib qoygan bolsa -
+  // butunlay yashirmaymiz, balki KULRANG (nofaol) qilib, sababini yozib qoyamiz,
+  // shunda oquvchi nega bosilmayotganini tushunadi.
   var examCard=document.getElementById('exam-mode-card');
   if(examCard){
     var db=getDB();
     var tq=(db.userQs||[]).find(function(q){return q.topic===t;});
     var owner=tq&&tq.teacherId?(db.users||[]).find(function(u){return u.id===tq.teacherId;}):null;
     var examOff=owner&&owner.examEnabled===false;
-    examCard.style.display=examOff?'none':'block';
+    var descEl=document.getElementById('exam-mode-desc');
+    if(examOff){
+      examCard.style.opacity='0.5';
+      examCard.style.filter='grayscale(1)';
+      examCard.style.cursor='not-allowed';
+      examCard.onclick=function(){};
+      if(descEl)descEl.innerHTML='Imtihon rejimi o\'chiq';
+    } else {
+      examCard.style.opacity='';
+      examCard.style.filter='';
+      examCard.style.cursor='';
+      examCard.onclick=function(){startTest('exam');};
+      if(descEl)descEl.innerHTML='Natija saqlanadi';
+    }
   }
   setTimeout(function(){mc.scrollIntoView({behavior:'smooth',block:'center'});},100);
 }
@@ -3372,4 +3387,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-  </html>
+      </html>
