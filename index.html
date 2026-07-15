@@ -1850,8 +1850,15 @@ function deleteStorageImagesFor(questions){
     var p1=extractPath(q.img); if(p1) paths.push(p1);
     (q.options||[]).forEach(function(opt){ var p2=extractPath(opt); if(p2) paths.push(p2); });
   });
-  if(paths.length){
-    _sb.storage.from(SB_STORAGE_BUCKET).remove(paths).catch(function(e){console.error('Storage ochirish xato:',e);});
+  if(!paths.length) return;
+  // Katta miqdordagi rasm bolganda (masalan "Barchasini tozalash" bosilganda,
+  // yuzlab-minglab rasm bolishi mumkin) bitta sorovda hammasini yuborish
+  // ornatilgan chegaraga urilib xato berishi mumkin - shuning uchun kichik
+  // guruhlarga bolib yuboramiz.
+  var BATCH=200;
+  for(var i=0;i<paths.length;i+=BATCH){
+    var chunk=paths.slice(i,i+BATCH);
+    _sb.storage.from(SB_STORAGE_BUCKET).remove(chunk).catch(function(e){console.error('Storage ochirish xato:',e);});
   }
 }
 function deleteTopic(t){
@@ -2584,14 +2591,19 @@ function clearResults(){
   alert("Natijalar tozalandi!");
 }
 function clearUserQs(){
-  if(!confirm("Barcha qo'shilgan savollarni o'chirasizmi? (O'zgarmas savollar ham o'chadi)"))return;
+  if(!confirm("Sizning barcha qo'shgan savollaringizni o'chirasizmi? Bog'liq rasmlar Supabase Storage'dan ham butunlay o'chib ketadi - qaytarib bo'lmaydi!"))return;
   var db=getDB();
-  db.userQs=[];
-  db.topicsMeta=[];
+  // MUHIM: faqat SHU ustozning oz savollarini olamiz - boshqa ustozlarning
+  // savollari/rasmlariga tegmaymiz (avval bu yerda filtr yoq edi va tugma
+  // BARCHA ustozlarning savollarini ochirib yuborar edi - xavfli xato edi).
+  var mine=(db.userQs||[]).filter(function(q){return q.teacherId===ME.id;});
+  deleteStorageImagesFor(mine);
+  db.userQs=(db.userQs||[]).filter(function(q){return q.teacherId!==ME.id;});
+  db.topicsMeta=(db.topicsMeta||[]).filter(function(m){return m.teacherId!==ME.id;});
   saveDB(db);
   BQ=[];
   renderQT();
-  alert("Savollar tozalandi!");
+  alert("Savollaringiz va ularga tegishli rasmlar (serverdan ham) tozalandi!");
 }
 function clearStudents(){
   if(!confirm("Barcha o'quvchilarni o'chirasizmi?"))return;
