@@ -886,7 +886,7 @@ function getDB() {
 }
 
 // ── SUZUVCHI MATEMATIK BELGILAR (fon dizayni) ──────────────────────────────
-function initMathBg(){renderFloatingBg('math');}
+function initMathBg(){renderFloatingBg('default');}
 // Har bir fan uchun ozining "suzib yuruvchi" belgi/emoji toplami - diqqatni
 // tortadigan, harakatlanadigan fon. Fan ozgarganda (applySubjectTheme orqali)
 // bu ham yangilanadi.
@@ -902,14 +902,15 @@ var SUBJECT_BG_SYMBOLS={
   eng: ['🇬🇧','A','B','C','abc','📘','✉️','🔠'],
   rus: ['Ё','Ж','Щ','Ъ','Ы','📕','✎','🔤'],
   info:['💻','⌨️','01','{}','</>','🖥️','⚙️','🔌'],
-  other:['π','√','∑','∞','×','÷','+','−','%','∆']
+  other:['π','√','∑','∞','×','÷','+','−','%','∆'],
+  default:['📚','🎓','✏️','π','🔬','🌍','📖','🧠','⭐','💡','🧮','📐','🗺️','🎨','🧬']
 };
 function renderFloatingBg(subjectKey){
   var host=document.getElementById('mathBg');
   if(!host)return;
   host.innerHTML='';
   if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  var symbols=SUBJECT_BG_SYMBOLS[subjectKey]||SUBJECT_BG_SYMBOLS.math;
+  var symbols=SUBJECT_BG_SYMBOLS[subjectKey]||SUBJECT_BG_SYMBOLS.default;
   var n=22;
   for(var i=0;i<n;i++){
     var el=document.createElement('span');
@@ -975,7 +976,7 @@ function applySubjectTheme(subjectKey){
   root.setProperty('--pri',t.pri);
   root.setProperty('--purd',t.purd);
   root.setProperty('--accent',t.accent);
-  renderFloatingBg(subjectKey||'math');
+  renderFloatingBg(subjectKey||'default');
 }
 function resetTheme(){applySubjectTheme(null);}
 
@@ -3449,4 +3450,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-  </html>
+</html>
