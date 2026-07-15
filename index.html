@@ -14,6 +14,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -684,9 +687,10 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="fg"><label>Berilishi kerak bo'lgan savol soni</label><input type="number" id="aq-qcount" placeholder="20" min="1" style="width:120px"></div>
     <div class="fg">
       <label>Savol matni</label>
-      <textarea id="aq-text" placeholder="Savolni yozing..."></textarea>
+      <textarea id="aq-text" placeholder="Savolni yozing..." oninput="updateMathPreview()"></textarea>
       <div class="sarea" id="aq-syms"></div>
-      <div class="ts tm" style="margin-top:4px">&#x1F4A1; Ichma-ich yozish uchun: ichki qismini yozib, <b>belgilab (select qilib)</b> oling, so'ng kerakli belgini (√, xⁿ, qavs) bosing — u shu qismni avtomatik o'rab oladi. Shu usulda ildiz ichida ildiz, daraja ustiga daraja yozish mumkin.</div>
+      <div class="ts tm" style="margin-top:4px">&#x1F4A1; Kasr, ildiz, daraja tugmalari <b>haqiqiy chizilgan</b> ko'rinishda qo'shiladi (chizig'i ichidagi matnga qarab cho'ziladi). Ichma-ich yozish uchun: ichki qismini yozib, <b>belgilab (select qilib)</b> oling, so'ng kerakli tugmani (Kasr, √, xⁿ) bosing — natija tagidagi ko'rinishda darhol chiqadi.</div>
+      <div id="aq-preview" style="display:none;margin-top:8px;padding:12px 14px;background:#f8f9fc;border:1px dashed var(--color-border);border-radius:8px;font-size:16px;line-height:1.8;overflow-x:auto"></div>
     </div>
     <div class="fg">
       <label>Test turi</label>
@@ -888,13 +892,13 @@ var SUBJECTS=[
 function subjName(v){var s=SUBJECTS.find(function(x){return x.v===v;});return s?s.n:v;}
 
 var SYMBOLS_BY_SUBJECT={
-  math:['=','≠','≈','≡','±','∓','√','∛','∜','ⁿ√','xⁿ','π','∞','≤','≥','∑','∏','∫','∮','÷','×','∆','∇','∈','∉','∪','∩','⊂','⊆','⊄','→','⇒','⇔','↦','∀','∃','∴','∵','¬','∧','∨','⊕','%','‰','∠','⊥','∥','!','|','(',')','[',']','{','}','ℝ','ℕ','ℤ','ℚ','ℂ',
+  math:['=','≠','≈','≡','±','∓','a/b','√','∛','∜','ⁿ√','xⁿ','π','∞','≤','≥','∑','∏','∫','∮','÷','×','∆','∇','∈','∉','∪','∩','⊂','⊆','⊄','→','⇒','⇔','↦','∀','∃','∴','∵','¬','∧','∨','⊕','%','‰','∠','⊥','∥','!','|','(',')','[',']','{','}','ℝ','ℕ','ℤ','ℚ','ℂ',
     'α','β','γ','δ','ε','θ','λ','μ','ν','ξ','ρ','σ','τ','φ','χ','ψ','ω','Γ','Δ','Θ','Λ','Ξ','Π','Σ','Φ','Ψ','Ω',
     '⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹','⁺','⁻',
     '₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'],
   phys:['Δ','∇','Ω','λ','μ','ν','θ','ρ','ω','σ','τ','φ','χ','ψ','α','β','γ','ε','ħ','π',
     '→','⇌','⇒','↑','↓','∝','·','×','÷','±','≈','≠','≤','≥','≡',
-    '√','ⁿ√','xⁿ','∑','∏','∫','∮','∆','∇',
+    '√','ⁿ√','xⁿ','a/b','∑','∏','∫','∮','∆','∇',
     '°','°C','°F','‰','%',
     '∥','⊥','∠',
     '⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹','⁺','⁻',
@@ -923,58 +927,97 @@ var SYMBOLS_BY_SUBJECT={
   other:['±','→','↔','°','%','‰','...','«','»','№','–','×','÷','²','³','≈','≠','≤','≥']
 };
 
-// Ildiz belgisidagi darajani (kichik raqamni) o'zi xohlagancha kiritish -
-// masalan 5-daraja ildiz, 7-daraja ildiz va hokazo (faqat 2 va 3 emas).
-var SUP_DIGITS={'0':'\u2070','1':'\u00B9','2':'\u00B2','3':'\u00B3','4':'\u2074','5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079'};
-var SUP_LETTERS={'n':'\u207F','i':'\u2071'};
-function toSuperscript(v){
-  var neg=v.charAt(0)==='-';
-  var body=neg?v.slice(1):v;
-  var out='';
-  for(var i=0;i<body.length;i++){
-    var ch=body.charAt(i).toLowerCase();
-    out+=SUP_DIGITS[ch]||SUP_LETTERS[ch]||body.charAt(i);
-  }
-  return (neg?'\u207B':'')+out;
+// Endi kasr, ildiz va daraja belgilari HAQIQIY chizilgan matematik shakl
+// (KaTeX) sifatida qo'shiladi - shuning uchun kasr chizig'i va ildiz ustidagi
+// chiziq ichidagi matn qancha uzun bo'lsa, shuncha cho'ziladi (rasmdagidek).
+function stripMathDelim(s){
+  s=s.trim();
+  if(s.length>=2&&s.charAt(0)==='$'&&s.charAt(s.length-1)==='$')return s.slice(1,-1);
+  return s;
 }
-// Belgilangan (select qilingan) matnni qavs bilan o'rab, oldiga prefiks qo'shadi -
-// shu tufayli "ildiz ichida ildiz", "daraja ustiga daraja" kabi ICHMA-ICH
-// ifodalarni yozish mumkin: avval ichki qismini yozib, belgilab olib, kerakli
-// tugmani bosaverish kifoya - istalgan chuqurlikda.
-function insWrapped(prefix){
+function insLatex(latex){
+  var ta=document.getElementById('aq-text');
+  var st=ta.selectionStart,en=ta.selectionEnd;
+  var out='$'+latex+'$';
+  ta.value=ta.value.slice(0,st)+out+ta.value.slice(en);
+  ta.selectionStart=ta.selectionEnd=st+out.length;
+  ta.focus();
+  updateMathPreview();
+}
+// KASR: surat ustiga, mahraj ostiga yoziladi, orasida cho'ziluvchan chiziq -
+// ICHMA-ICH kasr uchun: avval kichik kasrni yozib, uni belgilab (select qilib)
+// oling, so'ng yana "Kasr" tugmasini bosing - belgilangan qism suratga aylanadi.
+function insFraction(){
   var ta=document.getElementById('aq-text');
   var st=ta.selectionStart,en=ta.selectionEnd;
   var sel=ta.value.slice(st,en);
-  var out=prefix+'('+sel+')';
-  ta.value=ta.value.slice(0,st)+out+ta.value.slice(en);
-  if(sel){
-    // ichki qismni yana belgilab qo'yamiz - darhol yana bir tugma bosib, yanada
-    // chuqurroq ichma-ich yozish uchun qulay
-    ta.selectionStart=st+prefix.length+1;
-    ta.selectionEnd=st+prefix.length+1+sel.length;
-  } else {
-    ta.selectionStart=ta.selectionEnd=st+prefix.length+1;
+  var num;
+  if(sel){ num=stripMathDelim(sel); }
+  else {
+    num=prompt("Kasr suratini (yuqori qismini) kiriting:\nMasalan: 2x+1","");
+    if(num===null)return;
   }
-  ta.focus();
+  var den=prompt("Kasr mahrajini (pastki qismini) kiriting:\nMasalan: x-3\n\n(Ichma-ich kasr uchun: kichik kasrni alohida yozib, belgilab oling, so'ng yana \"Kasr\" tugmasini bosing)","");
+  if(den===null)return;
+  insLatex('\\frac{'+num+'}{'+den+'}');
 }
+// ILDIZ: ostidagi ifoda qancha uzun bo'lsa, ustidagi chiziq ham shuncha cho'ziladi.
 function insNthRoot(){
-  var n=prompt("Ildiz darajasini kiriting:\n\u2022 Oddiy son uchun: 3, 5, 7\n\u2022 Harf uchun: n\n(bekor qilish uchun bo'sh qoldiring)","3");
+  var ta=document.getElementById('aq-text');
+  var st=ta.selectionStart,en=ta.selectionEnd;
+  var sel=ta.value.slice(st,en);
+  var content;
+  if(sel){ content=stripMathDelim(sel); }
+  else {
+    content=prompt("Ildiz ostidagi ifodani kiriting:\nMasalan: 25, x+7","");
+    if(content===null)return;
+  }
+  var n=prompt("Ildiz darajasini kiriting (oddiy kvadrat ildiz uchun bo'sh qoldiring):\nMasalan: 3, 5, 7, n","");
   if(n===null)return;
   n=n.trim();
-  if(!n){insWrapped('\u221A');return;}
-  insWrapped(toSuperscript(n)+'\u221A');
+  insLatex(n?('\\sqrt['+n+']{'+content+'}'):('\\sqrt{'+content+'}'));
 }
+function insRootQuick(n){
+  var ta=document.getElementById('aq-text');
+  var st=ta.selectionStart,en=ta.selectionEnd;
+  var sel=ta.value.slice(st,en);
+  var content=sel?stripMathDelim(sel):'';
+  insLatex(n?('\\sqrt['+n+']{'+content+'}'):('\\sqrt{'+content+'}'));
+}
+// DARAJA: asosni belgilab (select) qilib tanlang, so'ng bu tugmani bosing -
+// daraja ustiga daraja (ichma-ich) yozish uchun ham xuddi shunday: chiqqan
+// natijani belgilab, yana bosing.
 function insCustomExp(){
-  var v=prompt("Daraja qiymatini kiriting:\n\u2022 Oddiy son uchun: 2, 3, -1, 10\n\u2022 Harf uchun: n\n\u2022 Murakkab ifoda uchun (masalan daraja ustiga daraja): 2n, x+1","2");
-  if(v===null)return;
-  v=v.trim();
-  if(!v)return;
-  if(/^-?[0-9]+$/.test(v)||/^n$/i.test(v)){
-    insSym(toSuperscript(v));
-  } else {
-    insWrapped('^');
+  var ta=document.getElementById('aq-text');
+  var st=ta.selectionStart,en=ta.selectionEnd;
+  var sel=ta.value.slice(st,en);
+  var base;
+  if(sel){ base=stripMathDelim(sel); }
+  else {
+    base=prompt("Daraja qo'yiladigan sonni/harfni kiriting:\nMasalan: x, 5","x");
+    if(base===null)return;
   }
+  var exp=prompt("Daraja qiymatini kiriting:\nMasalan: 2, 3, -1, n, yoki murakkab: 2n+1","2");
+  if(exp===null)return;
+  insLatex(base+'^{'+exp+'}');
 }
+function updateMathPreview(){
+  var ta=document.getElementById('aq-text');
+  var prev=document.getElementById('aq-preview');
+  if(!ta||!prev)return;
+  var txt=ta.value;
+  if(!txt.trim()){prev.style.display='none';return;}
+  prev.style.display='block';
+  prev.textContent=txt;
+  renderMathIn(prev);
+}
+function renderMathIn(el){
+  if(!el||typeof renderMathInElement!=='function')return;
+  try{
+    renderMathInElement(el,{delimiters:[{left:'$',right:'$',display:false}],throwOnError:false});
+  }catch(e){}
+}
+
 
 var UZ_REGIONS={
   'Toshkent shahri':['Bektemir','Chilonzor','Yakkasaroy','Mirobod','Mirzo Ulugbek','Olmazor','Sergeli','Shayxontohur','Uchtepa','Yashnobod','Yunusobod','Yangihayot'],
@@ -1439,6 +1482,7 @@ function renderQ(){
   var imgHtml = imgSrc ? '<div style="text-align:center;margin:10px 0"><img src="'+imgSrc+'" style="max-width:100%;max-height:200px;border-radius:8px;background:#fff;padding:4px"></div>' : '';
   document.getElementById('t-qbody').innerHTML='<div style="font-weight:700;font-size:17px;margin-bottom:8px;line-height:1.6">'+(S.idx+1)+'. '+q.text+'</div>'+imgHtml+(q.isMulti?'<div class="alt ai ts" style="margin-bottom:10px">Ko\'p javobli: bir nechta to\'g\'ri</div>':'')+
     q.options.map(function(opt,i){var sel=ans.indexOf(i)>=0;var ctrl=q.isMulti?'<div class="chk'+(sel?' on':'')+'"><span>'+(sel?'&#x2713;':'')+'</span></div>':'<div class="radio'+(sel?' on':'')+'"></div>';var isImg=isImgVal(opt);var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-width:100%;max-height:150px;display:block;margin:6px 0 2px 0;background:#fff;border-radius:6px;padding:4px">':'<span> '+opt+'</span>';return '<div class="opt'+(sel?' sel':'')+'" onclick="selAns('+i+')">'+ctrl+'<div style="flex:1"><span>'+String.fromCharCode(65+i)+'.</span>'+optContent+'</div></div>';}).join('');
+  renderMathIn(document.getElementById('t-qbody'));
 }
 function goQ(d){S.idx=Math.max(0,Math.min(S.test.length-1,S.idx+d));renderQ();}
 function selAns(i){var q=S.test[S.idx],ans=(S.answers[S.idx]||[]).slice();if(q.isMulti){var x=ans.indexOf(i);if(x>=0)ans.splice(x,1);else ans.push(i);}else{ans=[i];}S.answers[S.idx]=ans;renderQ();}
@@ -1553,7 +1597,7 @@ function fireConfetti(count){
 }
 function toggleDetail(){
   showDet=!showDet;var el=document.getElementById('r-det');el.style.display=showDet?'block':'none';
-  if(showDet&&S.lastRes){document.getElementById('r-det-body').innerHTML=S.lastRes.details.map(function(d,i){return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px"><div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+((d.img||d.image)?'<img src="'+imgSrcVal(d.img||d.image)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+d.options.map(function(opt,oi){var isR=d.correct.indexOf(oi)>=0,isU=d.userAns.indexOf(oi)>=0,bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent',ic=isR?'✅':(isU&&!isR)?'❌':'⬜';var isImg=isImgVal(opt);var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';}).join('')+'</div>';}).join('');}
+  if(showDet&&S.lastRes){document.getElementById('r-det-body').innerHTML=S.lastRes.details.map(function(d,i){return '<div style="padding:12px;border-radius:9px;background:'+(d.ok?'#f0fdf4':'#fff7f7')+';border:1px solid '+(d.ok?'#bbf7d0':'#fecaca')+';margin-bottom:9px"><div style="font-weight:700;margin-bottom:7px">'+(i+1)+'. '+d.text+'</div>'+((d.img||d.image)?'<img src="'+imgSrcVal(d.img||d.image)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px;display:block;background:#fff;padding:4px">':'')+d.options.map(function(opt,oi){var isR=d.correct.indexOf(oi)>=0,isU=d.userAns.indexOf(oi)>=0,bg=isR?'#dcfce7':(isU&&!isR)?'#fee2e2':'transparent',ic=isR?'✅':(isU&&!isR)?'❌':'⬜';var isImg=isImgVal(opt);var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-height:80px;border-radius:4px;vertical-align:middle;margin-left:4px">':opt;return '<div style="padding:6px 8px;border-radius:6px;font-size:13px;background:'+bg+';margin-bottom:4px">'+ic+' '+String.fromCharCode(65+oi)+'. '+optContent+(isR?'<span style="color:#16a34a;font-size:11px;font-weight:700;margin-left:6px">(To\'g\'ri)</span>':'')+'</div>';}).join('')+'</div>';}).join('');renderMathIn(document.getElementById('r-det-body'));}
 }
 
 var _curQFolder=null;
@@ -1885,11 +1929,12 @@ function refreshSyms(){
   var subj=document.getElementById('aq-subj').value||'math';
   var syms=SYMBOLS_BY_SUBJECT[subj]||SYMBOLS_BY_SUBJECT.math;
   var special={
+    'a/b':['insFraction()','Kasr (surat/mahraj) - chizig\'i avtomatik cho\'ziladi'],
     'ⁿ√':['insNthRoot()','Ildiz darajasini o\'zingiz kiriting'],
     'xⁿ':['insCustomExp()','Daraja qiymatini o\'zingiz kiriting'],
-    '√':['insWrapped(\'\\u221A\')','Ildiz (belgilab olingan qism ichiga qo\'yiladi)'],
-    '∛':['insWrapped(\'\\u00B3\\u221A\')','Kub ildiz'],
-    '∜':['insWrapped(\'\\u2074\\u221A\')','4-daraja ildiz'],
+    '√':['insRootQuick(\'\')','Kvadrat ildiz (chizig\'i avtomatik cho\'ziladi)'],
+    '∛':['insRootQuick(\'3\')','Kub ildiz'],
+    '∜':['insRootQuick(\'4\')','4-daraja ildiz'],
     '(':['insWrapAny()','Belgilangan qismni qavsga oladi']
   };
   document.getElementById('aq-syms').innerHTML=syms.map(function(s){
