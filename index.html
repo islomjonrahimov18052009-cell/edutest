@@ -2640,11 +2640,30 @@ function collectUsedStoragePaths(db){
 // generatsiya qilingani uchun oddiy "savolni ochirish" ularni topa olmaydi.
 async function cleanupOrphanStorageImages(msgEl){
   if(!_sbReady || !_sb) return {deleted:0, total:0, skipped:true};
-  var db=getDB();
+  // XAVFSIZLIK 1: mahalliy (shu qurilmadagi) nusxa ESKIRGAN bolishi mumkin -
+  // masalan boshqa ustoz yaqinda yangi savol qoshgan-u, hali shu brauzerga
+  // "yetib kelmagan" bolishi mumkin edi. Shuning uchun "ishlatilayotgan"
+  // royxatini albatta ENG SONGGI BULUT holatidan tuzamiz, mahalliy keshdan
+  // emas - aks holda boshqa ustozning yangi rasmini xato "etim" deb ochirib
+  // qoyishimiz mumkin edi.
+  if(msgEl) msgEl.innerHTML='<div class="alt ai">&#x23F3; Eng songgi malumot bulutdan tekshirilmoqda...</div>';
+  var cloudDb=await sbPull();
+  var db=cloudDb||getDB();
   var used=collectUsedStoragePaths(db);
   if(msgEl) msgEl.innerHTML='<div class="alt ai">&#x23F3; Serverdagi fayllar royxati olinmoqda...</div>';
   var allFiles=await listAllStorageObjects();
-  var orphanPaths=allFiles.filter(function(f){ return !used[f.name]; }).map(function(f){return f.name;});
+  // XAVFSIZLIK 2: oxirgi 3 soat ichida yuklangan fayllarga TEGMAYMIZ - bu,
+  // masalan, aynan shu daqiqada boshqa ustoz tomonidan import qilinayotgan
+  // (rasm allaqachon yuklangan, lekin savol hali db'ga yozilmagan) fayllarni
+  // tasodifan ochirib qoyishning oldini oladi.
+  var GRACE_MS=3*60*60*1000;
+  var now=Date.now();
+  var orphanPaths=allFiles.filter(function(f){
+    if(used[f.name]) return false;
+    var createdAt=f.created_at?new Date(f.created_at).getTime():0;
+    if(createdAt && (now-createdAt)<GRACE_MS) return false;
+    return true;
+  }).map(function(f){return f.name;});
   var BATCH=200, deletedCount=0;
   for(var i=0;i<orphanPaths.length;i+=BATCH){
     var chunk=orphanPaths.slice(i,i+BATCH);
@@ -3543,4 +3562,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-          </html>
+      </html>
