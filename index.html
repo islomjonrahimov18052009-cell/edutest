@@ -579,9 +579,10 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div class="alt aw">Diqqat! Qaytarib bo'lmaydi.</div>
       <div class="fx fxw" style="gap:8px">
         <button class="btn bd bsm" onclick="clearResults()">&#x1F5D1; Natijalarni tozalash</button>
-        <button class="btn bd bsm" onclick="clearUserQs()">&#x1F5D1; Qo'shilgan savollarni tozalash</button>
+        <button class="btn bd bsm" id="clearqs-btn" onclick="clearUserQs()">&#x1F5D1; Qo'shilgan savollarni tozalash</button>
         <button class="btn bd bsm" onclick="clearStudents()">&#x1F5D1; O'quvchilarni tozalash</button>
       </div>
+      <div id="clearqs-msg" class="mt8"></div>
     </div>
     <div class="card" style="border:2px solid var(--color-border-secondary);display:none">
       <h3 style="margin-bottom:4px">&#x1F310; Internet sinxronlash (Supabase)</h3>
@@ -2590,8 +2591,77 @@ function clearResults(){
   loadResults();
   alert("Natijalar tozalandi!");
 }
-function clearUserQs(){
-  if(!confirm("Sizning barcha qo'shgan savollaringizni o'chirasizmi? Bog'liq rasmlar Supabase Storage'dan ham butunlay o'chib ketadi - qaytarib bo'lmaydi!"))return;
+// Bucket'dagi barcha fayllarni sahifalab royxatga oladi (loadStorageStats
+// bilan bir xil pattern - 1000 talik sahifalarda, minglab fayl bolsa ham
+// ishlaydi).
+async function listAllStorageObjects(){
+  var all=[];
+  var offset=0, pageSize=1000, guard=0;
+  while(true){
+    guard++;
+    var res=await _sb.storage.from(SB_STORAGE_BUCKET).list('',{limit:pageSize,offset:offset,sortBy:{column:'name',order:'asc'}});
+    if(res.error) throw new Error(res.error.message);
+    var page=res.data||[];
+    all=all.concat(page);
+    if(page.length<pageSize || guard>500) break;
+    offset+=pageSize;
+  }
+  return all.filter(function(f){return f.name && f.metadata;});
+}
+// Joriy bazada (BARCHA ustozlarning savollari + natijalar tarixidagi
+// "Batafsil" korinishi uchun saqlangan tafsilotlar) ISHLATILAYOTGAN barcha
+// rasm yollarini yigadi. Natijalar tarixi ham hisobga olinadi - aks holda
+// eski imtihon natijalarida korsatiladigan rasmlar ham ochirilib qolar edi.
+function collectUsedStoragePaths(db){
+  var used={};
+  function extractPath(url){
+    if(!url || typeof url!=='string') return null;
+    var marker='/storage/v1/object/public/'+SB_STORAGE_BUCKET+'/';
+    var idx=url.indexOf(marker);
+    if(idx<0) return null;
+    return url.slice(idx+marker.length);
+  }
+  function mark(url){ var p=extractPath(url); if(p) used[p]=true; }
+  (db.userQs||[]).forEach(function(q){
+    mark(q.img);
+    (q.options||[]).forEach(mark);
+  });
+  (db.results||[]).forEach(function(r){
+    (r.details||[]).forEach(function(d){
+      mark(d.img||d.image);
+      (d.options||[]).forEach(mark);
+    });
+  });
+  return used;
+}
+// "Etim" (hech qanday joriy savol/natijaga bogliq bolmagan) fayllarni butun
+// Storage bucket boyicha topib ochiradi. Bular kopincha muvaffaqiyatsiz yoki
+// qayta urinilgan importlardan qolgan - fayl nomi har safar tasodifiy
+// generatsiya qilingani uchun oddiy "savolni ochirish" ularni topa olmaydi.
+async function cleanupOrphanStorageImages(msgEl){
+  if(!_sbReady || !_sb) return {deleted:0, total:0, skipped:true};
+  var db=getDB();
+  var used=collectUsedStoragePaths(db);
+  if(msgEl) msgEl.innerHTML='<div class="alt ai">&#x23F3; Serverdagi fayllar royxati olinmoqda...</div>';
+  var allFiles=await listAllStorageObjects();
+  var orphanPaths=allFiles.filter(function(f){ return !used[f.name]; }).map(function(f){return f.name;});
+  var BATCH=200, deletedCount=0;
+  for(var i=0;i<orphanPaths.length;i+=BATCH){
+    var chunk=orphanPaths.slice(i,i+BATCH);
+    if(msgEl) msgEl.innerHTML='<div class="alt ai">&#x23F3; Etim fayllar ochirilmoqda... ('+Math.min(i+BATCH,orphanPaths.length)+'/'+orphanPaths.length+')</div>';
+    try{
+      var r=await _sb.storage.from(SB_STORAGE_BUCKET).remove(chunk);
+      if(!r.error) deletedCount+=chunk.length;
+    }catch(e){ console.error('Etim fayl ochirish xato:',e); }
+  }
+  return {deleted:deletedCount, total:allFiles.length};
+}
+async function clearUserQs(){
+  if(!confirm("Sizning barcha qo'shgan savollaringizni o'chirasizmi? Bog'liq VA butun serverda ishlatilmayotgan (etim) barcha rasmlar ham butunlay o'chib ketadi - qaytarib bo'lmaydi!"))return;
+  var btn=document.getElementById('clearqs-btn');
+  var msg=document.getElementById('clearqs-msg');
+  if(btn) btn.disabled=true;
+  if(msg) msg.innerHTML='<div class="alt ai">&#x23F3; Savollaringiz tozalanmoqda...</div>';
   var db=getDB();
   // MUHIM: faqat SHU ustozning oz savollarini olamiz - boshqa ustozlarning
   // savollari/rasmlariga tegmaymiz (avval bu yerda filtr yoq edi va tugma
@@ -2603,7 +2673,13 @@ function clearUserQs(){
   saveDB(db);
   BQ=[];
   renderQT();
-  alert("Savollaringiz va ularga tegishli rasmlar (serverdan ham) tozalandi!");
+  try{
+    var res=await cleanupOrphanStorageImages(msg);
+    if(msg) msg.innerHTML='<div class="alt as">&#x2705; Savollaringiz tozalandi! Serverdan yana <b>'+res.deleted+'</b> ta ishlatilmayotgan (etim) fayl ochirildi (jami tekshirilgan: '+res.total+' ta).</div>';
+  }catch(e){
+    if(msg) msg.innerHTML='<div class="alt ar">Savollaringiz tozalandi, lekin etim rasmlarni qidirishda xato yuz berdi: '+e.message+'</div>';
+  }
+  if(btn) btn.disabled=false;
 }
 function clearStudents(){
   if(!confirm("Barcha o'quvchilarni o'chirasizmi?"))return;
@@ -3467,4 +3543,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-  </html>
+          </html>
