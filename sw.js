@@ -21,6 +21,11 @@ self.addEventListener('activate', function(e) {
 
 self.addEventListener('fetch', function(e) {
   if (e.request.method !== 'GET') return;
+  // MUHIM: faqat OZ saytimiz (GitHub Pages) fayllarini keshlaymiz.
+  // Avval bu tekshiruv yoq edi, shuning uchun Render serverimizga ketayotgan
+  // /parse_batch_status kabi DINAMIK API sorovlari ham shu yerda ushlanib,
+  // ikkilanib xato berardi va bekorga keshlashga urinardi.
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request).then(function(res) {
       var clone = res.clone();
