@@ -24,7 +24,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#eef1f7;--card:#fff;--pri:#25316d;--purd:#5b3ea6;--ok:#15803d;--err:#b91c1c;--warn:#b45309;--accent:#f0b429;--txt:#111827;--mut:#64748b;--bdr:#dbe1ea;--r:14px}
 body{font-family:'Inter',system-ui,sans-serif;color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;position:relative;overflow-x:hidden}
-body{background:linear-gradient(125deg,#151b3d,#2a1f5c 30%,#5b3ea6 55%,#7c4fc9 70%,#2a1f5c 100%);background-size:280% 280%;animation:bgShift 24s ease-in-out infinite}
+body{background:linear-gradient(125deg,#151b3d,var(--purd) 30%,var(--pri) 55%,var(--accent) 70%,var(--purd) 100%);background-size:280% 280%;animation:bgShift 24s ease-in-out infinite}
 @keyframes bgShift{0%,100%{background-position:0% 30%}50%{background-position:100% 70%}}
 #mathBg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
 #heroArt{position:fixed;left:0;right:0;bottom:0;height:38vh;min-height:280px;z-index:-2;pointer-events:none}
@@ -2908,7 +2908,12 @@ function importMultipleFiles(files,suggestedFolder){
   // serverga yuboramiz - shunda server imkoniyatidan maksimal foydalanib,
   // import sezilarli tezlashadi (avval faqat bitta guruh navbat bilan ishlar edi).
   var GROUP_SIZE=8;
-  var GROUP_CONCURRENCY=3; // bir vaqtda nechta guruh serverga yuborilishi
+  // MUHIM: Render'ning "Free" tarifi atigi 512 MB xotira va 0.1 vCPU beradi.
+  // Har bir guruh serverda ozining LibreOffice jarayonini ishga tushiradi -
+  // bir nechtasi bir vaqtda ishlasa, xotira tugab (OOM) server qulab tushadi.
+  // Shuning uchun guruhlarni ENDI KETMA-KET (1 tadan) yuboramiz - sekinroq,
+  // lekin server qulab, hamma narsa qaytadan boshlanishidan koра barqaror.
+  var GROUP_CONCURRENCY=1; // bir vaqtda nechta guruh serverga yuborilishi
   var okTotal=0, errTotal=0, failedNames=[];
   function sleepMs(ms){return new Promise(function(res){setTimeout(res,ms);});}
 
@@ -3462,4 +3467,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-</html>
+  </html>
