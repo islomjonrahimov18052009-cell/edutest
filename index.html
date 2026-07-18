@@ -816,47 +816,59 @@ function sbInit() {
   if (!SB_URL || !SB_KEY) { _sbReady = false; return; }
   if (_sb) return;
   try {
+    // MUHIM: bu klient endi FAQAT Storage (rasmlar) uchun ishlatiladi.
+    // Jadval (edutest_store) o'qish/yozish endi TO'G'RIDAN-TO'G'RI Supabase'ga
+    // emas, Render serveringiz orqali (service key bilan, faqat serverda
+    // saqlanadigan) amalga oshiriladi - shuning uchun anon key orqali
+    // hech kim bazani o'qiy/yoza olmaydi.
     _sb = supabase.createClient(SB_URL, SB_KEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'sb_edu_'+SB_URL.slice(-8) }
     });
     _sbReady = true;
-    sbSubscribe();
+    startDbPolling();
   } catch(e) { _sbReady = false; }
 }
 
-function sbSubscribe() {
-  if (!_sb) return;
-  _realtimeCh = _sb.channel('db_changes')
-    .on('postgres_changes', {event:'UPDATE', schema:'public', table:'edutest_store'}, function(payload) {
-      if (payload.new && payload.new.key === SK) {
-        try {
-          var remote = JSON.parse(payload.new.value);
-          var local = localGetDB();
-          // Only update if remote is newer
-          if ((remote.v||0) > (local.v||0)) {
-            localStorage.setItem(SK, JSON.stringify(remote));
-            // Refresh visible UI if teacher is on results/progress page
-            if (document.getElementById('pg-results') && document.getElementById('pg-results').style.display !== 'none') renderResults();
-            if (document.getElementById('pg-progress') && document.getElementById('pg-progress').style.display !== 'none') renderProgress();
-          }
-        } catch(e) {}
+// Avval Supabase Realtime (postgres_changes) orqali kuzatilgan edi - lekin bu
+// RLS yoqilgach anon key uchun ishlamay qoladi (Realtime ham RLS'ga bo'ysunadi).
+// Shuning uchun endi davriy ravishda serverdan yangilanishni soraymiz -
+// funksionallik deyarli bir xil, faqat "darhol" emas, ~20 soniyada bir marta.
+var _dbPollTimer=null;
+function startDbPolling(){
+  if(_dbPollTimer) return;
+  _dbPollTimer=setInterval(async function(){
+    try{
+      var remote=await sbPull();
+      if(!remote) return;
+      var local=localGetDB();
+      if((remote.v||0) > (local.v||0)){
+        localStorage.setItem(SK, JSON.stringify(remote));
+        if(document.getElementById('pg-results') && document.getElementById('pg-results').style.display !== 'none') renderResults();
+        if(document.getElementById('pg-progress') && document.getElementById('pg-progress').style.display !== 'none') renderProgress();
       }
-    })
-    .subscribe();
+    }catch(e){}
+  }, 20000);
 }
 
 async function sbPush(db) {
-  if (!_sbReady || !_sb) return;
+  if (!_sbReady) return;
   try {
-    await _sb.from('edutest_store').upsert({ key: SK, value: JSON.stringify(db) }, { onConflict: 'key' });
-  } catch(e) { console.error('Supabase push xato (malumot juda katta bolishi mumkin):', e); }
+    var res = await fetch(RENDER_SERVER+'/db_save', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ value: JSON.stringify(db) })
+    });
+    if(!res.ok){ console.error('Server push xato (kod: '+res.status+')'); }
+  } catch(e) { console.error('Server push xato (malumot juda katta bolishi yoki server band bolishi mumkin):', e); }
 }
 
 async function sbPull() {
-  if (!_sbReady || !_sb) return null;
+  if (!_sbReady) return null;
   try {
-    var res = await _sb.from('edutest_store').select('value').eq('key', SK).single();
-    if (res.data && res.data.value) return JSON.parse(res.data.value);
+    var res = await fetch(RENDER_SERVER+'/db_get');
+    if(!res.ok) return null;
+    var data = await res.json();
+    if (data && data.value) return JSON.parse(data.value);
   } catch(e) {}
   return null;
 }
@@ -870,8 +882,10 @@ function localGetDB() {
       var changed = false;
       if (!db.users) { db.users = []; changed = true; }
       if (!db.users.some(function(u){return u.role==='admin';})) {
-        db.users.push({id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:'admin123',cls:''});
+        var _newAdminPass=genRandomPassword();
+        db.users.push({id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:_newAdminPass,cls:''});
         changed = true;
+        setTimeout(function(){ alert('Admin hisobi topilmadi, yangisi yaratildi:\n\nsuperadmin / '+_newAdminPass+'\n\nBu parolni saqlab qoying!'); }, 500);
       }
       if (!db.teacherCode) { db.teacherCode = genTeacherCode(); db.teacherCodeUsed = false; changed = true; }
       if (typeof db.teacherCodeUsed === 'undefined') { db.teacherCodeUsed = false; changed = true; }
@@ -1143,10 +1157,32 @@ function genTeacherCode(){
   }
   return 'USTOZ-'+s;
 }
+// Standart (bootstrap) hisoblar uchun tasodifiy, taxmin qilib bolmaydigan
+// parol - "1234"/"admin123" kabi hammaga malum qiymatlar ornini bosadi.
+function genRandomPassword(){
+  var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  var rnd;
+  if(window.crypto&&window.crypto.getRandomValues){
+    var arr=new Uint32Array(16);
+    window.crypto.getRandomValues(arr);
+    rnd=function(i){return arr[i]/4294967296;};
+  } else {
+    rnd=function(){return Math.random();};
+  }
+  var s='';
+  for(var i=0;i<16;i++){
+    s+=chars[Math.floor(rnd(i)*chars.length)];
+  }
+  return s;
+}
 function defDB() {
+  var tPass=genRandomPassword(), aPass=genRandomPassword();
+  setTimeout(function(){
+    alert('Birinchi marta ishga tushirilyapti - avtomatik yaratilgan hisoblar:\n\nUstoz: admin / '+tPass+'\nAdmin: superadmin / '+aPass+'\n\nBu parollarni saqlab qoying - keyinchalik "Mening hisobim" bolimidan ozgartirishingiz mumkin.');
+  },500);
   return { users: [
-      {id:'t1',role:'teacher',name:'Admin',login:'admin',pass:'1234',cls:''},
-      {id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:'admin123',cls:''}
+      {id:'t1',role:'teacher',name:'Admin',login:'admin',pass:tPass,cls:''},
+      {id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:aPass,cls:''}
     ],
     classes: ['5A','5B','6A','6B','7A','7B','8A','8B','9A','9B','10A','10B','11A','11B'],
     userQs: [], topicsMeta: [], results: [], v: 0,
@@ -3251,8 +3287,9 @@ initMeta();
   // URL va KEY kod ichida - localStorage dan o'qish shart emas
 })();
 
-// AI SAVOL TEKSHIRISH (Groq)
-var GROQ_KEY = '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';
+// AI SAVOL TEKSHIRISH (Groq) - kalit endi bu yerda emas, Render serverida
+// (GROQ_API_KEY muhit ozgaruvchisi sifatida) saqlanadi. Brauzer /ai_check
+// orqali muroj oat qiladi, server esa haqiqiy kalit bilan Groq'ga yuboradi.
 
 var _aiResults = []; // global, detail modal shu yerdan o'qiydi
 
@@ -3368,13 +3405,12 @@ function aiCheckTopic(topic) {
       lines.push('   Belgilangan togri javob: ' + correct.join(', '));
     });
 
-    var url = 'https://api.groq.com/openai/v1/chat/completions';
+    var url = RENDER_SERVER + '/ai_check';
 
     fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + GROQ_KEY
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
@@ -3562,4 +3598,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-      </html>
+</html>
