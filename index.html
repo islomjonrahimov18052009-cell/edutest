@@ -500,6 +500,17 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <input type="file" id="exe-inp" accept=".exe,.docx,.pdf,.txt" multiple style="display:none">
       <div id="imp-msg" style="margin-top:10px"></div>
     </div>
+    <div class="card" style="border:2px solid var(--purd)">
+      <h2 style="margin-bottom:6px">&#x1F4DA; Kitobdan test tuzish (AI)</h2>
+      <p class="ts tm" style="margin-bottom:11px">Bu — tayyor testni o'qish EMAS. Butun bir kitob/darslik (.docx, .pdf, .txt) tashlang - AI shu kitob MAZMUNIGA asoslanib, YANGI, murakkab test savollarini o'zi tuzib beradi.</p>
+      <div class="darea" id="book-drop-area" onclick="document.getElementById('book-inp').click()">
+        <div style="font-size:36px">&#x1F393;</div>
+        <div style="font-weight:700;margin-top:6px">Kitobni shu yerga tashlang</div>
+        <div class="ts tm">.docx, .pdf, .txt</div>
+      </div>
+      <input type="file" id="book-inp" accept=".docx,.pdf,.txt" style="display:none">
+      <div id="book-msg" style="margin-top:10px"></div>
+    </div>
     <div class="card">
       <h3 style="margin-bottom:10px">JSON import/eksport</h3>
       <div class="fx fxw" style="gap:8px">
@@ -699,6 +710,35 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 </div>
 
 
+</div>
+
+<!-- KITOBDAN TEST TUZISH MODAL -->
+<div class="mbg" id="gen-modal" style="display:none">
+  <div class="modal">
+    <div class="mh"><h3>&#x1F4DA; Kitobdan test tuzish</h3><button class="xb" onclick="closeGenModal()">&#x2715;</button></div>
+    <p class="ts tm" style="margin-bottom:12px" id="gen-filename"></p>
+    <div class="fg">
+      <label>Savollar qanday tuzilsin?</label>
+      <div class="fx" style="gap:10px;flex-direction:column">
+        <label class="opt" style="margin-bottom:0" onclick="document.getElementById('gen-mode-topic').checked=true">
+          <input type="radio" name="genmode" id="gen-mode-topic" value="per_topic" checked style="width:18px;height:18px">
+          <div><div style="font-weight:600">Har bir mavzudan alohida</div><div class="ts tm">Kitobdagi har bir bob/mavzu uchun alohida test yaratiladi</div></div>
+        </label>
+        <label class="opt" style="margin-bottom:0" onclick="document.getElementById('gen-mode-overall').checked=true">
+          <input type="radio" name="genmode" id="gen-mode-overall" value="overall" style="width:18px;height:18px">
+          <div><div style="font-weight:600">Umumiy (bitta test)</div><div class="ts tm">Butun kitob boyicha bitta yagona test yaratiladi</div></div>
+        </label>
+      </div>
+    </div>
+    <div class="fg">
+      <label id="gen-count-label">Har bir mavzudan nechta savol?</label>
+      <input type="number" id="gen-count" value="10" min="1" max="30" style="width:120px">
+    </div>
+    <div class="fx" style="justify-content:flex-end;gap:8px;margin-top:10px">
+      <button class="btn bg bsm" onclick="closeGenModal()">Bekor</button>
+      <button class="btn bpu" onclick="submitGenModal()">&#x1F52E; Tuzishni boshlash</button>
+    </div>
+  </div>
 </div>
 
 <!-- FOLDER PICK MODAL (bitta test yuklanganda qaysi faylga/papkaga qo'shishni tanlash) -->
@@ -2808,6 +2848,95 @@ da.addEventListener('drop',function(e){
   if(fs&&fs.length)importMultipleFiles(Array.prototype.slice.call(fs));
 });
 document.getElementById('exe-inp').addEventListener('change',function(){if(this.files&&this.files.length)importMultipleFiles(Array.prototype.slice.call(this.files));this.value='';});
+
+// ─── KITOBDAN TEST TUZISH - UI ─────────────────────────────────────────────
+var _genPendingFile=null;
+var bookDa=document.getElementById('book-drop-area');
+bookDa.addEventListener('dragover',function(e){e.preventDefault();bookDa.style.borderColor='var(--purd)';bookDa.style.background='#f5f3ff';});
+bookDa.addEventListener('dragleave',function(){bookDa.style.borderColor='';bookDa.style.background='';});
+bookDa.addEventListener('drop',function(e){
+  e.preventDefault();bookDa.style.borderColor='';bookDa.style.background='';
+  var fs=e.dataTransfer.files;
+  if(fs&&fs.length) openGenModal(fs[0]);
+});
+document.getElementById('book-inp').addEventListener('change',function(){
+  if(this.files&&this.files.length) openGenModal(this.files[0]);
+  this.value='';
+});
+document.querySelectorAll('input[name="genmode"]').forEach(function(r){
+  r.addEventListener('change', function(){
+    document.getElementById('gen-count-label').textContent = this.value==='per_topic'
+      ? "Har bir mavzudan nechta savol?" : "Jami nechta savol?";
+  });
+});
+function openGenModal(file){
+  if(!isDocFile(file.name)){
+    document.getElementById('book-msg').innerHTML='<div class="alt ar">&#x274C; Faqat .docx, .pdf, .txt fayllar qabul qilinadi.</div>';
+    return;
+  }
+  _genPendingFile=file;
+  document.getElementById('gen-filename').innerHTML='&#x1F4C4; '+file.name;
+  document.getElementById('gen-modal').style.display='flex';
+}
+function closeGenModal(){ document.getElementById('gen-modal').style.display='none'; _genPendingFile=null; }
+function submitGenModal(){
+  var file=_genPendingFile;
+  if(!file)return;
+  var mode=document.querySelector('input[name="genmode"]:checked').value;
+  var count=parseInt(document.getElementById('gen-count').value)||10;
+  document.getElementById('gen-modal').style.display='none';
+  startBookGeneration(file, mode, count);
+  _genPendingFile=null;
+}
+async function startBookGeneration(file, mode, count){
+  var msg=document.getElementById('book-msg');
+  msg.innerHTML='<div class="alt ai">&#x23F3; Kitob yuklanmoqda va tahlil qilinmoqda...</div>';
+  try{
+    var dataUrl=await new Promise(function(res,rej){
+      var r=new FileReader();
+      r.onload=function(e){res(e.target.result);};
+      r.onerror=rej;
+      r.readAsDataURL(file);
+    });
+    var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
+    var startRes=await fetch(RENDER_SERVER+'/generate_test_start',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({data:base64, filename:file.name, mode:mode, total_questions:count})
+    }).then(function(r){return r.json();});
+    if(startRes.error){ msg.innerHTML='<div class="alt ar">&#x274C; '+startRes.error+'</div>'; return; }
+    var jobId=startRes.job_id;
+    var pollCount=0;
+    while(true){
+      pollCount++;
+      if(pollCount>300){ msg.innerHTML='<div class="alt ar">&#x274C; Juda uzoq davom etdi, qaytadan urinib koring.</div>'; return; }
+      await new Promise(function(res){setTimeout(res,3000);});
+      var st;
+      try{ st=await fetch(RENDER_SERVER+'/generate_test_status/'+jobId).then(function(r){return r.json();}); }
+      catch(e){ continue; }
+      if(st.error){ msg.innerHTML='<div class="alt ar">&#x274C; '+st.error+'</div>'; return; }
+      if(st.status==='processing'){ msg.innerHTML='<div class="alt ai">&#x23F3; '+(st.progress||'ishlanmoqda...')+'</div>'; continue; }
+      if(st.status==='done'){
+        var results=st.results||[];
+        if(!results.length){ msg.innerHTML='<div class="alt ar">&#x274C; Hech qanday savol yaratilmadi.</div>'; return; }
+        var folderName=results.length>1 ? (file.name.replace(/\.(docx|pdf|txt)$/i,'')) : null;
+        if(folderName) _pendingImportFolder=folderName;
+        var totalQs=0;
+        for(var i=0;i<results.length;i++){
+          msg.innerHTML='<div class="alt ai">&#x23F3; Saqlanmoqda: "'+results[i].topic+'" ('+(i+1)+'/'+results.length+')...</div>';
+          await saveImportedQs({qs:results[i].questions, topic:results[i].topic, questionsToAsk:results[i].questionsToAsk}, msg);
+          totalQs+=results[i].questions.length;
+        }
+        _pendingImportFolder=null;
+        msg.innerHTML='<div class="alt as">&#x2705; Tayyor! '+results.length+' ta mavzudan jami '+totalQs+' ta savol yaratildi.</div>';
+        renderQT();
+        return;
+      }
+    }
+  }catch(e){
+    msg.innerHTML='<div class="alt ar">&#x274C; Xato: '+e.message+'</div>';
+  }
+}
+
 document.getElementById('json-inp').addEventListener('change',function(){
   var f=this.files[0];if(!f)return;
   var folderName=f.name.replace(/\.json$/i,'');
@@ -3678,4 +3807,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-        </html>
+      </html>
