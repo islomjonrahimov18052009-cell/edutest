@@ -491,13 +491,13 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   <div class="tc" id="tc-i">
     <div class="card">
       <h2 style="margin-bottom:6px">Test import</h2>
-      <p class="ts tm" style="margin-bottom:11px">EasyQuizzy (.exe), Word (.docx), PDF yoki oddiy matn (.txt) faylni tashlang - savollar avtomatik o'qiladi (AI yordamida)</p>
+      <p class="ts tm" style="margin-bottom:11px">EasyQuizzy (.exe), Word (.docx), PDF, matn (.txt) yoki test sahifasining FOTOSURATI (.jpg/.png) - savollar avtomatik o'qiladi (AI yordamida)</p>
       <div class="darea" id="drop-area" onclick="document.getElementById('exe-inp').click()">
         <div style="font-size:36px">&#x1F4C2;</div>
         <div style="font-weight:700;margin-top:6px">Bosing yoki tashlang</div>
-        <div class="ts tm">.exe, .docx, .pdf, .txt fayllar qabul qilinadi</div>
+        <div class="ts tm">.exe, .docx, .pdf, .txt, .jpg, .png fayllar qabul qilinadi</div>
       </div>
-      <input type="file" id="exe-inp" accept=".exe,.docx,.pdf,.txt" multiple style="display:none">
+      <input type="file" id="exe-inp" accept=".exe,.docx,.pdf,.txt,.jpg,.jpeg,.png" multiple style="display:none">
       <div id="imp-msg" style="margin-top:10px"></div>
     </div>
     <div class="card" style="border:2px solid var(--purd)">
@@ -521,6 +521,10 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   </div>
 
   <div class="tc" id="tc-s">
+    <div class="card" id="usage-card">
+      <div class="ch"><h3 style="margin:0">&#x1F4CA; Oylik imkoniyatingiz</h3><span class="bdg bpu2" id="usage-plan-badge">Bepul</span></div>
+      <div id="usage-body"></div>
+    </div>
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F3AF; Imtihon rejimi</h3>
       <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Ochirilsa, o'quvchilar sizning mavzularingizda faqat "Sinov" rejimida ishlaydi (natija saqlanmaydi) - "Imtihon" tugmasi ularga korinmaydi.</p>
@@ -710,6 +714,14 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 </div>
 
 
+</div>
+
+<!-- OBUNA (UPGRADE) MODAL -->
+<div class="mbg" id="upgrade-modal" style="display:none">
+  <div class="modal" style="max-width:460px">
+    <div class="mh"><div></div><button class="xb" onclick="closeUpgradeModal()">&#x2715;</button></div>
+    <div id="upgrade-modal-body"></div>
+  </div>
 </div>
 
 <!-- KITOBDAN TEST TUZISH MODAL -->
@@ -1313,6 +1325,104 @@ function initMeta() {
 }
 
 var ME=null, selTopic=null, showDet=false;
+
+// ─── FOYDALANISH LIMITLARI (bepul/Pro) ────────────────────────────────────
+// MUHIM: bu limitlar boshlangich TAKLIF - haqiqiy xarajatlarga qarab keyin
+// ozgartirilishi kerak. Foydalanuvchiga korsatiladigan matnlarda hech qanday
+// texnik nom (AI provayder, server nomi va h.k.) ishlatilmaydi - faqat
+// "imkoniyat" tilida ("shuncha rasm, shuncha bet") tushuntiriladi.
+var PLAN_LIMITS = {
+  free: { images: 15, pages: 20, questions: 40, label: "Bepul" },
+  pro:  { images: 200, pages: 300, questions: 2000, label: "Pro" }
+};
+function curMonthKey(){
+  var d = new Date();
+  return d.getFullYear() + '-' + (d.getMonth()+1);
+}
+function myPlan(){ return (ME && ME.plan) || 'free'; }
+function myUsage(){
+  if(!ME) return {month:curMonthKey(), images:0, pages:0, questions:0};
+  if(!ME.usage || ME.usage.month !== curMonthKey()){
+    ME.usage = {month: curMonthKey(), images:0, pages:0, questions:0};
+    var db=getDB();
+    db.users.forEach(function(u){ if(u.id===ME.id) u.usage=ME.usage; });
+    saveDB(db);
+  }
+  return ME.usage;
+}
+// kind: 'images' | 'pages' | 'questions'. amount - qoshiladigan miqdor.
+// Limitga yetgan bolsa - yuqorilash oynasini korsatadi va false qaytaradi
+// (chaqiruvchi funksiya operatsiyani DAVOM ETTIRMASLIGI kerak).
+function checkAndIncrementUsage(kind, amount){
+  if(!ME || ME.role!=='teacher') return true; // faqat ustozlar uchun limit bor
+  amount = amount || 1;
+  var plan = myPlan();
+  var limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+  var usage = myUsage();
+  if((usage[kind]||0) + amount > limits[kind]){
+    showUpgradeModal(kind);
+    return false;
+  }
+  usage[kind] = (usage[kind]||0) + amount;
+  var db=getDB();
+  db.users.forEach(function(u){ if(u.id===ME.id) u.usage=usage; });
+  saveDB(db);
+  return true;
+}
+function showUpgradeModal(kind){
+  var kindText = {
+    images: "rasmlardan test yuklash",
+    pages: "kitobdan test tuzish",
+    questions: "AI orqali savol yaratish"
+  }[kind] || "bu imkoniyat";
+  var limits = PLAN_LIMITS.free;
+  var proLimits = PLAN_LIMITS.pro;
+  var body = document.getElementById('upgrade-modal-body');
+  body.innerHTML =
+    '<div style="text-align:center;padding:6px 0 14px 0">' +
+      '<div style="font-size:40px;margin-bottom:8px">&#x2728;</div>' +
+      '<h2 style="margin-bottom:8px">Bu oylik bepul imkoniyatingiz tugadi</h2>' +
+      '<p class="ts tm" style="margin-bottom:16px">"' + kindText + '" uchun oylik chegarangizga yetdingiz.</p>' +
+    '</div>' +
+    '<div class="g2" style="margin-bottom:16px">' +
+      '<div class="sc"><div style="font-weight:700;margin-bottom:6px">Bepul</div>' +
+        '<div class="ts tm">' + limits.images + ' ta rasmdan test</div>' +
+        '<div class="ts tm">' + limits.pages + ' bet kitobdan test</div>' +
+        '<div class="ts tm">' + limits.questions + ' ta AI savol</div>' +
+      '</div>' +
+      '<div class="sc" style="border:2px solid var(--accent)"><div style="font-weight:700;margin-bottom:6px;color:var(--purd)">&#x2B50; Pro</div>' +
+        '<div class="ts">' + proLimits.images + ' ta rasmdan test</div>' +
+        '<div class="ts">' + proLimits.pages + ' bet kitobdan test</div>' +
+        '<div class="ts">' + proLimits.questions + ' ta AI savol</div>' +
+        '<div class="ts" style="margin-top:4px;font-weight:600;color:var(--ok)">Tezroq ishlov berish</div>' +
+      '</div>' +
+    '</div>' +
+    '<button class="btn bpu bfw blg" onclick="alert(\'Pro tarifga otish tez kunda ochiladi! Hozircha administrator bilan boglaning.\')">&#x2B50; Pro\'ga o\'tish (tez kunda)</button>';
+  document.getElementById('upgrade-modal').style.display='flex';
+}
+function closeUpgradeModal(){ document.getElementById('upgrade-modal').style.display='none'; }
+function renderUsageCard(){
+  var el=document.getElementById('usage-body');
+  if(!el || !ME) return;
+  var plan=myPlan();
+  var limits=PLAN_LIMITS[plan]||PLAN_LIMITS.free;
+  var usage=myUsage();
+  document.getElementById('usage-plan-badge').textContent = plan==='pro' ? 'Pro' : 'Bepul';
+  document.getElementById('usage-plan-badge').className = 'bdg ' + (plan==='pro'?'bgr':'bpu2');
+  function bar(label, used, max){
+    var pct=Math.min(100, Math.round((used/max)*100));
+    var col = pct>=100 ? 'var(--err)' : pct>=80 ? 'var(--warn)' : 'var(--pri)';
+    return '<div style="margin-bottom:10px">'+
+      '<div class="fx between ts" style="margin-bottom:4px"><span>'+label+'</span><span>'+used+' / '+max+'</span></div>'+
+      '<div class="pb"><div class="pf" style="width:'+pct+'%;background:'+col+'"></div></div>'+
+    '</div>';
+  }
+  el.innerHTML = bar('&#x1F4F7; Rasmdan test', usage.images||0, limits.images) +
+    bar('&#x1F4DA; Kitobdan test (bet)', usage.pages||0, limits.pages) +
+    bar('&#x1F916; AI savol yaratish', usage.questions||0, limits.questions) +
+    (plan!=='pro' ? '<button class="btn bpu bsm mt8" onclick="showUpgradeModal(\'images\')">&#x2B50; Pro imkoniyatlarni korish</button>' : '');
+}
+
 var S={test:[],idx:0,answers:{},timeLeft:0,iv:null,mode:'',lastRes:null};
 
 function showPg(id){document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');});document.getElementById(id).classList.add('on');}
@@ -1443,7 +1553,7 @@ function doRegister(){
   }
   var dup=db.users.filter(function(x){return x.login===user;});
   if(dup.length){showErr("Bu login band! Boshqa login tanlang.");return;}
-  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,teachClasses:tclasses,viloyat:vil,tuman:tum,maktab:maktab};
+  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,teachClasses:tclasses,viloyat:vil,tuman:tum,maktab:maktab,plan:'free',usage:{month:curMonthKey(),images:0,pages:0,questions:0}};
   db.users.push(nu);
   if(authRole==='teacher'){db.teacherCodeUsed=true;}
   saveDB(db);ME=nu;afterLogin();
@@ -2544,6 +2654,7 @@ function toggleExamMode(on){
 }
 function initSettings(){
   var db=getDB();
+  renderUsageCard();
   document.getElementById('cls-inp').value=(db.classes||[]).join(',');
   renderUsersT();
   var examOn=ME.examEnabled!==false;
@@ -2857,12 +2968,19 @@ bookDa.addEventListener('dragleave',function(){bookDa.style.borderColor='';bookD
 bookDa.addEventListener('drop',function(e){
   e.preventDefault();bookDa.style.borderColor='';bookDa.style.background='';
   var fs=e.dataTransfer.files;
-  if(fs&&fs.length) openGenModal(fs[0]);
+  if(fs&&fs.length) checkAndAskFolderForBook(fs[0]);
 });
 document.getElementById('book-inp').addEventListener('change',function(){
-  if(this.files&&this.files.length) openGenModal(this.files[0]);
+  if(this.files&&this.files.length) checkAndAskFolderForBook(this.files[0]);
   this.value='';
 });
+function checkAndAskFolderForBook(file){
+  if(!isDocFile(file.name)){
+    document.getElementById('book-msg').innerHTML='<div class="alt ar">&#x274C; Faqat .docx, .pdf, .txt fayllar qabul qilinadi.</div>';
+    return;
+  }
+  askFolderThenImport(file,'generate');
+}
 document.querySelectorAll('input[name="genmode"]').forEach(function(r){
   r.addEventListener('change', function(){
     document.getElementById('gen-count-label').textContent = this.value==='per_topic'
@@ -2870,10 +2988,6 @@ document.querySelectorAll('input[name="genmode"]').forEach(function(r){
   });
 });
 function openGenModal(file){
-  if(!isDocFile(file.name)){
-    document.getElementById('book-msg').innerHTML='<div class="alt ar">&#x274C; Faqat .docx, .pdf, .txt fayllar qabul qilinadi.</div>';
-    return;
-  }
   _genPendingFile=file;
   document.getElementById('gen-filename').innerHTML='&#x1F4C4; '+file.name;
   document.getElementById('gen-modal').style.display='flex';
@@ -2890,6 +3004,10 @@ function submitGenModal(){
 }
 async function startBookGeneration(file, mode, count){
   var msg=document.getElementById('book-msg');
+  // Fayl hajmidan taxminiy bet sonini hisoblaymiz (aniq son server tomonda
+  // malum boladi, lekin limitni OLDINDAN tekshirish uchun tахmin yetarli).
+  var estimatedPages=Math.max(1, Math.round(file.size/3000));
+  if(!checkAndIncrementUsage('pages', estimatedPages)) return;
   msg.innerHTML='<div class="alt ai">&#x23F3; Kitob yuklanmoqda va tahlil qilinmoqda...</div>';
   try{
     var dataUrl=await new Promise(function(res,rej){
@@ -2918,8 +3036,8 @@ async function startBookGeneration(file, mode, count){
       if(st.status==='done'){
         var results=st.results||[];
         if(!results.length){ msg.innerHTML='<div class="alt ar">&#x274C; Hech qanday savol yaratilmadi.</div>'; return; }
-        var folderName=results.length>1 ? (file.name.replace(/\.(docx|pdf|txt)$/i,'')) : null;
-        if(folderName) _pendingImportFolder=folderName;
+        // Papka allaqachon foydalanuvchi tomonidan tanlangan (fp-modal orqali,
+        // _pendingImportFolder ichida saqlangan) - qayta sorash shart emas.
         var totalQs=0;
         for(var i=0;i<results.length;i++){
           msg.innerHTML='<div class="alt ai">&#x23F3; Saqlanmoqda: "'+results[i].topic+'" ('+(i+1)+'/'+results.length+')...</div>';
@@ -3112,7 +3230,10 @@ function getMyFolders(){
 var _fpPendingFile=null;
 function isDocFile(name){ return /\.(docx|pdf|txt)$/i.test(name); }
 function isExeFile(name){ return /\.exe$/i.test(name); }
-function askFolderThenImport(file){
+function isImageFile(name){ return /\.(jpe?g|png)$/i.test(name); }
+var _fpMode='import'; // 'import' - oddiy import, 'generate' - kitobdan tuzish
+function askFolderThenImport(file,mode){
+  _fpMode=mode||'import';
   _fpPendingFile=file;
   var folders=getMyFolders();
   var box=document.getElementById('fp-existing');
@@ -3124,7 +3245,7 @@ function askFolderThenImport(file){
       return '<div class="tbtn" style="text-align:left;padding:10px 12px" onclick="submitFP(\''+esc+'\',false)">&#x1F4D8; '+fn+'</div>';
     }).join('');
   }
-  var defaultName=file.name.replace(/\.(exe|docx|pdf|txt)$/i,'').replace(/[\s_-]*\d+$/,'')||'Yangi fayl';
+  var defaultName=file.name.replace(/\.(exe|docx|pdf|txt|jpe?g|png)$/i,'').replace(/[\s_-]*\d+$/,'')||'Yangi fayl';
   document.getElementById('fp-newname').value=defaultName;
   document.getElementById('fp-modal').style.display='flex';
 }
@@ -3139,7 +3260,13 @@ function submitFP(folderName,isNew){
   document.getElementById('fp-modal').style.display='none';
   _fpPendingFile=null;
   _pendingImportFolder=folderName;
-  if(isDocFile(file.name)){
+  if(_fpMode==='generate'){
+    openGenModal(file);
+    return;
+  }
+  if(isImageFile(file.name)){
+    importImageFiles([file], folderName);
+  } else if(isDocFile(file.name)){
     importDocumentFiles([file], folderName);
   } else {
     importExe(file);
@@ -3156,15 +3283,20 @@ function importMultipleFiles(files,suggestedFolder){
   }
   var exeFiles=valid.filter(function(f){return isExeFile(f.name);});
   var docFiles=valid.filter(function(f){return isDocFile(f.name);});
-  var unsupported=valid.filter(function(f){return !isExeFile(f.name)&&!isDocFile(f.name);});
-  if(!exeFiles.length && !docFiles.length){
-    msg.innerHTML='<div class="alt ar">&#x274C; Qollab-quvvatlanmaydigan fayl turi. Faqat .exe, .docx, .pdf, .txt fayllar qabul qilinadi.</div>';
+  var imgFiles=valid.filter(function(f){return isImageFile(f.name);});
+  var unsupported=valid.filter(function(f){return !isExeFile(f.name)&&!isDocFile(f.name)&&!isImageFile(f.name);});
+  if(!exeFiles.length && !docFiles.length && !imgFiles.length){
+    msg.innerHTML='<div class="alt ar">&#x274C; Qollab-quvvatlanmaydigan fayl turi. Faqat .exe, .docx, .pdf, .txt, .jpg, .png fayllar qabul qilinadi.</div>';
     return;
   }
   var unsupportedNote=unsupported.length?(' ('+unsupported.length+' ta qollab-quvvatlanmaydigan fayl otkazib yuborildi)'):'';
   // Word/PDF/TXT fayllar - alohida, sodda (AI asosidagi) oqim orqali
   if(docFiles.length){
     importDocumentFiles(docFiles, suggestedFolder, unsupportedNote);
+  }
+  // Rasm (foto) fayllar - Vision AI orqali
+  if(imgFiles.length){
+    importImageFiles(imgFiles, suggestedFolder, unsupportedNote);
   }
   // .exe fayllar - mavjud, EMF/LibreOffice asosidagi murakkab oqim orqali
   if(!exeFiles.length) return;
@@ -3385,6 +3517,7 @@ async function importDocumentFiles(files, suggestedFolder, unsupportedNote){
   if(folderName) _pendingImportFolder=folderName;
   var okTotal=0, errTotal=0, failedNames=[];
   for(var i=0;i<files.length;i++){
+    if(!checkAndIncrementUsage('questions', 5)){ break; }
     msg.innerHTML='<div class="alt ai">&#x23F3; AI orqali tahlil qilinmoqda: "'+files[i].name+'" ('+(i+1)+'/'+files.length+')...'+(unsupportedNote||'')+'</div>';
     var res=await sendDocumentToServer(files[i]);
     if(res.ok){
@@ -3402,6 +3535,66 @@ async function importDocumentFiles(files, suggestedFolder, unsupportedNote){
   msg.innerHTML=summary;
   renderQT();
 }
+
+// ─── RASM (FOTO) IMPORT - Vision AI ───────────────────────────────────────
+// Test sahifasining fotosurati tashlanganda - server rasmning ozini AI'ga
+// yuboradi, AI esa savol/variant va TOGRI JAVOB BELGISINI (nuqta, doira va
+// h.k.) togridan-togri rasmdan oqiydi.
+function sendImageToServer(file){
+  return new Promise(function(resolve){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var dataUrl=e.target.result;
+      var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
+      fetch(RENDER_SERVER+'/parse_image', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({data:base64, filename:file.name})
+      }).then(function(r){ return r.json().then(function(j){return {status:r.status, body:j};}); })
+        .then(function(res){
+          if(res.status>=400 || res.body.error){
+            resolve({ok:false, error: res.body.error || ('Server xatosi: '+res.status), filename:file.name});
+          } else {
+            resolve({ok:true, data:res.body, filename:file.name});
+          }
+        })
+        .catch(function(e){ resolve({ok:false, error:e.message, filename:file.name}); });
+    };
+    reader.onerror=function(){ resolve({ok:false, error:'Rasmni oqib bolmadi', filename:file.name}); };
+    reader.readAsDataURL(file);
+  });
+}
+async function importImageFiles(files, suggestedFolder, unsupportedNote){
+  var msg=document.getElementById('imp-msg');
+  var folderName=suggestedFolder;
+  if(!folderName && files.length>1){
+    var defaultName='Rasmlardan test';
+    folderName=prompt('Bu '+files.length+' ta rasmni bitta "kitob" nomiga birlashtiramiz.\nKitob nomini tasdiqlang yoki ozgartiring:', defaultName);
+    if(folderName===null)return;
+    folderName=folderName.trim()||'Kitob';
+  }
+  if(folderName) _pendingImportFolder=folderName;
+  var okTotal=0, errTotal=0, failedNames=[];
+  for(var i=0;i<files.length;i++){
+    if(!checkAndIncrementUsage('images', 1)){ break; }
+    msg.innerHTML='<div class="alt ai">&#x1F4F7; Rasm AI orqali oqilmoqda: "'+files[i].name+'" ('+(i+1)+'/'+files.length+')...'+(unsupportedNote||'')+'</div>';
+    var res=await sendImageToServer(files[i]);
+    if(res.ok){
+      var qs=(res.data.questions||[]).map(function(q){ if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1; return q; });
+      await saveImportedQs({qs:qs, topic:res.data.topic, questionsToAsk:res.data.questionsToAsk}, msg);
+      okTotal++;
+    } else {
+      errTotal++;
+      failedNames.push(res.filename+' ('+res.error+')');
+    }
+  }
+  _pendingImportFolder=null;
+  var summary='<div class="alt '+(errTotal?'aw':'as')+'">'+(okTotal?('&#x2705; '+okTotal+' ta rasmdan savollar import qilindi!'):'')+
+    (errTotal?('<br>&#x274C; '+errTotal+' ta rasmda xato: '+failedNames.join('; ')):'')+'</div>';
+  msg.innerHTML=summary;
+  renderQT();
+}
+
 
 function decompZ(chunk){
   // Try pako first (most reliable), then DecompressionStream fallback
@@ -3807,4 +4000,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-      </html>
+</html>
