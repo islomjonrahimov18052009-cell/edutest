@@ -632,6 +632,10 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div class="g4" id="admin-stats"></div>
     </div>
     <div class="card">
+      <div class="ch"><h3 style="margin:0">&#x1F4BE; Xotira holati (Supabase Storage)</h3><span class="ts tm" id="storage-overview-updated"></span></div>
+      <div id="storage-overview-body"><p class="ts tm" style="text-align:center;padding:14px">&#x23F3; Yuklanmoqda...</p></div>
+    </div>
+    <div class="card">
       <h3 style="margin-bottom:10px">Ustozlar</h3>
       <div style="overflow-x:auto"><table><thead><tr><th>Ism</th><th>Login</th></tr></thead><tbody id="admin-teachers-tbody"></tbody></table></div>
     </div>
@@ -2400,13 +2404,21 @@ function renderAdminOverview(){
   var results=db.results||[];
   var exam=results.filter(function(r){return r.mode==='exam';});
   var avg=exam.length?Math.round(exam.reduce(function(a,r){return a+r.pct;},0)/exam.length):0;
+  // Pro/Bepul obunachilar soni - faqat ustozlar orasida (limitlar faqat ustozlarga tegishli)
+  var proCount=teachers.filter(function(t){return t.plan==='pro';}).length;
+  var freeCount=teachers.length-proCount;
   document.getElementById('admin-stats').innerHTML=
     '<div class="sc"><div class="sn">'+teachers.length+'</div><div class="sl">Ustozlar</div></div>'+
     '<div class="sc"><div class="sn">'+students.length+'</div><div class="sl">O\'quvchilar</div></div>'+
     '<div class="sc"><div class="sn">'+qs.length+'</div><div class="sl">Savollar</div></div>'+
     '<div class="sc"><div class="sn">'+exam.length+'</div><div class="sl">Imtihonlar</div></div>'+
     '<div class="sc"><div class="sn">'+avg+'%</div><div class="sl">O\'rtacha ball</div></div>'+
-    '<div class="sc"><div class="sn">'+(db.classes||[]).length+'</div><div class="sl">Sinflar</div></div>';
+    '<div class="sc"><div class="sn">'+(db.classes||[]).length+'</div><div class="sl">Sinflar</div></div>'+
+    '<div class="sc" style="border:2px solid var(--accent)"><div class="sn" style="color:var(--purd)">&#x2B50; '+proCount+'</div><div class="sl">Pro obunachi (ustoz)</div></div>'+
+    '<div class="sc"><div class="sn">'+freeCount+'</div><div class="sl">Bepul rejadagi ustoz</div></div>';
+  // Xotira holatini har safar "Umumiy" bo'limi ochilganda avtomatik yuklaymiz -
+  // avval faqat "Sozlamalar" bo'limida, qo'lda "Yangilash" bosilganda korinardi.
+  loadStorageStats();
   document.getElementById('admin-teachers-tbody').innerHTML=teachers.map(function(t){
     return '<tr><td>'+t.name+'</td><td class="ts tm">'+t.login+'</td></tr>';
   }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--mut)">Ustozlar yoq</td></tr>';
@@ -2460,12 +2472,24 @@ var _adminShowPass=false;
 var STORAGE_PLAN_MB={free:1024,pro:1024*100};
 var _storageCache=null;
 async function loadStorageStats(){
-  var body=document.getElementById('storage-stats-body');
+  // Endi bu funksiya "Umumiy" (avtomatik) va "Sozlamalar" (qolda "Yangilash")
+  // bolimlaridan ham chaqirilishi mumkin - ikkalasi ham bolmasligi mumkin,
+  // shuning uchun har birini alohida topamiz va bor bolganiga yozamiz.
+  var bodyOverview=document.getElementById('storage-overview-body');
+  var bodySettings=document.getElementById('storage-stats-body');
   var btn=document.getElementById('storage-refresh-btn');
-  if(!body)return;
-  if(!_sbReady||!_sb){ body.innerHTML='<p class="ts tm" style="text-align:center;padding:14px">Supabase ulanmagan.</p>'; return; }
+  if(!bodyOverview&&!bodySettings)return;
+  var loadingHtml='<p class="ts tm" style="text-align:center;padding:14px">&#x23F3; Yuklanmoqda...</p>';
+  if(!_sbReady||!_sb){
+    var noConnHtml='<p class="ts tm" style="text-align:center;padding:14px">Supabase ulanmagan.</p>';
+    if(bodyOverview)bodyOverview.innerHTML=noConnHtml;
+    if(bodySettings)bodySettings.innerHTML=noConnHtml;
+    return;
+  }
   if(btn){btn.disabled=true;btn.textContent='\u23F3 Yuklanmoqda...';}
-  body.innerHTML='<p class="ts tm" style="text-align:center;padding:14px">\u23F3 Supabase\'dan malumot olinmoqda (real vaqtda)...</p>';
+  var busyHtml='<p class="ts tm" style="text-align:center;padding:14px">\u23F3 Supabase\'dan malumot olinmoqda (real vaqtda)...</p>';
+  if(bodyOverview)bodyOverview.innerHTML=busyHtml;
+  if(bodySettings)bodySettings.innerHTML=busyHtml;
   try{
     var all=[];
     var offset=0, pageSize=1000, guard=0;
@@ -2483,8 +2507,12 @@ async function loadStorageStats(){
     var largest=files.reduce(function(m,f){return f.size>m?f.size:m;},0);
     _storageCache={files:files,totalBytes:totalBytes,largest:largest};
     renderStorageBars();
+    var upd=document.getElementById('storage-overview-updated');
+    if(upd)upd.textContent='Yangilandi: '+new Date().toLocaleTimeString('uz-UZ');
   }catch(e){
-    body.innerHTML='<p class="ts" style="color:#b91c1c;text-align:center;padding:14px">Xato: '+e.message+'</p>';
+    var errHtml='<p class="ts" style="color:#b91c1c;text-align:center;padding:14px">Xato: '+e.message+'</p>';
+    if(bodyOverview)bodyOverview.innerHTML=errHtml;
+    if(bodySettings)bodySettings.innerHTML=errHtml;
   }
   if(btn){btn.disabled=false;btn.textContent='\uD83D\uDD04 Yangilash';}
 }
@@ -2519,7 +2547,10 @@ function renderStorageBars(){
   html+='<div>\uD83D\uDCC8 O\'rtacha hajm: <b>'+(_storageCache.files.length?(_storageCache.totalBytes/_storageCache.files.length/1024).toFixed(1):'0')+' KB</b></div>';
   html+='</div>';
   html+='<button class="btn bpu bsm" onclick="openImgPicker()">\uD83D\uDDBC\uFE0F Suratlarni ko\'rish / o\'chirish</button>';
-  document.getElementById('storage-stats-body').innerHTML=html;
+  var _bodyOv=document.getElementById('storage-overview-body');
+  var _bodySet=document.getElementById('storage-stats-body');
+  if(_bodyOv)_bodyOv.innerHTML=html;
+  if(_bodySet)_bodySet.innerHTML=html;
 }
 var _imgPickerPage=0;
 var IMG_PAGE_SIZE=20;
