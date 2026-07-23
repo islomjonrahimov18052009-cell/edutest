@@ -1316,12 +1316,21 @@ function resolveTimer(meta){
 function initMeta() {
   var db=getDB();
   if(!db.topicsMeta)db.topicsMeta=[];
+  // MUHIM: avval bu funksiya HAR DOIM saveDB() (demak sbPush ham) chaqirar
+  // edi, hech narsa ozgarmagan bolsa ham. Bu xavfli edi: agar shu qurilmada
+  // localStorage'da ESKI malumot (masalan eski parol) qolib ketgan bolsa-yu,
+  // uning versiya raqami (v) tasodifan bulutdagidan kattaroq bolsa,
+  // syncFromCloud yangi malumotni tortib olmay qolar, keyin esa bu yerda
+  // ESKI malumot qaytadan bulutga yozilib, boshqa qurilmada/joyda qilingan
+  // ozgarishlarni ustidan bosib ochirib yuborar edi. Endi FAQAT haqiqatan
+  // yangi narsa qoshilganda saqlaymiz.
+  var changed=false;
   INIT_META.forEach(function(m){
     var f=false;
     db.topicsMeta.forEach(function(x){if(x.topic===m.topic)f=true;});
-    if(!f)db.topicsMeta.push({topic:m.topic,questionsToAsk:m.questionsToAsk});
+    if(!f){db.topicsMeta.push({topic:m.topic,questionsToAsk:m.questionsToAsk});changed=true;}
   });
-  saveDB(db);
+  if(changed) saveDB(db);
 }
 
 var ME=null, selTopic=null, showDet=false;
