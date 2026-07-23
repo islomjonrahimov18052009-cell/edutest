@@ -934,7 +934,7 @@ function localGetDB() {
       var changed = false;
       if (!db.users) { db.users = []; changed = true; }
       if (!db.users.some(function(u){return u.role==='admin';})) {
-        var _newAdminPass=admin123;
+        var _newAdminPass=genRandomPassword();
         db.users.push({id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:_newAdminPass,cls:''});
         changed = true;
         setTimeout(function(){ alert('Admin hisobi topilmadi, yangisi yaratildi:\n\nsuperadmin / '+_newAdminPass+'\n\nBu parolni saqlab qoying!'); }, 500);
