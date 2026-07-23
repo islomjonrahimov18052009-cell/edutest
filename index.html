@@ -1332,7 +1332,7 @@ var ME=null, selTopic=null, showDet=false;
 // texnik nom (AI provayder, server nomi va h.k.) ishlatilmaydi - faqat
 // "imkoniyat" tilida ("shuncha rasm, shuncha bet") tushuntiriladi.
 var PLAN_LIMITS = {
-  free: { images: 15, pages: 20, questions: 40, label: "Bepul" },
+  free: { images: 15, pages: 30, questions: 40, label: "Bepul" },
   pro:  { images: 200, pages: 300, questions: 2000, label: "Pro" }
 };
 function curMonthKey(){
@@ -3002,11 +3002,36 @@ function submitGenModal(){
   startBookGeneration(file, mode, count);
   _genPendingFile=null;
 }
+function countPdfPages(bytes){
+  // PDF ichidagi "/Type /Page" obyekt belgilarini sanab, HAQIQIY bet sonini
+  // topamiz - fayl hajmiga qarab taxmin qilishdan (rasm kop bolsa juda
+  // notogri chiqadi) ancha aniqroq. "/Type /Pages" (kop b bilan, butun
+  // daraxt tuguni) ni chalgan qoshib yubormaslik uchun ajratamiz.
+  try{
+    var text='';
+    for(var i=0;i<bytes.length;i++) text+=String.fromCharCode(bytes[i]);
+    var matches=text.match(/\/Type\s*\/Page(?!s)/g);
+    if(matches&&matches.length>0) return matches.length;
+  }catch(e){}
+  return null;
+}
 async function startBookGeneration(file, mode, count){
   var msg=document.getElementById('book-msg');
-  // Fayl hajmidan taxminiy bet sonini hisoblaymiz (aniq son server tomonda
-  // malum boladi, lekin limitni OLDINDAN tekshirish uchun tахmin yetarli).
-  var estimatedPages=Math.max(1, Math.round(file.size/3000));
+  // MUHIM: avval fayl hajmidan taxmin qilinardi (bayt/3000) - lekin rasmga
+  // boy (dizaynli, fotosuratli) kitoblarda bu haqiqiy bet sonidan yuzlab
+  // marta katta chiqib, birinchi urinishdayoq bepul limitni notogri
+  // "tugatib qoyar" edi. Endi PDF uchun HAQIQIY bet sonini faylning ozidan
+  // hisoblaymiz, faqat aniqlab bolmasa (yoki .docx/.txt bolsa) taxminga
+  // otamiz.
+  var ext=(file.name.toLowerCase().split('.').pop()||'');
+  var estimatedPages=null;
+  if(ext==='pdf'){
+    try{
+      var buf=await file.arrayBuffer();
+      estimatedPages=countPdfPages(new Uint8Array(buf));
+    }catch(e){}
+  }
+  if(!estimatedPages) estimatedPages=Math.max(1, Math.round(file.size/3000));
   if(!checkAndIncrementUsage('pages', estimatedPages)) return;
   msg.innerHTML='<div class="alt ai">&#x23F3; Kitob yuklanmoqda va tahlil qilinmoqda...</div>';
   try{
