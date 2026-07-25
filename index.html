@@ -263,11 +263,6 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
           <div id="rg-tcls-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;border:1.5px solid var(--bdr);border-radius:9px;max-height:150px;overflow-y:auto"></div>
           <p class="ts tm" style="margin-top:5px">Bir nechtasini belgilashingiz mumkin - shu sinflar sizning testlaringizni ko'radi.</p>
         </div>
-        <div id="rg-phone-fg" class="fg" style="display:none">
-          <label>Telefon raqamingiz</label>
-          <input type="text" id="rg-phone" placeholder="+998 90 123 45 67">
-          <p class="ts tm" style="margin-top:5px">Admin hisobingizni tasdiqlash uchun shu raqamga bog'lanishi mumkin.</p>
-        </div>
         <div class="fg"><label>Login</label><input type="text" id="rg-u" placeholder="Foydalanuvchi nomi" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')"></div>
         <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="rg-p" placeholder="Parol" style="padding-right:38px" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"><span onclick="togglePw('rg-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
         <button class="btn bpu bfw blg mt8" onclick="doRegister()">Ro'yxatdan o'tish</button>
@@ -666,7 +661,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   <div class="tc" id="ta-s">
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F464; Tasdiqlanishi kerak bo'lgan ustozlar</h3>
-      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Yangi ro'yxatdan o'tgan ustozlar shu yerda ko'rinadi va siz tasdiqlamaguncha tizimga kira olmaydi. Telefon raqamiga qo'ng'iroq qilib tekshirib, keyin tasdiqlang.</p>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Yangi ro'yxatdan o'tgan ustozlar shu yerda ko'rinadi va siz tasdiqlamaguncha tizimga kira olmaydi. Ism, maktab va sinflarni tekshirib (kerak bo'lsa maktab bilan bog'lanib), keyin tasdiqlang.</p>
       <div id="admin-pending-teachers"></div>
     </div>
     <div class="card">
@@ -1518,7 +1513,6 @@ function goAuth(role){
   document.getElementById('rg-cls-fg').style.display=isT?'none':'block';
   document.getElementById('rg-subj-fg').style.display=isT?'block':'none';
   document.getElementById('rg-tcls-fg').style.display=isT?'block':'none';
-  document.getElementById('rg-phone-fg').style.display=isT?'block':'none';
   document.getElementById('tab-rg').style.display=isA?'none':'flex';
   document.getElementById('auth-err').innerHTML='';
   var db=getDB();
@@ -1538,7 +1532,7 @@ function goAuth(role){
   document.getElementById('rg-maktab').value='';
   // Xavfsizlik: parol maydonlari har safar bosh sahifadan qayta ochilganda tozalanadi
   // (brauzerning avtomatik toldirish/eslab qolishidan himoya uchun)
-  ['li-u','li-p','rg-phone'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['li-u','li-p'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   showAuthTab('li');
   showPg('pg-auth');
 }
@@ -1586,7 +1580,6 @@ function doRegister(){
   var cls=authRole==='student'?document.getElementById('rg-cls').value:'';
   var subj=authRole==='teacher'?document.getElementById('rg-subj').value:'';
   var tclasses=authRole==='teacher'?Array.prototype.slice.call(document.querySelectorAll('.rg-tcls-chk:checked')).map(function(c){return c.value;}):[];
-  var phone=authRole==='teacher'?document.getElementById('rg-phone').value.trim():'';
   var vil=document.getElementById('rg-vil').value;
   var tum=document.getElementById('rg-tum').value;
   var maktab=document.getElementById('rg-maktab').value.trim();
@@ -1600,15 +1593,14 @@ function doRegister(){
   if(authRole==='student'&&!cls){showErr("Sinf tanlang!");return;}
   if(authRole==='teacher'&&!subj){showErr("Fan tanlang!");return;}
   if(authRole==='teacher'&&!tclasses.length){showErr("Kamida bitta sinfni belgilang!");return;}
-  if(authRole==='teacher'&&!phone){showErr("Telefon raqamingizni kiriting - admin tasdig'i uchun kerak!");return;}
   var db=getDB();
   var dup=db.users.filter(function(x){return x.login===user;});
   if(dup.length){showErr("Bu login band! Boshqa login tanlang.");return;}
   // MUHIM: endi maxfiy kod tizimi YOQ - uning ornini admin tasdigi
   // egallaydi. Yangi ustoz hisobi darhol ISHLAY OLMAYDI (approved:false) -
-  // admin uni "Tasdiqlanishi kerak" royxatida korib, telefon orqali
+  // admin uni "Tasdiqlanishi kerak" royxatida korib (ism/maktab/sinflar orqali)
   // tekshirib, keyin tasdiqlaydi. Shu payGacha ustoz kira olmaydi.
-  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,teachClasses:tclasses,phone:phone,viloyat:vil,tuman:tum,maktab:maktab,plan:'free',approved:(authRole!=='teacher'),usage:{month:curMonthKey(),images:0,pages:0,questions:0}};
+  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,teachClasses:tclasses,viloyat:vil,tuman:tum,maktab:maktab,plan:'free',approved:(authRole!=='teacher'),usage:{month:curMonthKey(),images:0,pages:0,questions:0}};
   db.users.push(nu);
   saveDB(db);
   if(authRole==='teacher' && !nu.approved){
@@ -2743,11 +2735,13 @@ function renderPendingTeachers(){
     return;
   }
   host.innerHTML=pending.map(function(u){
-    var phoneHtml=u.phone?('<a href="tel:'+u.phone.replace(/[^0-9+]/g,'')+'" style="color:var(--pri);font-weight:700;text-decoration:none">&#x1F4DE; '+u.phone+'</a>'):'<span class="ts tm">Telefon korsatilmagan</span>';
+    var locHtml=[u.viloyat,u.tuman].filter(Boolean).join(', ');
+    var clsHtml=(u.teachClasses&&u.teachClasses.length)?u.teachClasses.join(', '):'-';
     return '<div class="pd"><div class="fx between" style="align-items:flex-start;gap:10px">'+
       '<div><div style="font-weight:700">'+u.name+'</div>'+
       '<div class="ts tm">'+(u.maktab||'')+(u.subject?' &middot; '+subjName(u.subject):'')+'</div>'+
-      '<div class="ts" style="margin-top:4px">'+phoneHtml+'</div>'+
+      '<div class="ts tm" style="margin-top:2px">'+locHtml+'</div>'+
+      '<div class="ts tm" style="margin-top:2px">Sinflar: '+clsHtml+'</div>'+
       '<div class="ts tm" style="margin-top:2px">Login: '+u.login+'</div></div>'+
       '<div class="fx" style="gap:6px;flex-shrink:0">'+
         '<button class="btn bs bsm" onclick="approveTeacher(\''+u.id+'\')">&#x2705; Tasdiqlash</button>'+
