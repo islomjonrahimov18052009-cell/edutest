@@ -2030,6 +2030,7 @@ function renderQT(){
       '<button class="btn bg bsm" onclick="_curQFolder=null;renderQT()">&#8592; Fayllar</button>'+
       '<h3 style="flex:1;margin:0">&#x1F4D8; '+_curQFolder+'</h3>'+
       '<button class="btn bs bsm" onclick="renameFolder(\''+fEsc+'\')" title="Fayl nomini ozgartirish">&#x270F;&#65039; Nomini ozgartirish</button>'+
+      '<button class="btn bd bsm" onclick="deleteFolder(\''+fEsc+'\')" title="Papkani ochirish">&#x1F5D1;&#65039; Ochirish</button>'+
     '</div>';
     html+=inFolder.length?inFolder.map(topicRow).join(''):'<p class="ts tm" style="text-align:center;padding:14px">Bu faylda hali test yoq. "+ Savol qo\'shish" bilan qoshing.</p>';
     list.innerHTML=html;
@@ -2050,6 +2051,7 @@ function renderQT(){
         '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">'+cnt+' ta mavzu</div>'+
       '</div>'+
       '<button class="btn bs bsm" onclick="renameFolder(\''+fEsc+'\')" title="Nomini ozgartirish">&#x270F;&#65039;</button>'+
+      '<button class="btn bd bsm" onclick="deleteFolder(\''+fEsc+'\')" title="Papkani ochirish">&#x1F5D1;&#65039;</button>'+
     '</div>';
   }).join('');
   html+=unfoldered.map(topicRow).join('');
@@ -2079,6 +2081,23 @@ function renameFolder(fn){
   db.qFolders.forEach(function(f){ if(f.teacherId===ME.id&&f.name===fn) f.name=newName; });
   saveDB(db);
   _curQFolder=newName;
+  renderQT();
+}
+function deleteFolder(fn){
+  var db=getDB();
+  var topicsInFolder=(db.topicsMeta||[]).filter(function(m){return m.teacherId===ME.id&&m.folder===fn;}).map(function(m){return m.topic;});
+  if(topicsInFolder.length){
+    if(!confirm('"'+fn+'" papkasida '+topicsInFolder.length+' ta mavzu bor. Papkani VA ichidagi BARCHA mavzu/savollarni butunlay o\'chirasizmi? Bu qaytarib bo\'lmaydi!'))return;
+    var toDelete=(db.userQs||[]).filter(function(q){return q.teacherId===ME.id&&topicsInFolder.indexOf(q.topic)>=0;});
+    deleteStorageImagesFor(toDelete);
+    db.userQs=(db.userQs||[]).filter(function(q){return !(q.teacherId===ME.id&&topicsInFolder.indexOf(q.topic)>=0);});
+    db.topicsMeta=(db.topicsMeta||[]).filter(function(m){return !(m.teacherId===ME.id&&topicsInFolder.indexOf(m.topic)>=0);});
+  } else {
+    if(!confirm('"'+fn+'" bo\'sh papkasini o\'chirasizmi?'))return;
+  }
+  db.qFolders=(db.qFolders||[]).filter(function(f){return !(f.teacherId===ME.id&&f.name===fn);});
+  saveDB(db);
+  if(_curQFolder===fn)_curQFolder=null;
   renderQT();
 }
 
