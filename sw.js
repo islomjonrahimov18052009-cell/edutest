@@ -1,4 +1,4 @@
-const CACHE = 'edutest-v5';
+const CACHE = 'edutest-v6';
 const FILES = ['./', './index.html'];
 
 self.addEventListener('install', function(e) {
@@ -21,7 +21,7 @@ self.addEventListener('activate', function(e) {
 
 self.addEventListener('fetch', function(e) {
   if (e.request.method !== 'GET') return;
-  // MUhIM: faqat OZ saytimiz (GitHub Pages) fayllarini keshlaymiz.
+  // MUHIM: faqat OZ saytimiz (GitHub Pages) fayllarini keshlaymiz.
   // Avval bu tekshiruv yoq edi, shuning uchun Render serverimizga ketayotgan
   // /parse_batch_status kabi DINAMIK API sorovlari ham shu yerda ushlanib,
   // ikkilanib xato berardi va bekorga keshlashga urinardi.
