@@ -3792,7 +3792,12 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(function(){});
 }
 
-initMeta();
+// MUHIM: initMeta() endi shu yerda EMAS, pastda syncFromCloud() tugagandan
+// KEYIN chaqiriladi - aks holda "bo'sh" qurilmada (localStorage boʻsh -
+// masalan yangi telefon/tozalangan brauzer) initMeta() ulgurib bulutdagi
+// haqiqiy malumotni ustidan bosib, BOʻSH bazani bulutga yuborib yuborishi
+// mumkin edi (aynan shu xato butun bazaning tasodifan bosh qolishiga sabab
+// bolgan edi).
 // Load saved Supabase config on startup
 (function(){
   // URL va KEY kod ichida - localStorage dan o'qish shart emas
@@ -3984,8 +3989,12 @@ function aiCheckTopic(topic) {
 }
 
 sbInit();
-// Bulutdan malumot orqa fonda tortib olinadi - foydalanuvchiga korinmaydi
-syncFromCloud().then(function(){});
+// Bulutdan malumot orqa fonda tortib olinadi - foydalanuvchiga korinmaydi.
+// initMeta() endi FAQAT shu tortib olish tugagandan keyin ishga tushadi -
+// shunda "bosh" qurilmada ham, avval haqiqiy bulutdagi malumot localStorage
+// ga yozib bolinadi, initMeta() esa endi HAQIQIY malumot ustida ishlaydi
+// (bosh standart baza ustida emas) va bekorga bulutga hech narsa yozmaydi.
+syncFromCloud().then(function(){ initMeta(); });
 
 // ── ORQAGA TUGMA VA SAHIFADAN CHIQISH ──────────────────────────────
 var _backWarned = false;
