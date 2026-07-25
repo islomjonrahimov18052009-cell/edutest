@@ -1,4 +1,4 @@
-const CACHE = 'edutest-v4';
+const CACHE = 'edutest-v5';
 const FILES = ['./', './index.html'];
 
 self.addEventListener('install', function(e) {
