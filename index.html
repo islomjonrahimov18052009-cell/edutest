@@ -39,7 +39,6 @@ body{background:linear-gradient(125deg,#151b3d,var(--purd) 30%,var(--pri) 55%,va
   92%{opacity:1}
   100%{transform:translateY(-110vh) translateX(var(--sway)) rotate(var(--spin));opacity:0}
 }
-@media (prefers-reduced-motion:reduce){body{animation:none}#mathBg span{animation:none;opacity:0}}
 @keyframes confettiFall{
   0%{transform:translate(0,0) rotate(0deg);opacity:1}
   100%{transform:translate(var(--drift),105vh) rotate(var(--rot));opacity:.4}
@@ -982,7 +981,6 @@ function renderFloatingBg(subjectKey){
   var host=document.getElementById('mathBg');
   if(!host)return;
   host.innerHTML='';
-  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   var symbols=SUBJECT_BG_SYMBOLS[subjectKey]||SUBJECT_BG_SYMBOLS.default;
   var n=22;
   for(var i=0;i<n;i++){
