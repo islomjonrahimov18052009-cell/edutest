@@ -263,12 +263,13 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
           <div id="rg-tcls-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;border:1.5px solid var(--bdr);border-radius:9px;max-height:150px;overflow-y:auto"></div>
           <p class="ts tm" style="margin-top:5px">Bir nechtasini belgilashingiz mumkin - shu sinflar sizning testlaringizni ko'radi.</p>
         </div>
+        <div id="rg-phone-fg" class="fg" style="display:none">
+          <label>Telefon raqamingiz</label>
+          <input type="text" id="rg-phone" placeholder="+998 90 123 45 67">
+          <p class="ts tm" style="margin-top:5px">Admin hisobingizni tasdiqlash uchun shu raqamga bog'lanishi mumkin.</p>
+        </div>
         <div class="fg"><label>Login</label><input type="text" id="rg-u" placeholder="Foydalanuvchi nomi" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')"></div>
         <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="rg-p" placeholder="Parol" style="padding-right:38px" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"><span onclick="togglePw('rg-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
-        <div id="rg-code-fg" class="fg" style="display:none">
-          <label>Admindan olingan maxfiy kod</label>
-          <div style="position:relative"><input type="password" id="rg-code" placeholder="Admin bergan maxfiy kod" style="padding-right:38px" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"><span onclick="togglePw('rg-code',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div>
-        </div>
         <button class="btn bpu bfw blg mt8" onclick="doRegister()">Ro'yxatdan o'tish</button>
       </div>
       <div id="auth-err" style="margin-top:10px"></div>
@@ -664,15 +665,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 
   <div class="tc" id="ta-s">
     <div class="card">
-      <h3 style="margin-bottom:8px">&#x1F511; Ustoz royxatdan otish kodi</h3>
-      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Bu kod <b>bir martalik</b> — bitta kod bilan faqat bitta ustoz royxatdan ota oladi. Ishlatilgach, avtomatik bekor bo'ladi va yangi ustoz uchun yangi kod yaratishingiz kerak boladi.</p>
-      <div id="admin-tcode-status" style="margin-bottom:10px"></div>
-      <div class="fg"><label>Joriy kod</label><input type="text" id="admin-tcode" placeholder="Maxfiy kod"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn bpu bsm" onclick="saveTeacherCode()">Shu kodni saqlash</button>
-        <button class="btn bg bsm" onclick="genRandomTeacherCode()">&#x1F3B2; Tasodifiy murakkab kod yaratish</button>
-      </div>
-      <div id="admin-tcode-msg"></div>
+      <h3 style="margin-bottom:8px">&#x1F464; Tasdiqlanishi kerak bo'lgan ustozlar</h3>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Yangi ro'yxatdan o'tgan ustozlar shu yerda ko'rinadi va siz tasdiqlamaguncha tizimga kira olmaydi. Telefon raqamiga qo'ng'iroq qilib tekshirib, keyin tasdiqlang.</p>
+      <div id="admin-pending-teachers"></div>
     </div>
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F510; Mening hisobim</h3>
@@ -944,8 +939,6 @@ function localGetDB() {
         changed = true;
         setTimeout(function(){ alert('Admin hisobi topilmadi, yangisi yaratildi:\n\nsuperadmin / '+_newAdminPass+'\n\nBu parolni saqlab qoying!'); }, 500);
       }
-      if (!db.teacherCode) { db.teacherCode = genTeacherCode(); db.teacherCodeUsed = false; changed = true; }
-      if (typeof db.teacherCodeUsed === 'undefined') { db.teacherCodeUsed = false; changed = true; }
       if (changed) { try { localStorage.setItem(SK, JSON.stringify(db)); } catch(e) {} }
       return db;
     }
@@ -1241,9 +1234,7 @@ function defDB() {
       {id:'a1',role:'admin',name:'Bosh Admin',login:'superadmin',pass:aPass,cls:''}
     ],
     classes: ['5A','5B','6A','6B','7A','7B','8A','8B','9A','9B','10A','10B','11A','11B'],
-    userQs: [], topicsMeta: [], results: [], v: 0,
-    teacherCode: genTeacherCode(),
-    teacherCodeUsed: false
+    userQs: [], topicsMeta: [], results: [], v: 0
   };
 }
 
@@ -1527,7 +1518,7 @@ function goAuth(role){
   document.getElementById('rg-cls-fg').style.display=isT?'none':'block';
   document.getElementById('rg-subj-fg').style.display=isT?'block':'none';
   document.getElementById('rg-tcls-fg').style.display=isT?'block':'none';
-  document.getElementById('rg-code-fg').style.display=isT?'block':'none';
+  document.getElementById('rg-phone-fg').style.display=isT?'block':'none';
   document.getElementById('tab-rg').style.display=isA?'none':'flex';
   document.getElementById('auth-err').innerHTML='';
   var db=getDB();
@@ -1547,7 +1538,7 @@ function goAuth(role){
   document.getElementById('rg-maktab').value='';
   // Xavfsizlik: parol maydonlari har safar bosh sahifadan qayta ochilganda tozalanadi
   // (brauzerning avtomatik toldirish/eslab qolishidan himoya uchun)
-  ['li-u','li-p','rg-code'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['li-u','li-p','rg-phone'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   showAuthTab('li');
   showPg('pg-auth');
 }
@@ -1585,6 +1576,7 @@ async function doLogin(){
   var db=getDB(),found=null;
   db.users.forEach(function(x){if(x.login===u&&x.pass===p&&x.role===authRole)found=x;});
   if(!found){showErr("Login yoki parol noto'g'ri!");return;}
+  if(found.role==='teacher' && found.approved===false){showErr("Hisobingiz hali admin tomonidan tasdiqlanmagan. Iltimos, kuting yoki admin bilan boglaning.");return;}
   ME=found;afterLogin();
 }
 function doRegister(){
@@ -1594,6 +1586,7 @@ function doRegister(){
   var cls=authRole==='student'?document.getElementById('rg-cls').value:'';
   var subj=authRole==='teacher'?document.getElementById('rg-subj').value:'';
   var tclasses=authRole==='teacher'?Array.prototype.slice.call(document.querySelectorAll('.rg-tcls-chk:checked')).map(function(c){return c.value;}):[];
+  var phone=authRole==='teacher'?document.getElementById('rg-phone').value.trim():'';
   var vil=document.getElementById('rg-vil').value;
   var tum=document.getElementById('rg-tum').value;
   var maktab=document.getElementById('rg-maktab').value.trim();
@@ -1607,19 +1600,23 @@ function doRegister(){
   if(authRole==='student'&&!cls){showErr("Sinf tanlang!");return;}
   if(authRole==='teacher'&&!subj){showErr("Fan tanlang!");return;}
   if(authRole==='teacher'&&!tclasses.length){showErr("Kamida bitta sinfni belgilang!");return;}
+  if(authRole==='teacher'&&!phone){showErr("Telefon raqamingizni kiriting - admin tasdig'i uchun kerak!");return;}
   var db=getDB();
-  if(authRole==='teacher'){
-    if(db.teacherCodeUsed){showErr("Bu kod allaqachon ishlatilgan! Yangi kod olish uchun admin bilan boglaning.");return;}
-    var code=document.getElementById('rg-code').value.trim();
-    var realCode=db.teacherCode||'';
-    if(code!==realCode){showErr("Maxfiy kod noto'g'ri! Ustoz sifatida royxatdan otish uchun admindan kod so'rang.");return;}
-  }
   var dup=db.users.filter(function(x){return x.login===user;});
   if(dup.length){showErr("Bu login band! Boshqa login tanlang.");return;}
-  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,teachClasses:tclasses,viloyat:vil,tuman:tum,maktab:maktab,plan:'free',usage:{month:curMonthKey(),images:0,pages:0,questions:0}};
+  // MUHIM: endi maxfiy kod tizimi YOQ - uning ornini admin tasdigi
+  // egallaydi. Yangi ustoz hisobi darhol ISHLAY OLMAYDI (approved:false) -
+  // admin uni "Tasdiqlanishi kerak" royxatida korib, telefon orqali
+  // tekshirib, keyin tasdiqlaydi. Shu payGacha ustoz kira olmaydi.
+  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,teachClasses:tclasses,phone:phone,viloyat:vil,tuman:tum,maktab:maktab,plan:'free',approved:(authRole!=='teacher'),usage:{month:curMonthKey(),images:0,pages:0,questions:0}};
   db.users.push(nu);
-  if(authRole==='teacher'){db.teacherCodeUsed=true;}
-  saveDB(db);ME=nu;afterLogin();
+  saveDB(db);
+  if(authRole==='teacher' && !nu.approved){
+    showAuthTab('li');
+    document.getElementById('auth-err').innerHTML='<div class="alt as mt8">&#x2705; Ro\'yxatdan o\'tdingiz! Hisobingiz admin tasdig\'ini kutmoqda - tasdiqlangach kirishingiz mumkin bo\'ladi.</div>';
+    return;
+  }
+  ME=nu;afterLogin();
 }
 function afterLogin(){
   document.getElementById('nav-user').textContent=ME.name+(ME.cls?' - '+ME.cls:'')+(ME.role==='teacher'?' (Ustoz)':ME.role==='admin'?' (Admin)':'');
@@ -2531,11 +2528,7 @@ function renderAdminErrors(){
 }
 function initAdminSettings(){
   var db=getDB();
-  document.getElementById('admin-tcode').value=db.teacherCode||'';
-  var stEl=document.getElementById('admin-tcode-status');
-  stEl.innerHTML=db.teacherCodeUsed
-    ? '<span class="bdg brd">Ishlatilgan &#8212; yangi kod yarating</span>'
-    : '<span class="bdg bgr">Faol &#8212; hali ishlatilmagan</span>';
+  renderPendingTeachers();
   renderAdminAllUsers();
   document.getElementById('storage-plan-select').value=db.storagePlan||'free';
   loadStorageStats();
@@ -2740,22 +2733,48 @@ function adminDelUser(uid){
   renderAdminAllUsers();
   renderAdminOverview();
 }
-function saveTeacherCode(){
-  var v=document.getElementById('admin-tcode').value.trim();
-  var msg=document.getElementById('admin-tcode-msg');
-  if(v.length<4){msg.innerHTML='<div class="alt ar mt8">Kod kamida 4 belgidan iborat bolsin!</div>';return;}
-  var db=getDB();db.teacherCode=v;db.teacherCodeUsed=false;saveDB(db);
-  msg.innerHTML='<div class="alt as mt8">Kod saqlandi va faollashtirildi! Faqat 1 ta ustoz shu kod bilan royxatdan ota oladi.</div>';
-  initAdminSettings();
+function renderPendingTeachers(){
+  var host=document.getElementById('admin-pending-teachers');
+  if(!host)return;
+  var db=getDB();
+  var pending=(db.users||[]).filter(function(u){return u.role==='teacher'&&u.approved===false;});
+  if(!pending.length){
+    host.innerHTML='<p class="ts tm" style="text-align:center;padding:14px">Hozircha tasdiq kutayotgan ustoz yoq</p>';
+    return;
+  }
+  host.innerHTML=pending.map(function(u){
+    var phoneHtml=u.phone?('<a href="tel:'+u.phone.replace(/[^0-9+]/g,'')+'" style="color:var(--pri);font-weight:700;text-decoration:none">&#x1F4DE; '+u.phone+'</a>'):'<span class="ts tm">Telefon korsatilmagan</span>';
+    return '<div class="pd"><div class="fx between" style="align-items:flex-start;gap:10px">'+
+      '<div><div style="font-weight:700">'+u.name+'</div>'+
+      '<div class="ts tm">'+(u.maktab||'')+(u.subject?' &middot; '+subjName(u.subject):'')+'</div>'+
+      '<div class="ts" style="margin-top:4px">'+phoneHtml+'</div>'+
+      '<div class="ts tm" style="margin-top:2px">Login: '+u.login+'</div></div>'+
+      '<div class="fx" style="gap:6px;flex-shrink:0">'+
+        '<button class="btn bs bsm" onclick="approveTeacher(\''+u.id+'\')">&#x2705; Tasdiqlash</button>'+
+        '<button class="btn bd bsm" onclick="rejectTeacher(\''+u.id+'\')">&#x1F5D1;&#65039; Rad etish</button>'+
+      '</div></div></div>';
+  }).join('');
 }
-function genRandomTeacherCode(){
-  var v=genTeacherCode();
-  document.getElementById('admin-tcode').value=v;
-  var db=getDB();db.teacherCode=v;db.teacherCodeUsed=false;saveDB(db);
-  document.getElementById('admin-tcode-msg').innerHTML='<div class="alt as mt8">Yangi murakkab kod yaratildi va saqlandi!</div>';
-  initAdminSettings();
+function approveTeacher(uid){
+  var db=getDB();
+  var u=db.users.find(function(x){return x.id===uid;});
+  if(!u)return;
+  u.approved=true;
+  saveDB(db);
+  renderPendingTeachers();
+  renderAdminAllUsers();
+  alert(u.name+' tasdiqlandi - endi tizimga kira oladi.');
 }
-
+function rejectTeacher(uid){
+  var db=getDB();
+  var u=db.users.find(function(x){return x.id===uid;});
+  if(!u)return;
+  if(!confirm(u.name+' ("'+u.login+'") hisobini butunlay ochirasizmi?'))return;
+  db.users=db.users.filter(function(x){return x.id!==uid;});
+  saveDB(db);
+  renderPendingTeachers();
+  renderAdminAllUsers();
+}
 function toggleExamMode(on){
   var db=getDB();
   db.users.forEach(function(u){if(u.id===ME.id)u.examEnabled=on;});
