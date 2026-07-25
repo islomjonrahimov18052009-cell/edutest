@@ -1298,6 +1298,56 @@ function getAllQs() {
   });
 }
 function getTopics() { var qs=getAllQs(),t=[]; qs.forEach(function(q){if(q.topic&&t.indexOf(q.topic)<0)t.push(q.topic);}); return t; }
+
+// ─── USTOZ UCHUN KORISH HUQUQI CHEKLOVI (xavfsizlik) ──────────────────────
+// MUHIM: avval bu cheklov UMUMAN yoq edi - har qanday ustoz (hatto yolgon
+// kodni bilib olgan notanish kishi ham) BARCHA maktablarning, BARCHA
+// sinflarining oquvchilari, natijalari va login/parollarini korar,
+// ozgartirar va ochira olardi. Endi har bir ustoz FAQAT ozining maktabi VA
+// ozi dars beradigan sinflaridagi oquvchilarni/natijalarni koradi - xuddi
+// oquvchi tomonidagi getAllQs() dagi mantiq bilan bir xil tarzda.
+function myTeachClasses(){
+  if(!ME || ME.role!=='teacher') return null; // admin - cheklovsiz
+  return (ME.teachClasses && ME.teachClasses.length) ? ME.teachClasses : null;
+}
+function studentVisibleToMe(student){
+  if(!ME || ME.role==='admin') return true;
+  if(ME.role!=='teacher') return false;
+  var tSchool=normSchool(ME.maktab), sSchool=normSchool(student.maktab);
+  if(tSchool && sSchool && tSchool!==sSchool) return false;
+  var cls=myTeachClasses();
+  if(cls && (!student.cls || cls.indexOf(student.cls)<0)) return false;
+  return true;
+}
+function myVisibleStudents(){
+  var db=getDB();
+  return (db.users||[]).filter(function(u){ return u.role==='student' && studentVisibleToMe(u); });
+}
+// Natija (result) yozuvlarida oquvchining maktabi saqlanmaydi (faqat ism+sinf) -
+// shuning uchun mos oquvchi hisobini ism+sinf boyicha topib, maktabini shundan
+// aniqlaymiz. Mos oquvchi topilmasa (masalan hisobi ochirilgan), kamida sinf
+// tekshiruvi (teachClasses) bilan cheklanadi - bu boshqa maktablarning
+// notanish sinflarini hech bolmasa aralashtirib yubormaydi.
+function resultVisibleToMe(r){
+  if(!ME || ME.role==='admin') return true;
+  if(ME.role!=='teacher') return false;
+  var cls=myTeachClasses();
+  var rCls=r.cls||r.class||'';
+  if(cls && cls.indexOf(rCls)<0) return false;
+  var db=getDB();
+  var stu=(db.users||[]).find(function(u){return u.role==='student'&&u.name===r.student&&(u.cls||'')===rCls;});
+  if(stu) return studentVisibleToMe(stu);
+  return true;
+}
+function myVisibleResults(){
+  var db=getDB();
+  return (db.results||[]).filter(resultVisibleToMe);
+}
+function myVisibleClassNames(){
+  var db=getDB();
+  var cls=myTeachClasses();
+  return cls ? (db.classes||[]).filter(function(c){return cls.indexOf(c)>=0;}) : (db.classes||[]);
+}
 function getQsByTopic(t) { return getAllQs().filter(function(q){return q.topic===t;}); }
 // Ustoz panelida faqat OZ savollarini korsatish uchun (ustozlar orasida malumot ajratish)
 function getMyQs(){ return (getAllQs()).filter(function(q){return q.teacherId===ME.id;}); }
@@ -2300,15 +2350,15 @@ function saveQ(){
 function delQ(idx){if(idx<BQ.length){alert("Bu savol o'zgarmas!");return;}if(!confirm("O'chirasizmi?"))return;var db=getDB();db.userQs.splice(idx-BQ.length,1);saveDB(db);renderQT();}
 
 function loadResults(){
-  var db=getDB(),res=db.results||[],exam=res.filter(function(r){return r.mode==='exam';});
+  var res=myVisibleResults(),exam=res.filter(function(r){return r.mode==='exam';});
   var avg=exam.length?Math.round(exam.reduce(function(a,r){return a+r.pct;},0)/exam.length):0;
   document.getElementById('r-stats').innerHTML='<div class="sc"><div class="sn">'+res.length+'</div><div class="sl">Jami testlar</div></div><div class="sc"><div class="sn">'+exam.length+'</div><div class="sl">Imtihonlar</div></div><div class="sc"><div class="sn">'+avg+'%</div><div class="sl">O\'rtacha</div></div><div class="sc"><div class="sn">'+exam.filter(function(r){return r.pct>=70;}).length+'</div><div class="sl">O\'tgan (70%+)</div></div>';
-  var cls=db.classes||[];var rfc=document.getElementById('rf-c');var cur=rfc.value;
+  var cls=myVisibleClassNames();var rfc=document.getElementById('rf-c');var cur=rfc.value;
   rfc.innerHTML='<option value="">Barcha sinflar</option>'+cls.map(function(c){return '<option'+(cur===c?' selected':'')+'>'+c+'</option>';}).join('');
   renderResults();
 }
 function renderResults(){
-  var db=getDB(),res=db.results||[],sn=(document.getElementById('rf-n').value||'').toLowerCase(),cl=document.getElementById('rf-c').value,mo=document.getElementById('rf-m').value;
+  var res=myVisibleResults(),sn=(document.getElementById('rf-n').value||'').toLowerCase(),cl=document.getElementById('rf-c').value,mo=document.getElementById('rf-m').value;
   var f=res.filter(function(r){return(!sn||r.student.toLowerCase().indexOf(sn)>=0)&&(!cl||r.cls===cl||r.class===cl)&&(!mo||r.mode===mo);}).slice().reverse();
   document.getElementById('r-tbody').innerHTML=f.slice(0,200).map(function(r,i){var bc=r.pct>=70?'bgr':r.pct>=50?'byl':'brd';var c=r.cls||r.class||'';var idAttr=r.id?"'"+r.id+"'":'null';return '<tr><td>'+(i+1)+'</td><td><strong>'+r.student+'</strong></td><td>'+c+'</td><td class="ts">'+r.topic+'</td><td>'+r.correct+'/'+r.total+'</td><td><span class="bdg '+bc+'">'+r.pct+'%</span></td><td><span class="bdg '+(r.mode==='exam'?'bbl':'bgy')+'">'+(r.mode==='exam'?'Imtihon':'Sinov')+'</span></td><td class="ts tm">'+r.date+'</td><td>'+(r.details&&r.details.length?'<button class="btn bpu bsm" onclick="showResultDetail('+idAttr+')">&#x1F50D; Batafsil</button>':'<span class="ts tm">-</span>')+'</td></tr>';}).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--mut)">Natijalar yo\'q</td></tr>';
 }
@@ -2317,6 +2367,7 @@ function showResultDetail(id){
   var db=getDB();
   var r=(db.results||[]).find(function(x){return x.id===id;});
   if(!r||!r.details){alert('Malumot topilmadi.');return;}
+  if(!resultVisibleToMe(r)){alert('Bu natija sizga tegishli emas.');return;}
   var body=document.getElementById('rd-modal-body');
   body.innerHTML='<div style="margin-bottom:10px"><strong>'+r.student+'</strong> - '+(r.cls||'')+' &middot; <span class="ts tm">'+r.topic+' &middot; '+r.correct+'/'+r.total+' ('+r.pct+'%) &middot; '+r.date+'</span></div>'+
     r.details.map(function(d,i){
@@ -2339,7 +2390,7 @@ function showResultDetail(id){
 function closeRD(){document.getElementById('rd-modal').style.display='none';}
 
 function loadClasses(){
-  var db=getDB(),res=db.results||[],cls=db.classes||[];
+  var res=myVisibleResults(),cls=myVisibleClassNames();
   document.getElementById('cls-grid').innerHTML=cls.map(function(c){
     var cr=res.filter(function(r){return(r.cls===c||r.class===c)&&r.mode==='exam';});
     var avg=cr.length?Math.round(cr.reduce(function(a,r){return a+r.pct;},0)/cr.length):0;
@@ -2349,8 +2400,10 @@ function loadClasses(){
   }).join('')||'<p class="ts tm">Sinflar yo\'q</p>';
 }
 function showProg(enc){
-  var cls=decodeURIComponent(enc);var db=getDB();
-  var res=db.results.filter(function(r){return(r.cls===cls||r.class===cls)&&r.mode==='exam';});
+  var cls=decodeURIComponent(enc);
+  var visibleClasses=myVisibleClassNames();
+  if(visibleClasses.indexOf(cls)<0){alert('Bu sinf sizga tegishli emas.');return;}
+  var res=myVisibleResults().filter(function(r){return(r.cls===cls||r.class===cls)&&r.mode==='exam';});
   document.getElementById('prog-title').textContent=cls+' sinfi progressi';
   document.getElementById('prog-panel').style.display='block';
   if(!res.length){document.getElementById('prog-body').innerHTML='<p class="ts tm">Bu sinfda imtihon natijalari yo\'q</p>';document.getElementById('prog-panel').scrollIntoView({behavior:'smooth'});return;}
@@ -2783,13 +2836,14 @@ function testSbConnection(){
 }
 
 function renderUsersT(){
-  var db=getDB(),sts=db.users.filter(function(u){return u.role==='student';});
+  var sts=myVisibleStudents();
   document.getElementById('users-tbody').innerHTML=sts.map(function(u){return '<tr><td><strong>'+u.name+'</strong></td><td>'+u.login+'</td><td>'+(u.cls||'')+'</td><td style="display:flex;gap:4px"><button class="btn bp bsm" onclick="editUser(\''+u.id+'\')">✏️</button><button class="btn bd bsm" onclick="delUser(\''+u.id+'\')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--mut)">O\'quvchilar yo\'q</td></tr>';
 }
 function editUser(uid){
   var db=getDB();
   var u=db.users.find(function(x){return x.id===uid;});
   if(!u)return;
+  if(!studentVisibleToMe(u)){alert('Bu o\'quvchi sizga tegishli emas!');return;}
   var newName=prompt('Ism:',u.name);
   if(newName===null)return;
   var newLogin=prompt('Login:',u.login);
@@ -2803,7 +2857,14 @@ function editUser(uid){
   renderUsersT();
   alert('Saqlandi!');
 }
-function delUser(uid){if(!confirm("O'quvchini o'chirasizmi?"))return;var db=getDB();db.users=db.users.filter(function(u){return u.id!==uid;});saveDB(db);renderUsersT();}
+function delUser(uid){
+  var db=getDB();
+  var u=db.users.find(function(x){return x.id===uid;});
+  if(!u)return;
+  if(!studentVisibleToMe(u)){alert('Bu o\'quvchi sizga tegishli emas!');return;}
+  if(!confirm("O'quvchini o'chirasizmi?"))return;
+  db.users=db.users.filter(function(x){return x.id!==uid;});saveDB(db);renderUsersT();
+}
 function saveClsList(){
   var val=document.getElementById('cls-inp').value;
   var cls=val.split(',').map(function(c){return c.trim();}).filter(function(c){return c;});
@@ -2813,10 +2874,14 @@ function saveClsList(){
   setTimeout(function(){document.getElementById('cls-msg').innerHTML='';},3000);
 }
 function clearResults(){
-  if(!confirm("Barcha natijalarni o'chirasizmi?"))return;
-  var db=getDB();db.results=[];saveDB(db);
+  var visible=myVisibleResults();
+  if(!visible.length){alert("Sizga tegishli natijalar yo'q!");return;}
+  if(!confirm("Sizga tegishli barcha natijalarni o'chirasizmi? ("+visible.length+" ta)"))return;
+  var db=getDB();
+  db.results=(db.results||[]).filter(function(r){return !resultVisibleToMe(r);});
+  saveDB(db);
   loadResults();
-  alert("Natijalar tozalandi!");
+  alert("Sizga tegishli natijalar tozalandi!");
 }
 // Bucket'dagi barcha fayllarni sahifalab royxatga oladi (loadStorageStats
 // bilan bir xil pattern - 1000 talik sahifalarda, minglab fayl bolsa ham
@@ -2928,28 +2993,32 @@ async function clearUserQs(){
   if(btn) btn.disabled=false;
 }
 function clearStudents(){
-  if(!confirm("Barcha o'quvchilarni o'chirasizmi?"))return;
+  var toDelete=myVisibleStudents();
+  if(!toDelete.length){alert("Sizga tegishli o'quvchilar yo'q!");return;}
+  if(!confirm("Sizga tegishli barcha o'quvchilarni o'chirasizmi? ("+toDelete.length+" ta)"))return;
   var db=getDB();
-  db.users=db.users.filter(function(u){return u.role==='teacher';});
+  var delIds={};
+  toDelete.forEach(function(u){ delIds[u.id]=true; });
+  db.users=(db.users||[]).filter(function(u){ return !delIds[u.id]; });
   db.results=(db.results||[]).filter(function(r){
-    return db.users.some(function(u){return u.name===r.student;});
+    return !toDelete.some(function(u){return u.name===r.student;});
   });
   saveDB(db);
   sbPush(db).catch(function(){});
   renderUsersT();
-  alert("O'quvchilar tozalandi!");
+  alert("Sizga tegishli o'quvchilar tozalandi!");
 }
 
 function exportAll(){
-  var db=getDB(),res=db.results||[];if(!res.length){alert("Natijalar yo'q!");return;}
+  var res=myVisibleResults();if(!res.length){alert("Natijalar yo'q!");return;}
   var wb=XLSX.utils.book_new(),data=[["O'quvchi","Sinf","Mavzu","To'g'ri","Jami","Ball","Tur","Sana","Vaqt"]];
   res.forEach(function(r){data.push([r.student,r.cls||r.class,r.topic,r.correct,r.total,r.pct+'%',r.mode==='exam'?'Imtihon':'Sinov',r.date,r.time||'']);});
   var ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[{wch:22},{wch:8},{wch:22},{wch:8},{wch:6},{wch:8},{wch:10},{wch:12},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws,'Natijalar');XLSX.writeFile(wb,'natijalar.xlsx');
 }
 function exportByClass(){
-  var db=getDB(),res=(db.results||[]).filter(function(r){return r.mode==='exam';}),wb=XLSX.utils.book_new(),hasD=false;
-  (db.classes||[]).forEach(function(cls){
+  var res=myVisibleResults().filter(function(r){return r.mode==='exam';}),wb=XLSX.utils.book_new(),hasD=false;
+  myVisibleClassNames().forEach(function(cls){
     var cr=res.filter(function(r){return r.cls===cls||r.class===cls;});if(!cr.length)return;hasD=true;
     var sts=[],tps=[];cr.forEach(function(r){if(sts.indexOf(r.student)<0)sts.push(r.student);if(tps.indexOf(r.topic)<0)tps.push(r.topic);});
     var rows=sts.map(function(st){var sr=cr.filter(function(r){return r.student===st;});var vals=tps.map(function(t){var r=null;sr.forEach(function(x){if(x.topic===t)r=x;});return r?r.pct+'%':'--';});var avg=sr.length?Math.round(sr.reduce(function(a,r){return a+r.pct;},0)/sr.length):0;return [st].concat(vals).concat([avg+'%']);});
