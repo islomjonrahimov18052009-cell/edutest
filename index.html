@@ -3821,7 +3821,44 @@ function installApp(){
   }
 }
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(function(){});
+  navigator.serviceWorker.register('sw.js').then(function(reg){
+    reg.addEventListener('updatefound', function(){
+      var newSW = reg.installing;
+      if(!newSW) return;
+      newSW.addEventListener('statechange', function(){
+        if(newSW.state === 'installed' && navigator.serviceWorker.controller){
+          // Yangi versiya yuklab olindi - foydalanuvchiga xabar beramiz
+          var banner = document.createElement('div');
+          banner.id = 'sw-update-banner';
+          banner.innerHTML =
+            '<div style="position:fixed;bottom:0;left:0;right:0;z-index:9999;' +
+            'background:linear-gradient(90deg,#25316d,#5b3ea6);color:#fff;' +
+            'padding:14px 18px;display:flex;align-items:center;justify-content:space-between;' +
+            'box-shadow:0 -4px 20px rgba(0,0,0,.25);gap:12px">' +
+              '<div style="display:flex;align-items:center;gap:10px">' +
+                '<span style="font-size:22px">🔄</span>' +
+                '<div>' +
+                  '<div style="font-weight:700;font-size:15px">Yangi versiya mavjud!</div>' +
+                  '<div style="font-size:12px;opacity:.85">EduTest Pro yangilandi — darhol o\'ting</div>' +
+                '</div>' +
+              '</div>' +
+              '<button onclick="swUpdate()" style="background:#f0b429;color:#111;border:none;' +
+              'padding:10px 20px;border-radius:9px;font-weight:700;font-size:14px;' +
+              'cursor:pointer;white-space:nowrap;font-family:inherit">✅ Yangilash</button>' +
+            '</div>';
+          document.body.appendChild(banner);
+          // Yangilash funksiyasi: yangi SW ni faollashtirip, sahifani qayta yuklaydi
+          window.swUpdate = function(){
+            newSW.postMessage({type:'SKIP_WAITING'});
+          };
+        }
+      });
+    });
+  }).catch(function(){});
+  // Yangi SW faollashgach sahifani qayta yuklaymiz
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    window.location.reload();
+  });
 }
 
 // MUHIM: initMeta() endi shu yerda EMAS, pastda syncFromCloud() tugagandan
