@@ -490,16 +490,16 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <h2 style="margin-bottom:6px">Test import</h2>
       <p class="ts tm" style="margin-bottom:11px">EasyQuizzy (.exe), Word (.docx), PDF, matn (.txt) yoki test sahifasining FOTOSURATI (.jpg/.png) - savollar avtomatik o'qiladi (AI yordamida)</p>
       <div class="darea" id="drop-area" onclick="document.getElementById('exe-inp').click()">
-        <div style="font-size:36px">&#x1F4C2;</div>
-        <div style="font-weight:700;margin-top:6px">Bosing yoki tashlang</div>
-        <div class="ts tm">.exe, .docx, .pdf, .txt, .jpg, .png fayllar qabul qilinadi</div>
+        <div style="font-size:36px">📂</div>
+        <div style="font-weight:700;margin-top:6px">Bosing yoki faylni shu yerga tashlang</div>
+        <div class="ts tm">.exe, .docx, .pdf, .txt, .jpg, .png</div>
       </div>
       <input type="file" id="exe-inp" accept=".exe,.docx,.pdf,.txt,.jpg,.jpeg,.png" multiple style="display:none">
       <div id="imp-msg" style="margin-top:10px"></div>
     </div>
     <div class="card" style="border:2px solid var(--purd)">
       <h2 style="margin-bottom:6px">&#x1F4DA; Kitobdan test tuzish (AI)</h2>
-      <p class="ts tm" style="margin-bottom:11px">Bu — tayyor testni o'qish EMAS. Butun bir kitob/darslik (.docx, .pdf, .txt) tashlang - AI shu kitob MAZMUNIGA asoslanib, YANGI, murakkab test savollarini o'zi tuzib beradi.</p>
+      <p class="ts tm" style="margin-bottom:11px">Kitob yoki darslik tashlang — AI shu matnga asoslanib yangi test savollarini o'zi tuzib beradi. Bepul rejimda: 20 betgacha matn.</p>
       <div class="darea" id="book-drop-area" onclick="document.getElementById('book-inp').click()">
         <div style="font-size:36px">&#x1F393;</div>
         <div style="font-weight:700;margin-top:6px">Kitobni shu yerga tashlang</div>
@@ -1403,19 +1403,9 @@ function myUsage(){
 // Limitga yetgan bolsa - yuqorilash oynasini korsatadi va false qaytaradi
 // (chaqiruvchi funksiya operatsiyani DAVOM ETTIRMASLIGI kerak).
 function checkAndIncrementUsage(kind, amount){
-  if(!ME || ME.role!=='teacher') return true; // faqat ustozlar uchun limit bor
-  amount = amount || 1;
-  var plan = myPlan();
-  var limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
-  var usage = myUsage();
-  if((usage[kind]||0) + amount > limits[kind]){
-    showUpgradeModal(kind);
-    return false;
-  }
-  usage[kind] = (usage[kind]||0) + amount;
-  var db=getDB();
-  db.users.forEach(function(u){ if(u.id===ME.id) u.usage=usage; });
-  saveDB(db);
+  // TO'LOV TIZIMI (Click/Payme) ulanmaguncha limit tekshiruvi o'chirilgan.
+  // Limit chiqishi foydalanuvchini bezovta qilar edi, lekin haqiqiy to'lov
+  // yo'qligi sababli foydasi ham yo'q edi. Pro tizimi tayyor bo'lgach qaytariladi.
   return true;
 }
 function showUpgradeModal(kind){
@@ -1453,23 +1443,11 @@ function closeUpgradeModal(){ document.getElementById('upgrade-modal').style.dis
 function renderUsageCard(){
   var el=document.getElementById('usage-body');
   if(!el || !ME) return;
-  var plan=myPlan();
-  var limits=PLAN_LIMITS[plan]||PLAN_LIMITS.free;
-  var usage=myUsage();
-  document.getElementById('usage-plan-badge').textContent = plan==='pro' ? 'Pro' : 'Bepul';
-  document.getElementById('usage-plan-badge').className = 'bdg ' + (plan==='pro'?'bgr':'bpu2');
-  function bar(label, used, max){
-    var pct=Math.min(100, Math.round((used/max)*100));
-    var col = pct>=100 ? 'var(--err)' : pct>=80 ? 'var(--warn)' : 'var(--pri)';
-    return '<div style="margin-bottom:10px">'+
-      '<div class="fx between ts" style="margin-bottom:4px"><span>'+label+'</span><span>'+used+' / '+max+'</span></div>'+
-      '<div class="pb"><div class="pf" style="width:'+pct+'%;background:'+col+'"></div></div>'+
-    '</div>';
-  }
-  el.innerHTML = bar('&#x1F4F7; Rasmdan test', usage.images||0, limits.images) +
-    bar('&#x1F4DA; Kitobdan test (bet)', usage.pages||0, limits.pages) +
-    bar('&#x1F916; AI savol yaratish', usage.questions||0, limits.questions) +
-    (plan!=='pro' ? '<button class="btn bpu bsm mt8" onclick="showUpgradeModal(\'images\')">&#x2B50; Pro imkoniyatlarni korish</button>' : '');
+  el.innerHTML =
+    '<div class="alt ai" style="margin-bottom:10px">&#x1F511; Pro obuna tez kunda ochiladi — barcha imkoniyatlar hozircha cheksiz!</div>'+
+    '<div style="font-size:13px;color:var(--mut)">Pro obuna bilan: tezroq fayl yuklash, ko\'proq AI savol yaratish, ustuvor xizmat. Narx va to\'lov tizimi yaqin orada e\'lon qilinadi.</div>';
+  var badge=document.getElementById('usage-plan-badge');
+  if(badge){badge.textContent='Bepul';badge.className='bdg bpu2';}
 }
 
 var S={test:[],idx:0,answers:{},timeLeft:0,iv:null,mode:'',lastRes:null};
