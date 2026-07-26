@@ -1,5 +1,9 @@
-const CACHE = 'edutest-v6';
+const CACHE = 'edutest-v7';
 const FILES = ['./', './index.html'];
+
+self.addEventListener('message', function(e){
+  if(e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
@@ -7,7 +11,10 @@ self.addEventListener('install', function(e) {
       return cache.addAll(FILES).catch(function(){});
     })
   );
-  self.skipWaiting();
+  // skipWaiting() endi bu yerda emas - foydalanuvchi "Yangilash"
+  // tugmasini bosganda SKIP_WAITING xabari orqali chaqiriladi.
+  // Bu - yangilash xabarsiz, foydalanuvchi bilmagan holda bo'lib
+  // qolmasligini ta'minlaydi (test ishlayotganda ham xavfsiz).
 });
 
 self.addEventListener('activate', function(e) {
