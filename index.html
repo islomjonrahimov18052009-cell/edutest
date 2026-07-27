@@ -508,13 +508,6 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <input type="file" id="book-inp" accept=".docx,.pdf,.txt" style="display:none">
       <div id="book-msg" style="margin-top:10px"></div>
     </div>
-    <div class="card">
-      <h3 style="margin-bottom:10px">JSON import/eksport</h3>
-      <div class="fx fxw" style="gap:8px">
-        <button class="btn bs bsm" onclick="exportQsJSON()">&#x1F4BE; JSON saqlash</button>
-        <label class="btn bp bsm" style="cursor:pointer;margin:0">&#x1F4E4; JSON yuklash<input type="file" accept=".json" id="json-inp" style="display:none"></label>
-      </div>
-    </div>
   </div>
 
   <div class="tc" id="tc-s">
@@ -3037,8 +3030,6 @@ function exportByClass(){
   });
   if(!hasD){alert("Imtihon natijalari yo'q!");return;}XLSX.writeFile(wb,'sinflar_progressi.xlsx');
 }
-function exportQsJSON(){var db=getDB();var blob=new Blob([JSON.stringify(db.userQs||[],null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='savollar.json';a.click();}
-
 var da=document.getElementById('drop-area');
 da.addEventListener('dragover',function(e){e.preventDefault();da.style.borderColor='var(--pri)';da.style.background='#f0f9ff';});
 da.addEventListener('dragleave',function(){da.style.borderColor='';da.style.background='';});
@@ -3173,35 +3164,6 @@ async function startBookGeneration(file, mode, count){
     msg.innerHTML='<div class="alt ar">&#x274C; Xato: '+e.message+'</div>';
   }
 }
-
-document.getElementById('json-inp').addEventListener('change',function(){
-  var f=this.files[0];if(!f)return;
-  var folderName=f.name.replace(/\.json$/i,'');
-  var reader=new FileReader();
-  reader.onload=function(e){try{
-    var qs=JSON.parse(e.target.result);if(!Array.isArray(qs))throw 0;
-    var topicsInFile=[];
-    qs.forEach(function(q){
-      q.teacherId=ME.id;
-      if(!q.subject)q.subject=ME.subject||'math';
-      if(q.topic&&topicsInFile.indexOf(q.topic)<0)topicsInFile.push(q.topic);
-    });
-    var db=getDB();
-    db.userQs=(db.userQs||[]).concat(qs);
-    // Agar faylda 1 tadan kop mavzu bolsa - bu "kitob", barcha mavzularni bitta papkaga birlashtiramiz
-    if(topicsInFile.length>1){
-      db.topicsMeta=db.topicsMeta||[];
-      topicsInFile.forEach(function(t){
-        var found=false;
-        db.topicsMeta.forEach(function(m){if(m.topic===t&&m.teacherId===ME.id){m.folder=folderName;found=true;}});
-        if(!found)db.topicsMeta.push({topic:t,teacherId:ME.id,subject:ME.subject||'math',folder:folderName,questionsToAsk:qs.filter(function(q){return q.topic===t;}).length});
-      });
-    }
-    saveDB(db);renderQT();
-    alert(qs.length+" ta savol qo'shildi!"+(topicsInFile.length>1?" ("+topicsInFile.length+" ta mavzu, \""+folderName+"\" papkasiga birlashtirildi)":""));
-  }catch(ex){alert("Xatolik: JSON format noto'g'ri");}};
-  reader.readAsText(f);
-});
 
 var RENDER_SERVER='https://edutest-server.onrender.com';
 
