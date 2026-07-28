@@ -3167,6 +3167,14 @@ async function startBookGeneration(file, mode, count){
 
 var RENDER_SERVER='https://edutest-server.onrender.com';
 
+function uniqueTopicName(base){
+  var db=getDB();
+  var existing=(db.userQs||[]).filter(function(q){return q.teacherId===ME.id;}).map(function(q){return q.topic;});
+  if(existing.indexOf(base)<0) return base;
+  var i=2;
+  while(existing.indexOf(base+' ('+i+')')>=0) i++;
+  return base+' ('+i+')';
+}
 async function saveImportedQs(parsed,msg){
   // MUHIM: har bir savolga GLOBAL nodir ID beramiz (bir nechta mavzu
   // import qilinganda ID lar takrorlanib qolmasligi uchun)
@@ -3196,6 +3204,13 @@ async function saveImportedQs(parsed,msg){
   }
 
   var db=getDB();
+  var topicExists=(db.userQs||[]).some(function(q){return q.topic===parsed.topic&&q.teacherId===ME.id;});
+  if(topicExists){
+    var doUpdate=confirm('"'+parsed.topic+'" nomli mavzu allaqachon mavjud.\n\nOK — Yangilash (eskisi o\'chib, yangi savollar bilan almashtiriladi)\nBekor qilish — Yangi, alohida mavzu sifatida saqlash');
+    if(!doUpdate){
+      parsed.topic=uniqueTopicName(parsed.topic);
+    }
+  }
   db.userQs=db.userQs||[];
   db.userQs=db.userQs.filter(function(q){return !(q.topic===parsed.topic&&q.teacherId===ME.id);});
   db.userQs=db.userQs.concat(parsed.qs);
