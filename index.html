@@ -3181,6 +3181,7 @@ async function saveImportedQs(parsed,msg){
   parsed.qs.forEach(function(q,idx){
     q.id=Date.now()+'_'+idx+'_'+Math.random().toString(36).slice(2,8);
     q.teacherId=ME.id;
+    q.topic=parsed.topic;
     if(!q.subject)q.subject=ME.subject||'math';
   });
 
