@@ -3863,7 +3863,7 @@ function aiCheckTopic(topic) {
     }
   });
 
-  var BATCH = 5;
+  var BATCH = 3;
   var batches = [];
   for (var i = 0; i < textQs.length; i += BATCH) {
     batches.push(textQs.slice(i, i + BATCH));
@@ -3938,7 +3938,7 @@ function aiCheckTopic(topic) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
+        model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: lines.join('\n') }],
         max_tokens: 1000,
         temperature: 0.1
