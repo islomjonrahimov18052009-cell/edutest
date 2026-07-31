@@ -4087,18 +4087,46 @@ var _visWarnCount = 0;
 var _blurWarnCount = 0;
 var _ignoreBlur = false;
 
-// Tab yashirilganda (boshqa tabga o'tganda)
+// MUHIM: avval tab/oyna fokusdan chiqishi bilan test DARHOL tugardi - bu
+// hatto oddiy telefon qongiroqqa javob berish kabi qisqa uzilishlarda ham
+// testni bekor qilib qoyardi. Endi qisqa "kutish vaqti" (8 soniya) beriladi -
+// agar shu vaqt ichida foydalanuvchi ilovaga qaytsa, test davom etadi;
+// qaytmasa (haqiqatan chiqib ketgan/aldashga urinayotgan bolsa), test
+// avvalgidek yakunlanadi.
+var _autoSubmitTimer = null;
+var AUTO_SUBMIT_GRACE_MS = 8000;
+function _scheduleAutoSubmit(){
+  if(!S.mode || _ignoreBlur) return;
+  if(_autoSubmitTimer) return; // allaqachon kutilmoqda
+  _autoSubmitTimer = setTimeout(function(){
+    _autoSubmitTimer = null;
+    if(S.mode) submitTest(true);
+  }, AUTO_SUBMIT_GRACE_MS);
+}
+function _cancelAutoSubmit(){
+  if(_autoSubmitTimer){
+    clearTimeout(_autoSubmitTimer);
+    _autoSubmitTimer = null;
+  }
+}
+
+// Tab yashirilganda (boshqa tabga o'tganda / qongiroq kelganda)
 document.addEventListener('visibilitychange', function() {
   if(document.hidden && S.mode && !_ignoreBlur) {
-    submitTest(true);
+    _scheduleAutoSubmit();
+  } else if(!document.hidden){
+    _cancelAutoSubmit();
   }
 });
 
-// Oyna fokusdan chiqqanda - darhol test tugaydi
+// Oyna fokusdan chiqqanda - endi darhol emas, kutish vaqti bilan
 window.addEventListener('blur', function() {
   if(!S.mode) return;
   if(_ignoreBlur) return;
-  submitTest(true);
+  _scheduleAutoSubmit();
+});
+window.addEventListener('focus', function() {
+  _cancelAutoSubmit();
 });
 
 // Fullscreen dan chiqsa (Esc) - test tugaydi
