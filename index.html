@@ -3176,6 +3176,18 @@ function uniqueTopicName(base){
   return base+' ('+i+')';
 }
 async function saveImportedQs(parsed,msg){
+  // MUHIM: mavzu nomi tekshiruvi ENDI birinchi bo'lib ishlaydi - aks holda
+  // "Bekor qilish" (yangi mavzu sifatida saqlash) tanlansa ham, har bir
+  // savolga ESKI nom allaqachon yozib bo'lingan bo'lib qolar edi.
+  var _dbCheck=getDB();
+  var topicExists=(_dbCheck.userQs||[]).some(function(q){return q.topic===parsed.topic&&q.teacherId===ME.id;});
+  if(topicExists){
+    var doUpdate=confirm('"'+parsed.topic+'" nomli mavzu allaqachon mavjud.\n\nOK — Yangilash (eskisi o\'chib, yangi savollar bilan almashtiriladi)\nBekor qilish — Yangi, alohida mavzu sifatida saqlash');
+    if(!doUpdate){
+      parsed.topic=uniqueTopicName(parsed.topic);
+    }
+  }
+
   // MUHIM: har bir savolga GLOBAL nodir ID beramiz (bir nechta mavzu
   // import qilinganda ID lar takrorlanib qolmasligi uchun)
   parsed.qs.forEach(function(q,idx){
@@ -3205,13 +3217,6 @@ async function saveImportedQs(parsed,msg){
   }
 
   var db=getDB();
-  var topicExists=(db.userQs||[]).some(function(q){return q.topic===parsed.topic&&q.teacherId===ME.id;});
-  if(topicExists){
-    var doUpdate=confirm('"'+parsed.topic+'" nomli mavzu allaqachon mavjud.\n\nOK — Yangilash (eskisi o\'chib, yangi savollar bilan almashtiriladi)\nBekor qilish — Yangi, alohida mavzu sifatida saqlash');
-    if(!doUpdate){
-      parsed.topic=uniqueTopicName(parsed.topic);
-    }
-  }
   db.userQs=db.userQs||[];
   db.userQs=db.userQs.filter(function(q){return !(q.topic===parsed.topic&&q.teacherId===ME.id);});
   db.userQs=db.userQs.concat(parsed.qs);
@@ -4013,6 +4018,19 @@ function aiCheckTopic(topic) {
   checkBatch(0);
 }
 
+// ── INTERNET YOQLIGINI KUZATISH ──────────────────────────────────────────
+// Sayt Supabase/Render bilan doimiy aloqada ishlaydi (savol/natija saqlash,
+// AI chaqiruvlari) - internet bolmasa hech narsa ishlamaydi, shuning uchun
+// foydalanuvchiga tushunarli xabar korsatib, ilovani bloklab qoyamiz.
+function updateOfflineOverlay(){
+  var ov=document.getElementById('offline-overlay');
+  if(!ov)return;
+  ov.style.display = navigator.onLine ? 'none' : 'flex';
+}
+window.addEventListener('online', updateOfflineOverlay);
+window.addEventListener('offline', updateOfflineOverlay);
+updateOfflineOverlay();
+
 sbInit();
 // Bulutdan malumot orqa fonda tortib olinadi - foydalanuvchiga korinmaydi.
 // initMeta() endi FAQAT shu tortib olish tugagandan keyin ishga tushadi -
@@ -4140,6 +4158,16 @@ history.pushState(null, '', location.href);
     <div class="modal" style="max-width:480px;width:95%">
       <div class="mh"><h3>🤖 AI tekshirish natijasi</h3><button class="xb" onclick="document.getElementById('ai-modal').style.display='none'">&#x2715;</button></div>
       <div id="ai-modal-body" style="padding:8px"></div>
+    </div>
+  </div>
+
+  <!-- INTERNET YOQ EKRANI -->
+  <div id="offline-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:linear-gradient(125deg,#151b3d,#5b3ea6);align-items:center;justify-content:center;padding:24px;text-align:center">
+    <div style="max-width:360px">
+      <div style="font-size:56px;margin-bottom:14px">&#x1F4F6;</div>
+      <h2 style="color:#fff;margin-bottom:10px">Internet aloqasi yo'q</h2>
+      <p style="color:rgba(255,255,255,.8);font-size:15px;line-height:1.6">EduTest Pro ishlashi uchun internet aloqasi kerak. Iltimos, Wi-Fi yoki mobil internetni yoqing.</p>
+      <button class="btn bpu blg mt12" onclick="location.reload()">&#x1F504; Qayta urinish</button>
     </div>
   </div>
 </body>
