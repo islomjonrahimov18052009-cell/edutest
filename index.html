@@ -3239,7 +3239,9 @@ var RENDER_SERVERS=[
   'https://edutest-server-2.onrender.com',
   'https://edutest-server-3.onrender.com',
   'https://edutest-server-4.onrender.com',
-  'https://edutest-server-5.onrender.com'
+  'https://edutest-server-5.onrender.com',
+  'https://edutest-server-1.onrender.com',
+  'https://edutest-server-6.onrender.com'
 ];
 var _serverRR=0;
 function pickServer(){
@@ -4128,7 +4130,33 @@ function updateOfflineOverlay(){
 }
 window.addEventListener('online', updateOfflineOverlay);
 window.addEventListener('offline', updateOfflineOverlay);
-updateOfflineOverlay();
+// MUHIM: bu skript "#offline-overlay" divdan OLDIN joylashgan (u </body>
+// yaqinida). Shuning uchun updateOfflineOverlay()ni DARHOL chaqirsak, div
+// hali brauzerga yuklanmagan bolib, hech narsa topilmay qolar edi - shu
+// sabab "internet ochiq holda BIRINCHI marta ochilganda" xabar chiqmasdi,
+// faqat keyinroq (ilova ochiq turgan paytda) internetni ochirilsa ishlardi.
+// Endi DOMContentLoaded kutib, shundan keyin tekshiramiz - div allaqachon
+// mavjud boladi.
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', updateOfflineOverlay);
+} else {
+  updateOfflineOverlay();
+}
+
+// ── SERVERLARNI "UYGOQ" TUTISH ──────────────────────────────────────────
+// Render bepul tarifi ~15 daqiqa harakatsizlikdan keyin serverni uxlatib
+// qoyadi, keyingi sorov ~30-60 soniya "uygonish" vaqtini talab qiladi. Sayt
+// ochiq turgan paytda barcha serverlarga har 10 daqiqada yengil /health
+// sorovi yuborib, ularni uxlashga qoymaymiz. MUHIM: bu faqat KIMDIR saytni
+// ochib turgan paytda ishlaydi - hech kim ochmagan paytda ham 24/7 uygoq
+// tutish uchun UptimeRobot kabi tashqi xizmat kerak (alohida sozlanadi).
+function pingServersKeepAlive(){
+  RENDER_SERVERS.forEach(function(s){
+    fetch(s+'/health').catch(function(){});
+  });
+}
+setInterval(pingServersKeepAlive, 10*60*1000); // har 10 daqiqada
+pingServersKeepAlive(); // sahifa ochilganda ham darhol bir marta
 
 sbInit();
 // Bulutdan malumot orqa fonda tortib olinadi - foydalanuvchiga korinmaydi.
