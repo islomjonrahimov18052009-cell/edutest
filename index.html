@@ -958,12 +958,18 @@ var SUBJECT_BG_SYMBOLS={
   other:['π','√','∑','∞','×','÷','+','−','%','∆'],
   default:['📚','🎓','✏️','π','🔬','🌍','📖','🧠','⭐','💡','🧮','📐','🗺️','🎨','🧬']
 };
-function renderFloatingBg(subjectKey){
+function renderFloatingBg(subjectKey, tier){
   var host=document.getElementById('mathBg');
   if(!host)return;
   host.innerHTML='';
+  tier = tier||0;
   var symbols=SUBJECT_BG_SYMBOLS[subjectKey]||SUBJECT_BG_SYMBOLS.default;
-  var n=22;
+  // MUHIM: bu - "tabaqalash" (gamifikatsiya) tizimi. Hech qanday ochiq
+  // "reyting"/"o'rin" korsatilmaydi - faqat orqa fonning ozi sekin-asta
+  // jonliroq, porloqroq bolib boradi, agar oquvchi sinfdoshlariga nisbatan
+  // yuqori natija korsatsa. Past orindagilar uchun hech narsa ozgarmaydi
+  // (tier=0 - asl, ozgarishsiz fon).
+  var n = 22 + tier*10; // 22/32/42/52
   for(var i=0;i<n;i++){
     var el=document.createElement('span');
     el.textContent=symbols[Math.floor(Math.random()*symbols.length)];
@@ -976,6 +982,31 @@ function renderFloatingBg(subjectKey){
     el.style.cssText='left:'+left+'vw;font-size:'+size+'px;animation-duration:'+dur+'s;animation-delay:'+delay+'s;--sway:'+sway+';--spin:'+spin;
     host.appendChild(el);
   }
+  // Yuqori tabaqadagilar uchun qoshimcha: yulduzcha chaqnashlari va issiq nur
+  if(tier>=1){
+    var starCount = tier*8;
+    for(var s=0;s<starCount;s++){
+      var st=document.createElement('span');
+      st.textContent='\u2726';
+      var sz=8+Math.random()*10;
+      var lf=Math.random()*100;
+      var dl=Math.random()*4;
+      var dr=1.4+Math.random()*1.8;
+      st.style.cssText='left:'+lf+'vw;font-size:'+sz+'px;top:'+(Math.random()*90)+'vh;position:absolute;color:rgba(255,255,255,'+(.25+tier*.1)+');animation:twinkleStar '+dr+'s ease-in-out '+dl+'s infinite;';
+      host.appendChild(st);
+    }
+  }
+  if(tier>=2){
+    var glow=document.createElement('div');
+    glow.style.cssText='position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 15%, rgba(240,180,41,'+(.06+tier*.03)+') 0%, transparent 60%)';
+    host.appendChild(glow);
+  }
+}
+if(!document.getElementById('twinkle-star-style')){
+  var _tss=document.createElement('style');
+  _tss.id='twinkle-star-style';
+  _tss.textContent='@keyframes twinkleStar{0%,100%{opacity:.15;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}';
+  document.head.appendChild(_tss);
 }
 initMathBg();
 
@@ -1028,9 +1059,38 @@ function applySubjectTheme(subjectKey){
   root.setProperty('--pri',t.pri);
   root.setProperty('--purd',t.purd);
   root.setProperty('--accent',t.accent);
-  renderFloatingBg(subjectKey||'default');
+  renderFloatingBg(subjectKey||'default', computeMyStandingTier());
 }
 function resetTheme(){applySubjectTheme(null);}
+// Oquvchining sinfdoshlariga nisbatan ortacha natijasi qaysi choraktada
+// ekanligini hisoblaydi (0=past yarim yoki malumot yetarli emas,
+// 1/2/3=tobora yuqoriroq). Hech qanday raqam/orin ochiq korsatilmaydi -
+// faqat orqa fon shu qiymatga qarab tobora "jonliroq" boladi.
+function computeMyStandingTier(){
+  if(!ME || ME.role!=='student') return 0;
+  var db=getDB();
+  var classmates=(db.results||[]).filter(function(r){return r.mode==='exam'&&r.cls===ME.cls;});
+  if(!classmates.length) return 0;
+  var byStudent={};
+  classmates.forEach(function(r){
+    if(!byStudent[r.student]) byStudent[r.student]=[];
+    byStudent[r.student].push(r.pct);
+  });
+  var names=Object.keys(byStudent);
+  if(names.length<3) return 0; // solishtirish uchun yetarli oquvchi yoq
+  var averages=names.map(function(name){
+    var arr=byStudent[name];
+    return {name:name, avg:arr.reduce(function(a,b){return a+b;},0)/arr.length};
+  });
+  averages.sort(function(a,b){return b.avg-a.avg;});
+  var myIdx=averages.findIndex(function(a){return a.name===ME.name;});
+  if(myIdx<0) return 0;
+  var posFromTop=myIdx/(averages.length-1); // 0=eng yuqori, 1=eng past
+  if(posFromTop<=0.1) return 3;
+  if(posFromTop<=0.35) return 2;
+  if(posFromTop<=0.6) return 1;
+  return 0;
+}
 
 var SYMBOLS_BY_SUBJECT={
   math:['=','≠','≈','≡','±','∓','a/b','√','∛','∜','ⁿ√','xⁿ','π','∞','≤','≥','∑','∏','∫','∮','÷','×','∆','∇','∈','∉','∪','∩','⊂','⊆','⊄','→','⇒','⇔','↦','∀','∃','∴','∵','¬','∧','∨','⊕','%','‰','∠','⊥','∥','!','|','(',')','[',']','{','}','ℝ','ℕ','ℤ','ℚ','ℂ',
@@ -3166,6 +3226,27 @@ async function startBookGeneration(file, mode, count){
 }
 
 var RENDER_SERVER='https://edutest-server.onrender.com';
+// 1400+ rasm/formula import qilinganda BITTA (512MB) bepul server yetishmay
+// qolgan edi (xotira tugab OOM bolar edi). Endi 5 ta ALOHIDA bepul Render
+// xizmati bor - har biri ozining 512MB xotirasiga ega. Ogir importlar
+// (EasyQuizzy .exe guruhlari) shu 5 tasi orasida AYLANTIRIB (round-robin)
+// taqsimlanadi - shunda haqiqatan parallel ishlaydi, bittasi xotira
+// tugatib qulasa ham qolganlari davom etadi. db_get/db_save/ai_check kabi
+// YENGIL sorovlar esa hamon FAQAT asosiy serverga boradi (o'zgarishsiz) -
+// ularni taqsimlashning keragi yoq.
+var RENDER_SERVERS=[
+  'https://edutest-server.onrender.com',
+  'https://edutest-server-2.onrender.com',
+  'https://edutest-server-3.onrender.com',
+  'https://edutest-server-4.onrender.com',
+  'https://edutest-server-5.onrender.com'
+];
+var _serverRR=0;
+function pickServer(){
+  var s=RENDER_SERVERS[_serverRR % RENDER_SERVERS.length];
+  _serverRR++;
+  return s;
+}
 
 function uniqueTopicName(base){
   var db=getDB();
@@ -3256,7 +3337,8 @@ async function importViaBrowser(data,msg){
   return false;
 }
 
-function sendToServer(file,msg){
+function sendToServer(file,msg,server){
+  server = server || RENDER_SERVER;
   var MAX_RETRIES=4; // jami 5 marta (1 + 4 qayta urinish) haqiqiy serverga - rasmlar bilan
   var RETRY_DELAYS=[5000,15000,30000,60000]; // 5s, 15s, 30s, 1 daqiqa - sekin-asta ko'proq kutamiz
   return attempt(0);
@@ -3269,7 +3351,7 @@ function sendToServer(file,msg){
         var dataUrl=fe.target.result;
         var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
         var xhr=new XMLHttpRequest();
-        xhr.open('POST',RENDER_SERVER+'/parse',true);
+        xhr.open('POST',server+'/parse',true);
         xhr.timeout=1800000;
         xhr.setRequestHeader('Content-Type','application/json');
         var retryNote=retryCount?(' ('+(retryCount+1)+'-urinish)'):'';
@@ -3423,12 +3505,12 @@ function importMultipleFiles(files,suggestedFolder){
   // serverga yuboramiz - shunda server imkoniyatidan maksimal foydalanib,
   // import sezilarli tezlashadi (avval faqat bitta guruh navbat bilan ishlar edi).
   var GROUP_SIZE=8;
-  // MUHIM: Render'ning "Free" tarifi atigi 512 MB xotira va 0.1 vCPU beradi.
-  // Har bir guruh serverda ozining LibreOffice jarayonini ishga tushiradi -
-  // bir nechtasi bir vaqtda ishlasa, xotira tugab (OOM) server qulab tushadi.
-  // Shuning uchun guruhlarni ENDI KETMA-KET (1 tadan) yuboramiz - sekinroq,
-  // lekin server qulab, hamma narsa qaytadan boshlanishidan koра barqaror.
-  var GROUP_CONCURRENCY=1; // bir vaqtda nechta guruh serverga yuborilishi
+  // MUHIM: avval Render "Free" tarifi (512 MB) atigi 1 ta guruhni bir vaqtda
+  // qabul qila olardi, aks holda xotira tugab (OOM) qulardi. Endi 5 ta
+  // ALOHIDA bepul server bor - har bir guruh BOSHQA serverga yuboriladi,
+  // shuning uchun 5 tagacha guruhni chindan HAM PARALLEL ishlatish mumkin -
+  // xotira muammosi yoq, chunki har biri ozining 512MB'iga ega.
+  var GROUP_CONCURRENCY=RENDER_SERVERS.length; // bir vaqtda nechta guruh (=server soni)
   var okTotal=0, errTotal=0, failedNames=[];
   function sleepMs(ms){return new Promise(function(res){setTimeout(res,ms);});}
 
@@ -3451,7 +3533,8 @@ function importMultipleFiles(files,suggestedFolder){
       msg.innerHTML='<div class="alt ai">'+(lines.length?lines.join('<br>'):'&#x23F3; Boshlanmoqda...')+'</div>';
     }
 
-    async function fallbackGroupAsync(group,gi){
+    async function fallbackGroupAsync(group,gi,server){
+      server = server || pickServer();
       // Shu guruhdagi fayllarni ozbeticha (lekin 3 tasini bir vaqtda) qayta yuboramiz
       var fidx=0;
       async function worker(){
@@ -3466,7 +3549,7 @@ function importMultipleFiles(files,suggestedFolder){
           var blob=new Blob([new Uint8Array(byteNums)]);
           blob.name=fd.filename;
           var msgProxy={set innerHTML(html){groupStatus[gi]='Guruh '+(gi+1)+': ('+(i+1)+'/'+group.length+') '+html.replace(/<[^>]+>/g,'');renderStatus();}};
-          var ok=await sendToServer(blob,msgProxy);
+          var ok=await sendToServer(blob,msgProxy,server);
           if(ok)okTotal++; else { errTotal++; failedNames.push(fd.filename); }
         }
       }
@@ -3477,11 +3560,13 @@ function importMultipleFiles(files,suggestedFolder){
 
     async function processOneGroup(gi){
       var group=groups[gi];
-      groupStatus[gi]='Guruh '+(gi+1)+'/'+groups.length+': serverga yuborilmoqda ('+group.length+' fayl)...';
+      var server=pickServer();
+      var serverLabel=server.replace('https://','').replace('.onrender.com','');
+      groupStatus[gi]='Guruh '+(gi+1)+'/'+groups.length+' ['+serverLabel+']: serverga yuborilmoqda ('+group.length+' fayl)...';
       renderStatus();
       var jobId;
       try{
-        var startRes=await fetch(RENDER_SERVER+'/parse_batch_start',{
+        var startRes=await fetch(server+'/parse_batch_start',{
           method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({files:group})
         }).then(function(r){return r.json();});
         if(startRes.error)throw new Error(startRes.error);
@@ -3489,7 +3574,7 @@ function importMultipleFiles(files,suggestedFolder){
       }catch(e){
         groupStatus[gi]='Guruh '+(gi+1)+': xatosi ('+e.message+'), birma-bir otkazilmoqda...';
         renderStatus();
-        await fallbackGroupAsync(group,gi);
+        await fallbackGroupAsync(group,gi,server);
         groupStatus[gi]='';renderStatus();
         return;
       }
@@ -3499,20 +3584,20 @@ function importMultipleFiles(files,suggestedFolder){
         if(pollCount>400){
           groupStatus[gi]='Guruh '+(gi+1)+': juda uzoq davom etdi, birma-bir otkazilmoqda...';
           renderStatus();
-          await fallbackGroupAsync(group,gi);
+          await fallbackGroupAsync(group,gi,server);
           groupStatus[gi]='';renderStatus();
           return;
         }
         var st;
         try{
-          st=await fetch(RENDER_SERVER+'/parse_batch_status/'+jobId).then(function(r){return r.json();});
+          st=await fetch(server+'/parse_batch_status/'+jobId).then(function(r){return r.json();});
         }catch(e){
           await sleepMs(3000); continue; // vaqtincha tarmoq xatosi - qayta urinamiz
         }
         if(st.error){
           groupStatus[gi]='Guruh '+(gi+1)+': xatosi ('+st.error+'), birma-bir otkazilmoqda...';
           renderStatus();
-          await fallbackGroupAsync(group,gi);
+          await fallbackGroupAsync(group,gi,server);
           groupStatus[gi]='';renderStatus();
           return;
         }
