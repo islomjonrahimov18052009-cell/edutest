@@ -890,10 +890,16 @@ function startDbPolling(){
   }, 20000);
 }
 
+// MUHIM: db_save/db_get (login, profil, natijalarni saqlash) ENDI alohida,
+// faqat shu ish uchun ajratilgan serverga (edutest-server-7) boradi - import
+// vaqtida boshqa serverlar formula/rasm qayta ishlash bilan band bolib
+// qolganda ham, ustoz/oquvchi kirish va malumot saqlash SEKINLAMASIN uchun.
+var DB_SERVER='https://edutest-server-7.onrender.com';
+
 async function sbPush(db) {
   if (!_sbReady) return;
   try {
-    var res = await fetch(RENDER_SERVER+'/db_save', {
+    var res = await fetch(DB_SERVER+'/db_save', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ value: JSON.stringify(db) })
@@ -905,7 +911,7 @@ async function sbPush(db) {
 async function sbPull() {
   if (!_sbReady) return null;
   try {
-    var res = await fetch(RENDER_SERVER+'/db_get');
+    var res = await fetch(DB_SERVER+'/db_get');
     if(!res.ok) return null;
     var data = await res.json();
     if (data && data.value) return JSON.parse(data.value);
@@ -3241,7 +3247,9 @@ var RENDER_SERVERS=[
   'https://edutest-server-4.onrender.com',
   'https://edutest-server-5.onrender.com',
   'https://edutest-server-1.onrender.com',
-  'https://edutest-server-6.onrender.com'
+  'https://edutest-server-6.onrender.com',
+  'https://edutest-server-8.onrender.com',
+  'https://edutest-server-9.onrender.com'
 ];
 var _serverRR=0;
 function pickServer(){
@@ -3513,7 +3521,16 @@ function importMultipleFiles(files,suggestedFolder){
   // hajmi fayllar soni va SERVERLAR SONIGA qarab avtomatik hisoblanadi -
   // shunda guruhlar soni serverlar sonidan kam bolmaydi (fayllar yetarli
   // bolsa), va barcha serverlar ishga tortiladi.
-  var GROUP_SIZE=Math.max(1, Math.min(8, Math.ceil(valid.length/RENDER_SERVERS.length)));
+  // MUHIM: avval GROUP_SIZE serverlar soniga qarab hisoblanardi - bu HAR
+  // BIR serverga ANIQ 1 ta guruh tegishini taminlardi. Lekin muammo:
+  // fayllardagi EMF/formula soni juda notekis (ba'zi faylda 300 ta, ba'zida
+  // 4000 ta!) - shuning uchun "1 server = 1 guruh" bolganda, ogir fayllar
+  // tushgan serverlar son marta band bolib qolar, boshqalari esa bosh
+  // turar edi. Endi guruh hajmi KICHIK va QATIY (2 fayl) - shunda kop
+  // guruh hosil bolib, aylanma taqsimlash bir necha MARTA barcha
+  // serverlar boylab aylanadi. Bu ogir va yengil fayllarni statistik
+  // jihatdan barcha serverlar orasida TEKISROQ aralashtirib yuboradi.
+  var GROUP_SIZE=2;
   // MUHIM: avval Render "Free" tarifi (512 MB) atigi 1 ta guruhni bir vaqtda
   // qabul qila olardi, aks holda xotira tugab (OOM) qulardi. Endi 5 ta
   // ALOHIDA bepul server bor - har bir guruh BOSHQA serverga yuboriladi,
