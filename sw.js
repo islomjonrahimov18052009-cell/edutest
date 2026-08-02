@@ -1,4 +1,4 @@
-const CACHE = 'edutest-v21';
+const CACHE = 'edutest-v22';
 const FILES = ['./', './index.html'];
 
 self.addEventListener('message', function(e){
