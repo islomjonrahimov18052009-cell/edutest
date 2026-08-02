@@ -3506,7 +3506,14 @@ function importMultipleFiles(files,suggestedFolder){
   // Fayllarni KICHIK GURUHLARGA bolib, BIR NECHTASINI BIR VAQTDA (parallel)
   // serverga yuboramiz - shunda server imkoniyatidan maksimal foydalanib,
   // import sezilarli tezlashadi (avval faqat bitta guruh navbat bilan ishlar edi).
-  var GROUP_SIZE=8;
+  // MUHIM: avval GROUP_SIZE qatiy 8 edi - agar fayllar soni serverlar
+  // sonidan kam guruh hosil qilsa (masalan 40 fayl / 8 = 5 guruh), aylanma
+  // taqsimlash FAQAT birinchi 5 ta serverga yetib borar, qolgan serverlar
+  // (masalan -1 va -6) hech qachon ish olmasdan bosh turar edi. Endi guruh
+  // hajmi fayllar soni va SERVERLAR SONIGA qarab avtomatik hisoblanadi -
+  // shunda guruhlar soni serverlar sonidan kam bolmaydi (fayllar yetarli
+  // bolsa), va barcha serverlar ishga tortiladi.
+  var GROUP_SIZE=Math.max(1, Math.min(8, Math.ceil(valid.length/RENDER_SERVERS.length)));
   // MUHIM: avval Render "Free" tarifi (512 MB) atigi 1 ta guruhni bir vaqtda
   // qabul qila olardi, aks holda xotira tugab (OOM) qulardi. Endi 5 ta
   // ALOHIDA bepul server bor - har bir guruh BOSHQA serverga yuboriladi,
