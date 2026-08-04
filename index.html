@@ -3231,15 +3231,23 @@ async function startBookGeneration(file, mode, count){
   }
 }
 
-var RENDER_SERVER='https://edutest-server.onrender.com';
+// MUHIM: bu server FAQAT yengil, tez-tez keladigan sorovlar uchun -
+// db_get, db_save, ai_check va login/royxatdan otish (bularning barchasi
+// getDB()/saveDB() orqali ishlaydi). Bu ATAYLAB import-pool'dan (pastdagi
+// RENDER_SERVERS) ALOHIDA server - chunki avval ular BIR XIL server edi va
+// og'ir .exe import ishlab turganda (LibreOffice band bolganda) foydalanuvchi
+// tizimga kira olmay qolar edi (login/profil ochilmay qolardi). Endi
+// import qancha og'ir bolmasin, login/profil doim tez ishlaydi.
+var RENDER_SERVER='https://edutest-server-7.onrender.com';
 // 1400+ rasm/formula import qilinganda BITTA (512MB) bepul server yetishmay
-// qolgan edi (xotira tugab OOM bolar edi). Endi 5 ta ALOHIDA bepul Render
+// qolgan edi (xotira tugab OOM bolar edi). Endi 10 ta ALOHIDA bepul Render
 // xizmati bor - har biri ozining 512MB xotirasiga ega. Ogir importlar
-// (EasyQuizzy .exe guruhlari) shu 5 tasi orasida AYLANTIRIB (round-robin)
+// (EasyQuizzy .exe guruhlari) shu 10 tasi orasida AYLANTIRIB (round-robin)
 // taqsimlanadi - shunda haqiqatan parallel ishlaydi, bittasi xotira
 // tugatib qulasa ham qolganlari davom etadi. db_get/db_save/ai_check kabi
-// YENGIL sorovlar esa hamon FAQAT asosiy serverga boradi (o'zgarishsiz) -
-// ularni taqsimlashning keragi yoq.
+// YENGIL sorovlar esa yuqoridagi ALOHIDA (edutest-server-7) serverga
+// boradi - bu ikkalasi ATAYLAB turli serverlar, chunki og'ir import
+// yengil (login/profil) sorovlarni bloklab qoymasligi kerak.
 var RENDER_SERVERS=[
   'https://edutest-server.onrender.com',
   'https://edutest-server-2.onrender.com',
@@ -3249,7 +3257,8 @@ var RENDER_SERVERS=[
   'https://edutest-server-1.onrender.com',
   'https://edutest-server-6.onrender.com',
   'https://edutest-server-8.onrender.com',
-  'https://edutest-server-9.onrender.com'
+  'https://edutest-server-9.onrender.com',
+  'https://edutest-server-10.onrender.com'
 ];
 var _serverRR=0;
 function pickServer(){
@@ -3504,6 +3513,11 @@ function importMultipleFiles(files,suggestedFolder){
   if(folderName===null)return; // bekor qilindi
   folderName=folderName.trim()||'Kitob';
   _pendingImportFolder=folderName;
+
+  // Import boshlanishi bilan darhol BARCHA import-serverlarni parallel
+  // uygotamiz - shunda ular birinchi haqiqiy fayl kelguncha allaqachon
+  // tayyor boladi (cold-start kechikishi keyingi bosqichlarga qoshilmaydi)
+  warmUpImportServers();
 
   msg.innerHTML='<div class="alt ai">&#x23F3; '+valid.length+' ta fayl oqilmoqda...'+unsupportedNote+'</div>';
 
@@ -4168,19 +4182,33 @@ if(document.readyState==='loading'){
 }
 
 // ── SERVERLARNI "UYGOQ" TUTISH ──────────────────────────────────────────
-// Render bepul tarifi ~15 daqiqa harakatsizlikdan keyin serverni uxlatib
-// qoyadi, keyingi sorov ~30-60 soniya "uygonish" vaqtini talab qiladi. Sayt
-// ochiq turgan paytda barcha serverlarga har 10 daqiqada yengil /health
-// sorovi yuborib, ularni uxlashga qoymaymiz. MUHIM: bu faqat KIMDIR saytni
-// ochib turgan paytda ishlaydi - hech kim ochmagan paytda ham 24/7 uygoq
-// tutish uchun UptimeRobot kabi tashqi xizmat kerak (alohida sozlanadi).
+// MUHIM (2026-08-04'da ozgartirildi): Avval BARCHA 9 ta import-server har
+// 10 daqiqada pinglanardi - bu Render'ning 750 soat/oy bepul limitini
+// juda tez tugatib qoyayotgan edi (chunki bu 8 ta serverning 7-8 tasi
+// import PAYTIDAGINA kerak, lekin ular kun boyi - sayt ochiq turgan har bir
+// foydalanuvchi uchun - uyg'oq tutilardi). Endi faqat ASOSIY server
+// (db_get/db_save/ai_check ishlaydigan, RENDER_SERVER) background'da
+// uygoq tutiladi - u doim kerak, chunki foydalanuvchilar istalgan vaqtda
+// tizimga kirishi mumkin. Qolgan import-serverlar endi faqat IMPORT
+// BOSHLANGANDA (warmUpImportServers() orqali) "uyg'otiladi" - qarang
+// pastda, importMultipleFiles() ichida chaqiriladi.
 function pingServersKeepAlive(){
+  fetch(RENDER_SERVER+'/health').catch(function(){});
+}
+setInterval(pingServersKeepAlive, 10*60*1000); // har 10 daqiqada
+pingServersKeepAlive(); // sahifa ochilganda ham darhol bir marta
+
+// Import boshlanishidan oldin BARCHA import-serverlarni PARALLEL
+// "uyg'otish" - shunda ular birinchi haqiqiy so'rovga qadar allaqachon
+// uygongan boladi (cold-start 50 soniyasi import umumiy vaqtiga qoshilib
+// ketmaydi). Bu funksiya faqat CHAQIRILGAN payida ishlaydi (doimiy fon
+// jarayoni emas) - shuning uchun compute-hours faqat haqiqiy import
+// vaqtida sarflanadi.
+function warmUpImportServers(){
   RENDER_SERVERS.forEach(function(s){
     fetch(s+'/health').catch(function(){});
   });
 }
-setInterval(pingServersKeepAlive, 10*60*1000); // har 10 daqiqada
-pingServersKeepAlive(); // sahifa ochilganda ham darhol bir marta
 
 sbInit();
 // Bulutdan malumot orqa fonda tortib olinadi - foydalanuvchiga korinmaydi.
