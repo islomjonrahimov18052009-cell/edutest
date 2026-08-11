@@ -3193,7 +3193,13 @@ async function startBookGeneration(file, mode, count){
       r.readAsDataURL(file);
     });
     var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
-    var startRes=await fetch(IMPORT_SERVER+'/generate_test_start',{
+    // MUHIM: job_id serverga XOS (faqat o'sha VM'ning xotirasida saqlanadi),
+    // shuning uchun start va status so'rovlari ALBATTA bir xil serverga
+    // borishi kerak - shu sabab pickServer() BIR MARTA chaqirilib, natija
+    // o'zgaruvchiga saqlanadi (har safar qayta chaqirilsa, round-robin
+    // keyingi VM'ga o'tib ketib, "job not found" xatosiga olib kelardi).
+    var server=pickServer();
+    var startRes=await fetch(server+'/generate_test_start',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({data:base64, filename:file.name, mode:mode, total_questions:count})
     }).then(function(r){return r.json();});
@@ -3205,7 +3211,7 @@ async function startBookGeneration(file, mode, count){
       if(pollCount>300){ msg.innerHTML='<div class="alt ar">&#x274C; Juda uzoq davom etdi, qaytadan urinib koring.</div>'; return; }
       await new Promise(function(res){setTimeout(res,3000);});
       var st;
-      try{ st=await fetch(IMPORT_SERVER+'/generate_test_status/'+jobId).then(function(r){return r.json();}); }
+      try{ st=await fetch(server+'/generate_test_status/'+jobId).then(function(r){return r.json();}); }
       catch(e){ continue; }
       if(st.error){ msg.innerHTML='<div class="alt ar">&#x274C; '+st.error+'</div>'; return; }
       if(st.status==='processing'){ msg.innerHTML='<div class="alt ai">&#x23F3; '+(st.progress||'ishlanmoqda...')+'</div>'; continue; }
@@ -3240,20 +3246,27 @@ async function startBookGeneration(file, mode, count){
 // import qancha og'ir bolmasin, login/profil doim tez ishlaydi.
 var RENDER_SERVER='https://edutest-server-7.onrender.com';
 // 2026-08-09: import-server pool (avval 10 ta alohida bepul Render xizmati,
-// round-robin bilan) endi BUTUNLAY OLIB TASHLANDI va ORNIGA bitta Oracle
-// Cloud Always Free VM (Docker+LibreOffice, Nginx+Let's Encrypt SSL bilan
-// HTTPS'ga chiqarilgan) ishlatiladi. Sabab: Render'ning 750 soat/oy bepul
-// limiti va 512MB/instance xotira cheklovi, ko'p instance boshqarish
-// murakkabligi. Oracle VM ozi 1 ta (Micro shape, ~1GB RAM + 4GB swap),
-// shuning uchun round-robin/parallel-server mantigi endi kerak emas -
-// pickServer() shunchaki doim shu bitta manzilni qaytaradi. RENDER_SERVER
-// (=edutest-server-7) ozgarishsiz qoladi - u FAQAT db_get/db_save/ai_check
-// (login, profil, natija saqlash) uchun ishlatiladi, import bilan bogliq
-// emas, shuning uchun Oracle'ga kochirilmadi.
-var IMPORT_SERVER='https://edutest-oracle.duckdns.org';
-var RENDER_SERVERS=[IMPORT_SERVER]; // orqaga moslik uchun massiv shaklida qoldirilgan (GROUP_CONCURRENCY va warmUpImportServers shundan foydalanadi)
+// round-robin bilan) BUTUNLAY OLIB TASHLANDI va ORNIGA Oracle Cloud Always
+// Free VM(lar) (Docker+LibreOffice, Nginx+Let's Encrypt SSL bilan HTTPS'ga
+// chiqarilgan) ishlatiladi. RENDER_SERVER (=edutest-server-7) ozgarishsiz
+// qoladi - u FAQAT db_get/db_save/ai_check (login, profil, natija saqlash)
+// uchun ishlatiladi, import bilan bogliq emas, shuning uchun Oracle'ga
+// kochirilmadi.
+// 2026-08-11: IKKINCHI Oracle VM (edutest-oracle-2) qoshildi - endi ikkala
+// VM orasida ROUND-ROBIN qilinadi (pickServer() har chaqirilganda navbat
+// bilan keyingi serverni qaytaradi). Har ikkala VM bir xil Docker image
+// (shu repodagi Dockerfile) va bir xil sozlamalar (4GB swap, Nginx,
+// Certbot SSL) bilan ishlaydi - VM sozlash tarixi va uchragan xatolar
+// (OCI route-table bug, nginx default_server/IPv6 masalasi va h.k.)
+// uchun edutest-pro skill faylining Changelog bolimiga qarang.
+var IMPORT_SERVER='https://edutest-oracle.duckdns.org';      // VM1
+var IMPORT_SERVER_2='https://edutest-oracle-2.duckdns.org';  // VM2
+var RENDER_SERVERS=[IMPORT_SERVER,IMPORT_SERVER_2]; // round-robin pool - pickServer() va warmUpImportServers shundan foydalanadi
+var _serverIdx=0;
 function pickServer(){
-  return IMPORT_SERVER;
+  var s=RENDER_SERVERS[_serverIdx % RENDER_SERVERS.length];
+  _serverIdx++;
+  return s;
 }
 
 function uniqueTopicName(base){
@@ -3346,7 +3359,7 @@ async function importViaBrowser(data,msg){
 }
 
 function sendToServer(file,msg,server){
-  server = server || IMPORT_SERVER;
+  server = server || pickServer();
   var MAX_RETRIES=4; // jami 5 marta (1 + 4 qayta urinish) haqiqiy serverga - rasmlar bilan
   var RETRY_DELAYS=[5000,15000,30000,60000]; // 5s, 15s, 30s, 1 daqiqa - sekin-asta ko'proq kutamiz
   return attempt(0);
@@ -3534,13 +3547,15 @@ function importMultipleFiles(files,suggestedFolder){
   // serverlar boylab aylanadi. Bu ogir va yengil fayllarni statistik
   // jihatdan barcha serverlar orasida TEKISROQ aralashtirib yuboradi.
   var GROUP_SIZE=2;
-  // 2026-08-09: endi FAQAT bitta Oracle server bor (IMPORT_SERVER), Render
-  // pool'i olib tashlandi - shuning uchun guruhlarni parallel emas, KETMA-KET
-  // (GROUP_CONCURRENCY=1) yuboramiz. Oracle VM kichik (Micro, ~1GB RAM+4GB
-  // swap) bolgani uchun bir nechta LibreOffice jarayonini bir vaqtda
-  // ishlatish OOM xavfini oshiradi - app.py'dagi BATCH/CHUNK sozlamalari
-  // ham shu yagona-server holatiga moslab qayta korilishi tavsiya etiladi.
-  var GROUP_CONCURRENCY=1;
+  // 2026-08-11: ENDI 2 ta mustaqil Oracle VM bor (IMPORT_SERVER,
+  // IMPORT_SERVER_2), shuning uchun 2 ta guruhni PARALLEL yuborish
+  // xavfsiz - har biri ozining alohida VM'ida (alohida LibreOffice
+  // jarayonida) ishlaydi, bitta VM ichida bir nechta jarayon bir vaqtda
+  // ishlamaydi (OOM xavfi yoq). GROUP_CONCURRENCY VM sonidan OSHMASLIGI
+  // kerak - aks holda bitta VM'ga 2 ta guruh bir vaqtda tushib, avvalgi
+  // OOM muammosi qaytadi. Yangi VM qoshilsa, RENDER_SERVERS massiviga
+  // qoshish YETARLI - bu son avtomatik moslashadi.
+  var GROUP_CONCURRENCY=RENDER_SERVERS.length;
   var okTotal=0, errTotal=0, failedNames=[];
   function sleepMs(ms){return new Promise(function(res){setTimeout(res,ms);});}
 
@@ -3704,7 +3719,7 @@ function sendDocumentToServer(file){
     reader.onload=function(e){
       var dataUrl=e.target.result;
       var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
-      fetch(IMPORT_SERVER+'/parse_document', {
+      fetch(pickServer()+'/parse_document', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({data:base64, filename:file.name})
@@ -3763,7 +3778,7 @@ function sendImageToServer(file){
     reader.onload=function(e){
       var dataUrl=e.target.result;
       var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
-      fetch(IMPORT_SERVER+'/parse_image', {
+      fetch(pickServer()+'/parse_image', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({data:base64, filename:file.name})
@@ -4195,11 +4210,12 @@ pingServersKeepAlive(); // sahifa ochilganda ham darhol bir marta
 // jarayoni emas) - shuning uchun compute-hours faqat haqiqiy import
 // vaqtida sarflanadi.
 function warmUpImportServers(){
-  // Endi bitta Oracle server bor - u doim VM'da yonib turibdi (Render'dagi
-  // kabi "sovuq boshlanish"/uyqu holati yoq), lekin baribir /health chaqirib,
-  // birinchi haqiqiy import so'rovidan oldin server javob berayotganini
-  // tekshirib qoyamiz.
-  fetch(IMPORT_SERVER+'/health').catch(function(){});
+  // Oracle VM'lar doim yonib turadi (Render'dagi kabi "sovuq boshlanish"/uyqu
+  // holati yoq), lekin baribir har BIR VM'ga /health chaqirib, birinchi
+  // haqiqiy import so'rovidan oldin ikkalasi ham javob berayotganini
+  // tekshirib qoyamiz (bitta VM vaqtincha tushib qolgan bolsa, buni tez
+  // aniqlash uchun ham foydali).
+  RENDER_SERVERS.forEach(function(s){ fetch(s+'/health').catch(function(){}); });
 }
 
 sbInit();
