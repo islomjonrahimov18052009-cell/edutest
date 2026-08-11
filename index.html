@@ -391,6 +391,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <h2 id="r-title" style="margin-bottom:5px"></h2>
     <p class="ts tm" id="r-sub"></p>
     <div id="r-synote" class="alt aw" style="margin:12px auto;max-width:380px;display:none">&#x1F9EA; Sinov rejimi - natija saqlanmadi</div>
+    <div id="r-syncnote" class="alt" style="margin:12px auto;max-width:420px;display:none"></div>
     <div class="fx center fxw" style="margin-top:14px;gap:8px">
       <button class="btn bp" onclick="showPg('pg-topic');loadMyHist()">&#x1F504; Yana test</button>
       <button class="btn bg bsm" onclick="toggleDetail()">&#x1F4CB; Batafsil</button>
@@ -514,6 +515,12 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="card" id="usage-card">
       <div class="ch"><h3 style="margin:0">&#x1F4CA; Oylik imkoniyatingiz</h3><span class="bdg bpu2" id="usage-plan-badge">Bepul</span></div>
       <div id="usage-body"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">&#x1F514; Bildirishnomalar</h3>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Yoqilsa, o'quvchi imtihon topshirganda (hattaki internet uzilib, keyin tiklanganda ham) shu qurilmangizga darhol xabar keladi.</p>
+      <button class="btn bpu bsm" onclick="subscribeTeacherPush()">&#x1F514; Bildirishnomalarni yoqish</button>
+      <div id="push-msg"></div>
     </div>
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F3AF; Imtihon rejimi</h3>
@@ -878,13 +885,21 @@ function startDbPolling(){
   if(_dbPollTimer) return;
   _dbPollTimer=setInterval(async function(){
     try{
+      // Test yechilayotgan bolsa, hech narsaga tegmaymiz - internet
+      // muammosi test jarayonini butunlay chetlab otishi kerak.
+      if(S.mode) return;
       var remote=await sbPull();
-      if(!remote) return;
+      if(!remote){ markConnLost(); return; }
+      markConnOk();
+      flushPendingSync(); // navbatda kutayotgan (offline) natijalar bolsa - shu yerda ham urinib koramiz
       var local=localGetDB();
       if((remote.v||0) > (local.v||0)){
         localStorage.setItem(SK, JSON.stringify(remote));
-        if(document.getElementById('pg-results') && document.getElementById('pg-results').style.display !== 'none') renderResults();
-        if(document.getElementById('pg-progress') && document.getElementById('pg-progress').style.display !== 'none') renderProgress();
+        // Ustoz "Natijalar" tabida bolsa - jadval avtomatik yangilanadi
+        if(ME && ME.role==='teacher' && document.getElementById('tc-r') && document.getElementById('tc-r').classList.contains('on')) { loadResults(); }
+        // Admin "Natijalar" tabida bolsa - xuddi shunday
+        if(ME && ME.role==='admin' && document.getElementById('ta-r') && document.getElementById('ta-r').classList.contains('on')) { renderAdminResults(); }
+        if(ME && ME.role==='admin' && document.getElementById('ta-o') && document.getElementById('ta-o').classList.contains('on')) { renderAdminOverview(); }
       }
     }catch(e){}
   }, 20000);
@@ -897,26 +912,172 @@ function startDbPolling(){
 var DB_SERVER='https://edutest-server-7.onrender.com';
 
 async function sbPush(db) {
-  if (!_sbReady) return;
+  if (!_sbReady) return false;
   try {
     var res = await fetch(DB_SERVER+'/db_save', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ value: JSON.stringify(db) })
     });
-    if(!res.ok){ console.error('Server push xato (kod: '+res.status+')'); }
-  } catch(e) { console.error('Server push xato (malumot juda katta bolishi yoki server band bolishi mumkin):', e); }
+    if(!res.ok){ console.error('Server push xato (kod: '+res.status+')'); markConnLost(); return false; }
+    markConnOk();
+    return true;
+  } catch(e) { console.error('Server push xato (malumot juda katta bolishi yoki server band bolishi mumkin):', e); markConnLost(); return false; }
 }
 
 async function sbPull() {
   if (!_sbReady) return null;
   try {
     var res = await fetch(DB_SERVER+'/db_get');
-    if(!res.ok) return null;
+    if(!res.ok){ markConnLost(); return null; }
+    markConnOk();
     var data = await res.json();
     if (data && data.value) return JSON.parse(data.value);
-  } catch(e) {}
+  } catch(e) { markConnLost(); }
   return null;
+}
+
+// ─── ULANISH BANNERI (online/offline) ──────────────────────────────────────
+// MUHIM: test yechilayotganda (S.mode to'ldirilgan bolsa) bu banner HECH
+// QACHON korsatilmaydi - talab shunday: test jarayoni internetga bogliq
+// bolmasligi, o'quvchini chalgitmasligi kerak. Banner faqat "oddiy" holatda
+// (ustoz/admin panelida, yoki test tashqarisida) korinadi.
+function ensureConnBanner(){
+  var el=document.getElementById('conn-banner');
+  if(el) return el;
+  el=document.createElement('div');
+  el.id='conn-banner';
+  el.style.cssText='display:none;position:fixed;top:0;left:0;right:0;z-index:999;background:#b91c1c;color:#fff;text-align:center;padding:9px 14px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+  el.textContent='\u26A0\uFE0F Internet aloqasi yoq - Wi-Fi yoki mobil internetni yoqing';
+  document.body.appendChild(el);
+  return el;
+}
+var _connLost=false;
+function markConnLost(){
+  if(_connLost) return;
+  _connLost=true;
+  if(S.mode) return; // test paytida hech narsa korsatilmaydi
+  ensureConnBanner().style.display='block';
+}
+function markConnOk(){
+  if(!_connLost) return;
+  _connLost=false;
+  var el=document.getElementById('conn-banner');
+  if(el) el.style.display='none';
+  flushPendingSync();
+}
+window.addEventListener('offline', function(){ markConnLost(); });
+window.addEventListener('online', function(){ markConnOk(); });
+document.addEventListener('DOMContentLoaded', function(){
+  if(navigator.onLine===false) markConnLost();
+});
+
+// ─── OFFLINE IMTIHON NATIJALARI NAVBATI ────────────────────────────────────
+// Imtihon (exam) tugaganda internet bolmasa - natija baribir LOKAL saqlanadi
+// (localStorage, darhol), lekin serverga ("bulutga") yuborilmagan deb
+// belgilanadi. Internet tiklanganda (online event, keyingi poll, yoki
+// sahifa qayta ochilganda) avtomatik qayta urinib yuboriladi. O'quvchi
+// ilovadan chiqib ketgan bolsa ham - keyingi safar shu qurilmada ochganda
+// yoki fonda hali ochiq bolgan tab orqali baribir yuborilishga harakat
+// qilinadi (localStorage saqlanib qoladi, hech narsa yoqolmaydi).
+var PENDING_KEY='edutest_pending_sync';
+function getPendingSync(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY)||'[]'); }catch(e){ return []; } }
+function setPendingSync(arr){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(arr)); }catch(e){} }
+function queuePendingResult(resultId){
+  var p=getPendingSync();
+  if(p.indexOf(resultId)<0){ p.push(resultId); setPendingSync(p); }
+}
+var _flushingSync=false;
+async function flushPendingSync(){
+  if(_flushingSync) return;
+  var pending=getPendingSync();
+  if(!pending.length) return;
+  _flushingSync=true;
+  try{
+    var db=getDB();
+    var ok=await sbPush(db);
+    if(ok){
+      pending.forEach(function(rid){
+        var r=(db.results||[]).find(function(x){return x.id===rid;});
+        if(r) notifyResultToTeacher(r, true);
+      });
+      setPendingSync([]);
+    }
+  }catch(e){}
+  _flushingSync=false;
+}
+// Sahifa har ochilganda (o'quvchi ilovani yopib, keyin qayta ochsa ham)
+// avval kutilayotgan natijalarni yuborishga urinamiz.
+setTimeout(function(){ flushPendingSync(); }, 1500);
+// Zaxira: 'online' event ba'zi qurilmalarda ishonchli kelmasligi mumkin -
+// shuning uchun har 25 soniyada ham qoshimcha tekshirib turamiz.
+setInterval(flushPendingSync, 25000);
+
+// ─── PUSH BILDIRISHNOMA (ustozga) ──────────────────────────────────────────
+function urlBase64ToUint8Array(base64String){
+  var padding='='.repeat((4-base64String.length%4)%4);
+  var base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  var raw=atob(base64), out=new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+async function subscribeTeacherPush(){
+  var msgEl=document.getElementById('push-msg');
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    if(msgEl) msgEl.innerHTML='<div class="alt ar mt8">Bu brauzer push bildirishnomani qollab-quvvatlamaydi.</div>';
+    return;
+  }
+  try{
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){
+      if(msgEl) msgEl.innerHTML='<div class="alt aw mt8">Bildirishnoma ruxsati berilmadi.</div>';
+      return;
+    }
+    var reg=await navigator.serviceWorker.ready;
+    var keyRes=await fetch(DB_SERVER+'/vapid_public_key').then(function(r){return r.json();});
+    if(!keyRes.key){ if(msgEl) msgEl.innerHTML='<div class="alt ar mt8">Server bildirishnoma uchun sozlanmagan.</div>'; return; }
+    var sub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey: urlBase64ToUint8Array(keyRes.key)
+    });
+    var db=getDB();
+    db.pushSubs=(db.pushSubs||[]).filter(function(s){return s.subscription && s.subscription.endpoint!==sub.endpoint;});
+    db.pushSubs.push({teacherId:ME.id, subscription: sub.toJSON()});
+    saveDB(db);
+    if(msgEl) msgEl.innerHTML='<div class="alt as mt8">\u2705 Bildirishnomalar yoqildi! Yangi imtihon natijalari kelganda xabar berasiz.</div>';
+  }catch(e){
+    if(msgEl) msgEl.innerHTML='<div class="alt ar mt8">Xato: '+e.message+'</div>';
+  }
+}
+async function notifyResultToTeacher(res, wasOffline){
+  try{
+    var db=getDB();
+    var tq=(db.userQs||[]).find(function(q){return q.topic===res.topic;});
+    var teacherId=tq?tq.teacherId:null;
+    if(!teacherId) return;
+    var title = wasOffline ? '\u26A0\uFE0F Kechiktirilgan natija keldi' : '\uD83D\uDCCA Yangi imtihon natijasi';
+    var body = res.student+' ('+(res.cls||'')+') - '+res.topic+' - '+res.pct+'%'+(wasOffline?' (internetsiz topshirilgan, endi tekshirsa boladi)':'');
+    fetch(DB_SERVER+'/notify_teacher', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({teacherId:teacherId, title:title, body:body, url:'./'})
+    }).catch(function(){});
+  }catch(e){}
+}
+
+// ─── TEST BOSHLANISHIDA RASMLARNI OLDINDAN KESHLASH (offline uchun) ────────
+// Shunda test davomida internet ochib qolsa ham, savol/javob rasmlari
+// allaqachon qurilmada saqlangan bolib, korsatilishda davom etadi.
+function precacheTestImages(qs){
+  try{
+    if(!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+    var urls=[];
+    qs.forEach(function(q){
+      if(isImgVal(q.img)) urls.push(imgSrcVal(q.img));
+      (q.options||[]).forEach(function(o){ if(isImgVal(o)) urls.push(imgSrcVal(o)); });
+    });
+    urls=urls.filter(function(u){return u.indexOf('http')===0;});
+    if(urls.length) navigator.serviceWorker.controller.postMessage({type:'CACHE_IMAGES', urls:urls});
+  }catch(e){}
 }
 
 // ─── LOCAL DB ─────────────────────────────────────────────────────────────────
@@ -1828,6 +1989,8 @@ function startTest(mode){
     if(q.optImages){orig.forEach(function(opt,oi){var ni=sh.indexOf(opt);if(q.optImages[String(oi)])newOptImg[String(ni)]=q.optImages[String(oi)];});}
     return Object.assign({},q,{options:sh,shuffledCorrect:nc,optImages:Object.keys(newOptImg).length?newOptImg:q.optImages});
   });
+  precacheTestImages(qs);
+  var _cb=document.getElementById('conn-banner'); if(_cb) _cb.style.display='none';
   S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;_visWarnCount=0;_blurWarnCount=0;S._blurWarnPending=false;_logoutWarned=false;_ignoreBlur=false;history.pushState(null,'',location.href);
   // To'liq ekran rejimi
   var el=document.documentElement;
@@ -1921,7 +2084,7 @@ function closeFinishModal(){
 function confirmFinishTest(){
   submitTest(true);
 }
-function doSubmitTest(){
+async function doSubmitTest(){
   if(S.iv)clearInterval(S.iv);_backWarned=false;
   // To'liq ekrandan chiqish - faqat haqiqatan fullscreen bolsa
   if(document.fullscreenElement||document.webkitFullscreenElement){
@@ -1933,11 +2096,43 @@ function doSubmitTest(){
   var pct=Math.round(correct/S.test.length*100);
   var res={id:'res'+Date.now()+'_'+Math.random().toString(36).slice(2,8),student:ME.name,cls:ME.cls,topic:selTopic,mode:S.mode,correct:correct,total:S.test.length,pct:pct,date:new Date().toLocaleDateString('uz-UZ'),time:new Date().toLocaleTimeString('uz-UZ'),details:details};
   S.lastRes=res;
-  if(S.mode==='exam'){var db=getDB();db.results.push(res);saveDB(db);}
+  var isExam=(S.mode==='exam');
+  if(isExam){
+    // MUHIM: avval HAR DOIM lokal (qurilmada) saqlaymiz - internet bormi
+    // yoqmi, bundan qatiy nazar natija hech qachon yoqolmaydi.
+    var db=getDB();
+    db.results.push(res);
+    db.v=(db.v||0)+1;
+    try{ localStorage.setItem(SK, JSON.stringify(db)); }catch(e){}
+  }
   S.mode='';S._blurWarnPending=false;
-  showResult(res);showPg('pg-res');
+  // Natija ekranini DARHOL korsatamiz (internetni kutib turmaymiz) -
+  // "sinxronlanmoqda" holati fonda tekshiriladi va banner shu asosda
+  // yangilanadi.
+  showResult(res, isExam?'checking':null);showPg('pg-res');
+  if(isExam){
+    sbPush(getDB()).then(function(ok){
+      if(ok){ notifyResultToTeacher(res,false); updateSyncBanner('synced'); }
+      else { queuePendingResult(res.id); updateSyncBanner('offline'); }
+    });
+  }
 }
-function showResult(r){
+function updateSyncBanner(state){
+  var el=document.getElementById('r-syncnote');
+  if(!el) return;
+  if(state==='checking'){
+    el.className='alt ai'; el.style.display='block';
+    el.innerHTML='&#x23F3; Natija serverga yuborilmoqda...';
+  } else if(state==='synced'){
+    el.className='alt as'; el.style.display='block';
+    el.innerHTML='&#x2705; Natija saqlandi va ustozga yuborildi.';
+    setTimeout(function(){ if(el) el.style.display='none'; },4000);
+  } else if(state==='offline'){
+    el.className='alt ar'; el.style.display='block';
+    el.innerHTML='&#x26A0;&#xFE0F; Internet ishlamayapti - natijangiz qurilmada saqlandi. Internet tiklangach avtomatik yuboriladi, shundan keyin ustoz tekshira oladi.';
+  }
+}
+function showResult(r,syncState){
   var passed=r.pct>=70,col=passed?'#16a34a':r.pct>=50?'#d97706':'#dc2626';
   var ring=document.getElementById('r-ring');
   ring.style.borderColor=col;
@@ -1948,6 +2143,7 @@ function showResult(r){
   document.getElementById('r-title').textContent=titles[Math.floor(Math.random()*titles.length)];
   document.getElementById('r-sub').textContent=r.student+' - '+r.cls+' - '+r.topic;
   document.getElementById('r-synote').style.display=r.mode==='practice'?'block':'none';
+  if(syncState) updateSyncBanner(syncState); else { var sn=document.getElementById('r-syncnote'); if(sn) sn.style.display='none'; }
   // Doira animatsiyasi bilan paydo bo'ladi
   setTimeout(function(){
     ring.style.transition='transform .5s cubic-bezier(.34,1.56,.64,1),opacity .4s';
