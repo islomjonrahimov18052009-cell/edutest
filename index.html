@@ -190,6 +190,12 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   <div class="logo">&#x1F4DA; EduTest Pro</div>
   <div class="nav-r">
     <span id="nav-user" style="font-weight:600;opacity:.9"></span>
+    <div style="position:relative;display:none" id="notif-bell-wrap">
+      <button class="btn bsm" id="notif-bell-btn" style="background:rgba(255,255,255,.14);color:#fff;position:relative" onclick="toggleNotifDropdown()">
+        &#x1F514;<span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#e11d48;color:#fff;font-size:10px;font-weight:800;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 3px">0</span>
+      </button>
+      <div id="notif-dropdown" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:320px;max-width:88vw;max-height:420px;overflow-y:auto;background:#fff;color:var(--txt);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);z-index:500;padding:8px"></div>
+    </div>
     <button class="btn bsm" id="btn-install" style="display:none;background:#fff;color:#6C3EF4;font-weight:700;margin-right:4px" onclick="installApp()">&#x2B07; O'rnatish</button>
     <button class="btn bwh bsm" id="btn-out" style="display:none" onclick="safeLogout()">Chiqish</button>
   </div>
@@ -518,8 +524,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     </div>
     <div class="card">
       <h3 style="margin-bottom:8px">&#x1F514; Bildirishnomalar</h3>
-      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Yoqilsa, o'quvchi imtihon topshirganda (hattaki internet uzilib, keyin tiklanganda ham) shu qurilmangizga darhol xabar keladi.</p>
-      <button class="btn bpu bsm" onclick="subscribeTeacherPush()">&#x1F514; Bildirishnomalarni yoqish</button>
+      <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Yangi natijalar haqidagi xabarlar yuqoridagi &#x1F514; belgisida (ilova ichida) har doim korinadi. Qoshimcha ravishda, brauzer push'ni yoqsangiz - ilova yopiq bolsa ham qurilmangizga darhol xabar keladi (hattaki o'quvchi internetsiz topshirib, keyin internet tiklanganda ham).</p>
+      <button class="btn bpu bsm" onclick="subscribeTeacherPush()">&#x1F514; Brauzer bildirishnomasini yoqish</button>
       <div id="push-msg"></div>
     </div>
     <div class="card">
@@ -895,6 +901,7 @@ function startDbPolling(){
       var local=localGetDB();
       if((remote.v||0) > (local.v||0)){
         localStorage.setItem(SK, JSON.stringify(remote));
+        renderNotifBell();
         // Ustoz "Natijalar" tabida bolsa - jadval avtomatik yangilanadi
         if(ME && ME.role==='teacher' && document.getElementById('tc-r') && document.getElementById('tc-r').classList.contains('on')) { loadResults(); }
         // Admin "Natijalar" tabida bolsa - xuddi shunday
@@ -1057,12 +1064,88 @@ async function notifyResultToTeacher(res, wasOffline){
     if(!teacherId) return;
     var title = wasOffline ? '\u26A0\uFE0F Kechiktirilgan natija keldi' : '\uD83D\uDCCA Yangi imtihon natijasi';
     var body = res.student+' ('+(res.cls||'')+') - '+res.topic+' - '+res.pct+'%'+(wasOffline?' (internetsiz topshirilgan, endi tekshirsa boladi)':'');
+    // Ilova ICHIDAGI bildirishnoma - push ruxsat berilmagan/hali obuna
+    // bolmagan ustozlar uchun ham ishlaydi, chunki bu oddiy DB yozuvi.
+    var db2=getDB();
+    addNotification(db2, teacherId, title, body);
+    saveDB(db2);
+    // Brauzer push - agar ustoz oldin obuna bolgan bolsa, qurilmasiga darhol keladi.
     fetch(DB_SERVER+'/notify_teacher', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({teacherId:teacherId, title:title, body:body, url:'./'})
     }).catch(function(){});
   }catch(e){}
 }
+
+// ─── ILOVA ICHIDAGI BILDIRISHNOMA MARKAZI ──────────────────────────────────
+// Push (brauzer) bildirishnoma ruxsatga va obunaga bogliq, shuning uchun
+// har doim ishlayvermaydi. Shu sabab HAR BIR muhim hodisa (ustoz tasdiqlandi,
+// yangi natija keldi) baza ichida db.notifications[] sifatida ham saqlanadi -
+// foydalanuvchi keyingi safar tizimga kirganda yoki panelni yangilaganda
+// qongiroq belgisida korinadi, push kelmagan bolsa ham.
+function addNotification(db, userId, title, body){
+  db.notifications=db.notifications||[];
+  db.notifications.push({id:'n'+Date.now()+'_'+Math.random().toString(36).slice(2,7), userId:userId, title:title, body:body, date:Date.now(), read:false});
+  // Xotira tolib ketmasligi uchun - foydalanuvchi boshiga oxirgi 100 tasi yetarli
+  var mine=db.notifications.filter(function(n){return n.userId===userId;});
+  if(mine.length>100){
+    var toDropIds=mine.slice(0,mine.length-100).map(function(n){return n.id;});
+    db.notifications=db.notifications.filter(function(n){return toDropIds.indexOf(n.id)<0;});
+  }
+}
+function myNotifications(){
+  if(!ME) return [];
+  return (getDB().notifications||[]).filter(function(n){return n.userId===ME.id;}).sort(function(a,b){return b.date-a.date;});
+}
+function renderNotifBell(){
+  var wrap=document.getElementById('notif-bell-wrap');
+  if(!wrap) return;
+  if(!ME || ME.role==='student'){ wrap.style.display='none'; return; }
+  wrap.style.display='inline-block';
+  var list=myNotifications();
+  var unread=list.filter(function(n){return !n.read;}).length;
+  var badge=document.getElementById('notif-badge');
+  if(badge){
+    if(unread>0){ badge.style.display='flex'; badge.textContent=unread>99?'99+':unread; }
+    else badge.style.display='none';
+  }
+}
+function toggleNotifDropdown(){
+  var dd=document.getElementById('notif-dropdown');
+  if(!dd) return;
+  var opening=dd.style.display==='none'||!dd.style.display;
+  dd.style.display=opening?'block':'none';
+  if(opening) renderNotifDropdown();
+}
+function renderNotifDropdown(){
+  var dd=document.getElementById('notif-dropdown');
+  if(!dd) return;
+  var list=myNotifications();
+  if(!list.length){
+    dd.innerHTML='<div style="padding:20px;text-align:center;color:var(--mut);font-size:13px">Bildirishnomalar yoq</div>';
+  } else {
+    dd.innerHTML=list.slice(0,30).map(function(n){
+      var d=new Date(n.date);
+      var timeStr=d.toLocaleDateString('uz-UZ')+' '+d.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});
+      return '<div style="padding:10px 12px;border-radius:9px;margin-bottom:4px;background:'+(n.read?'#fff':'#eef2ff')+';border:1px solid '+(n.read?'#e5e7eb':'#c7d2fe')+'">'+
+        '<div style="font-weight:700;font-size:13px;margin-bottom:3px">'+_aiEsc(n.title)+'</div>'+
+        '<div style="font-size:12.5px;color:var(--mut);line-height:1.4">'+_aiEsc(n.body)+'</div>'+
+        '<div style="font-size:11px;color:#9ca3af;margin-top:4px">'+timeStr+'</div>'+
+      '</div>';
+    }).join('');
+  }
+  // Ochilganda hammasi "oqilgan" deb belgilanadi
+  var db=getDB();
+  var changed=false;
+  (db.notifications||[]).forEach(function(n){ if(n.userId===ME.id && !n.read){ n.read=true; changed=true; } });
+  if(changed){ saveDB(db); renderNotifBell(); }
+}
+document.addEventListener('click', function(e){
+  var wrap=document.getElementById('notif-bell-wrap');
+  var dd=document.getElementById('notif-dropdown');
+  if(!wrap||!dd||dd.style.display==='none') return;
+  if(!wrap.contains(e.target)) dd.style.display='none';
+});
 
 // ─── TEST BOSHLANISHIDA RASMLARNI OLDINDAN KESHLASH (offline uchun) ────────
 // Shunda test davomida internet ochib qolsa ham, savol/javob rasmlari
@@ -1812,6 +1895,7 @@ function afterLogin(){
   document.getElementById('nav-user').textContent=ME.name+(ME.cls?' - '+ME.cls:'')+(ME.role==='teacher'?' (Ustoz)':ME.role==='admin'?' (Admin)':'');
   document.getElementById('btn-out').style.display='inline-flex';
   document.getElementById('auth-err').innerHTML='';
+  renderNotifBell();
   if(ME.role==='admin'){resetTheme();showPg('pg-admin');initAdmin();}
   else if(ME.role==='teacher'){applySubjectTheme(ME.subject);showPg('pg-teacher');renderQT();}
   else{resetTheme();selTopic=null;_curFolder=null;showPg('pg-topic');renderTopics();loadMyHist();}
@@ -1842,7 +1926,10 @@ function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
     else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
     else if(document.mozCancelFullScreen)document.mozCancelFullScreen();
   }
-  document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';resetTheme();showPg('pg-home');}
+  document.getElementById('nav-user').textContent='';document.getElementById('btn-out').style.display='none';
+  var nbw=document.getElementById('notif-bell-wrap'); if(nbw) nbw.style.display='none';
+  var ndd=document.getElementById('notif-dropdown'); if(ndd) ndd.style.display='none';
+  resetTheme();showPg('pg-home');}
 
 var _curSubjFilter='';
 var _curFolder=null;
@@ -1991,6 +2078,7 @@ function startTest(mode){
   });
   precacheTestImages(qs);
   var _cb=document.getElementById('conn-banner'); if(_cb) _cb.style.display='none';
+  var _ov=document.getElementById('offline-overlay'); if(_ov) _ov.style.display='none';
   S.test=qs;S.idx=0;S.answers={};S.mode=mode;_backWarned=false;_visWarnCount=0;_blurWarnCount=0;S._blurWarnPending=false;_logoutWarned=false;_ignoreBlur=false;history.pushState(null,'',location.href);
   // To'liq ekran rejimi
   var el=document.documentElement;
@@ -2106,6 +2194,7 @@ async function doSubmitTest(){
     try{ localStorage.setItem(SK, JSON.stringify(db)); }catch(e){}
   }
   S.mode='';S._blurWarnPending=false;
+  if(typeof updateOfflineOverlay==='function') updateOfflineOverlay();
   // Natija ekranini DARHOL korsatamiz (internetni kutib turmaymiz) -
   // "sinxronlanmoqda" holati fonda tekshiriladi va banner shu asosda
   // yangilanadi.
@@ -2987,6 +3076,7 @@ function approveTeacher(uid){
   var u=db.users.find(function(x){return x.id===uid;});
   if(!u)return;
   u.approved=true;
+  addNotification(db, u.id, '\u2705 Ro\'yxatdan muvaffaqiyatli o\'tdingiz!', 'Login: '+u.login+' - Admin hisobingizni tasdiqladi, endi tizimga kirishingiz mumkin.');
   saveDB(db);
   renderPendingTeachers();
   renderAdminAllUsers();
@@ -3380,7 +3470,8 @@ async function startBookGeneration(file, mode, count){
   // malum boladi, lekin limitni OLDINDAN tekshirish uchun tахmin yetarli).
   var estimatedPages=Math.max(1, Math.round(file.size/3000));
   if(!checkAndIncrementUsage('pages', estimatedPages)) return;
-  msg.innerHTML='<div class="alt ai">&#x23F3; Kitob yuklanmoqda va tahlil qilinmoqda...</div>';
+  msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; Kitob yuklanmoqda va tahlil qilinmoqda...</div>';
+  await acquireImportWakeLock();
   try{
     var dataUrl=await new Promise(function(res,rej){
       var r=new FileReader();
@@ -3395,7 +3486,7 @@ async function startBookGeneration(file, mode, count){
     // o'zgaruvchiga saqlanadi (har safar qayta chaqirilsa, round-robin
     // keyingi VM'ga o'tib ketib, "job not found" xatosiga olib kelardi).
     var server=pickServer();
-    var startRes=await fetch(server+'/generate_test_start',{
+    var startRes=await fetchVM(server,'/generate_test_start',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({data:base64, filename:file.name, mode:mode, total_questions:count})
     }).then(function(r){return r.json();});
@@ -3407,7 +3498,7 @@ async function startBookGeneration(file, mode, count){
       if(pollCount>300){ msg.innerHTML='<div class="alt ar">&#x274C; Juda uzoq davom etdi, qaytadan urinib koring.</div>'; return; }
       await new Promise(function(res){setTimeout(res,3000);});
       var st;
-      try{ st=await fetch(server+'/generate_test_status/'+jobId).then(function(r){return r.json();}); }
+      try{ st=await fetchVM(server,'/generate_test_status/'+jobId).then(function(r){return r.json();}); }
       catch(e){ continue; }
       if(st.error){ msg.innerHTML='<div class="alt ar">&#x274C; '+st.error+'</div>'; return; }
       if(st.status==='processing'){ msg.innerHTML='<div class="alt ai">&#x23F3; '+(st.progress||'ishlanmoqda...')+'</div>'; continue; }
@@ -3430,6 +3521,8 @@ async function startBookGeneration(file, mode, count){
     }
   }catch(e){
     msg.innerHTML='<div class="alt ar">&#x274C; Xato: '+e.message+'</div>';
+  } finally {
+    releaseImportWakeLock();
   }
 }
 
@@ -3463,6 +3556,30 @@ function pickServer(){
   var s=RENDER_SERVERS[_serverIdx % RENDER_SERVERS.length];
   _serverIdx++;
   return s;
+}
+
+// ─── VM DNS-BLOKLASH ZAXIRASI (nip.io fallback) ────────────────────────────
+// Ba'zi qurilmalar/operatorlar (masalan bitta Redmi Note 10 5G'da kuzatilgan)
+// duckdns.org domenini DNS darajasida bloklaydi - server ishlab tursa ham
+// "server javob bermadi" xatosi chiqadi. Har bir VM uchun IP-ga bogliq
+// muqobil domen (nip.io - hech qanday DNS provayderga bogliq emas, IP'ni
+// domen nomiga aylantiradi) qoshilgan. fetchVM() avval asosiy domenga
+// urinadi, tarmoq darajasidagi xato (DNS/connection) bolsa - avtomatik
+// nip.io manziliga otadi.
+var VM_FALLBACK={};
+VM_FALLBACK[IMPORT_SERVER]='https://92-5-41-212.nip.io';
+VM_FALLBACK[IMPORT_SERVER_2]='https://92-5-126-0.nip.io';
+async function fetchVM(server, path, opts){
+  try{
+    return await fetch(server+path, opts);
+  }catch(e){
+    var fb=VM_FALLBACK[server];
+    if(fb){
+      console.warn('fetchVM: '+server+' javob bermadi, '+fb+'ga otilmoqda');
+      return await fetch(fb+path, opts);
+    }
+    throw e;
+  }
 }
 
 function uniqueTopicName(base){
@@ -3555,7 +3672,8 @@ async function importViaBrowser(data,msg){
 }
 
 function sendToServer(file,msg,server){
-  server = server || pickServer();
+  var currentServer = server || pickServer();
+  var _switchedHost = false;
   var MAX_RETRIES=4; // jami 5 marta (1 + 4 qayta urinish) haqiqiy serverga - rasmlar bilan
   var RETRY_DELAYS=[5000,15000,30000,60000]; // 5s, 15s, 30s, 1 daqiqa - sekin-asta ko'proq kutamiz
   return attempt(0);
@@ -3568,7 +3686,7 @@ function sendToServer(file,msg,server){
         var dataUrl=fe.target.result;
         var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
         var xhr=new XMLHttpRequest();
-        xhr.open('POST',server+'/parse',true);
+        xhr.open('POST',currentServer+'/parse',true);
         xhr.timeout=1800000;
         xhr.setRequestHeader('Content-Type','application/json');
         var retryNote=retryCount?(' ('+(retryCount+1)+'-urinish)'):'';
@@ -3606,7 +3724,18 @@ function sendToServer(file,msg,server){
             retryOrGiveUp('Server javobini o\'qib bo\'lmadi ('+e.message+').');
           }
         };
-        xhr.onerror=function(){ retryOrGiveUp('Server javob bermadi.'); };
+        xhr.onerror=function(){
+          // MUHIM: bu aynan Redmi Note 10 5G'da DNS bloklashi sababli
+          // kuzatilgan xato turi (duckdns.org ochilmasa, brauzer buni
+          // "network error" deb beradi). Bir marta muqobil (nip.io) manzilga
+          // otamiz, keyin odatiy qayta urinish davom etadi.
+          if(!_switchedHost && VM_FALLBACK[currentServer]){
+            _switchedHost=true;
+            currentServer=VM_FALLBACK[currentServer];
+            console.warn('sendToServer: DNS/tarmoq xatosi, '+currentServer+'ga otildi');
+          }
+          retryOrGiveUp('Server javob bermadi.');
+        };
         xhr.ontimeout=function(){ retryOrGiveUp('Server vaqt tugadi (30 daqiqa).'); };
         xhr.send(JSON.stringify({data:base64,filename:file.name}));
       };
@@ -3673,6 +3802,57 @@ function submitFP(folderName,isNew){
     importExe(file);
   }
 }
+// ─── IMPORT PAYTIDA EKRAN/FON MUAMMOSI ─────────────────────────────────────
+// TOPILGAN HAQIQIY SABAB (avvalgi sessiyada tahlil qilingan, lekin hech
+// qachon kodga aylantirilmagan): katta .exe fayllarda (yuzlab EMF/formula)
+// import 10-20+ daqiqa davom etishi mumkin. Shu vaqt ichida agar foydalanuvchi
+// ekranni ochirsa yoki boshqa ilovaga otsa - Android/Chrome (ayniqsa MIUI/
+// Xiaomi qurilmalarida, masalan Redmi Note 10 5G'da kuzatilgan) fon
+// tab'idagi tarmoq sorovlarini "muzlatib" qoyadi, natijada haqiqiy server
+// ishlab turgan bolsa ham "server javob bermadi" xatosi chiqadi. Bu VM_FALLBACK
+// (DNS bloklash)dan BUTUNLAY BOSHQA muammo edi - ikkalasi ham sodir bolishi
+// mumkin, shuning uchun ikkalasiga ham alohida yechim kerak.
+//
+// Yechim: (1) Wake Lock API orqali import davomida ekranni yonib turishga
+// majburlash (qollab-quvvatlansa), (2) foydalanuvchiga ochiq ogohlantirish,
+// (3) agar u baribir tab/ilovani fon qilib qoysa - buni aniqlab, natija
+// ekranida sababni tushuntirish (chalkash "server javob bermadi" xatosi
+// ornига).
+var _importWakeLock=null;
+var _importInProgress=false;
+var _importWasBackgrounded=false;
+async function acquireImportWakeLock(){
+  _importInProgress=true;
+  _importWasBackgrounded=false;
+  if(!('wakeLock' in navigator)) return; // eski brauzerlarda yoq - ogohlantirish baribir korsatiladi
+  try{
+    _importWakeLock=await navigator.wakeLock.request('screen');
+  }catch(e){ /* ruxsat berilmasa yoki qollab-quvvatlanmasa - jim otkazib yuboramiz */ }
+}
+function releaseImportWakeLock(){
+  _importInProgress=false;
+  if(_importWakeLock){
+    try{ _importWakeLock.release(); }catch(e){}
+    _importWakeLock=null;
+  }
+}
+// Wake Lock spetsifikatsiyasi boyicha, tab fonga tushganda u AVTOMATIK bekor
+// bolib qoladi - foydalanuvchi qaytib kelganda qayta sorash kerak.
+document.addEventListener('visibilitychange', function(){
+  if(!_importInProgress) return;
+  if(document.hidden){
+    _importWasBackgrounded=true;
+  } else if(_importWasBackgrounded){
+    // Foydalanuvchi qaytib keldi - Wake Lock'ni qayta olishga urinamiz
+    if('wakeLock' in navigator){
+      navigator.wakeLock.request('screen').then(function(wl){ _importWakeLock=wl; }).catch(function(){});
+    }
+  }
+});
+function importBgWarningHtml(){
+  return '<div class="alt aw" style="margin-bottom:8px">&#x26A0;&#xFE0F; Import davomida ekranni ochirmang va boshqa ilovaga otmang - ayniqsa Xiaomi/MIUI qurilmalarda (masalan Redmi) fon rejimi importni "muzlatib" qoyib, xato bilan toxtatishi mumkin. Katta fayllar (kop rasm/formula) bir necha daqiqa davom etishi mumkin.</div>';
+}
+
 function importMultipleFiles(files,suggestedFolder){
   // Papka tasodifan tanlangan bolsa (0 baytli yozuvlar) - otkazib yuboramiz
   var valid=files.filter(function(f){return f.size>0;});
@@ -3717,7 +3897,8 @@ function importMultipleFiles(files,suggestedFolder){
   // tayyor boladi (cold-start kechikishi keyingi bosqichlarga qoshilmaydi)
   warmUpImportServers();
 
-  msg.innerHTML='<div class="alt ai">&#x23F3; '+valid.length+' ta fayl oqilmoqda...'+unsupportedNote+'</div>';
+  msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; '+valid.length+' ta fayl oqilmoqda...'+unsupportedNote+'</div>';
+  acquireImportWakeLock();
 
   // Fayllarni KICHIK GURUHLARGA bolib, ketma-ket yuboramiz - shunda bitta
   // sorov hech qachon juda katta bolib ketmaydi (bu ba'zi hosting/tarmoq
@@ -3807,7 +3988,7 @@ function importMultipleFiles(files,suggestedFolder){
       renderStatus();
       var jobId;
       try{
-        var startRes=await fetch(server+'/parse_batch_start',{
+        var startRes=await fetchVM(server,'/parse_batch_start',{
           method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({files:group})
         }).then(function(r){return r.json();});
         if(startRes.error)throw new Error(startRes.error);
@@ -3831,7 +4012,7 @@ function importMultipleFiles(files,suggestedFolder){
         }
         var st;
         try{
-          st=await fetch(server+'/parse_batch_status/'+jobId).then(function(r){return r.json();});
+          st=await fetchVM(server,'/parse_batch_status/'+jobId).then(function(r){return r.json();});
         }catch(e){
           await sleepMs(3000); continue; // vaqtincha tarmoq xatosi - qayta urinamiz
         }
@@ -3890,14 +4071,17 @@ function importMultipleFiles(files,suggestedFolder){
     await Promise.all(gws);
 
     _pendingImportFolder=null;
-    msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+(failedNames.length?'<br>&#x274C; Import bolmadi ('+failedNames.length+' ta): '+failedNames.join(', ')+' &#8212; bularni qayta yuklab koring.':'')+'</div>';
+    releaseImportWakeLock();
+    var bgNote2=_importWasBackgrounded?'<br>&#x2139;&#xFE0F; Ekran/ilova fonga otganini aniqladik - xatolar shu sabab bolgan bolishi mumkin.':'';
+    msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+(failedNames.length?'<br>&#x274C; Import bolmadi ('+failedNames.length+' ta): '+failedNames.join(', ')+' &#8212; bularni qayta yuklab koring.':'')+bgNote2+'</div>';
     renderQT();
   });
 }
 function importExe(file){
   var msg=document.getElementById('imp-msg');
-  msg.innerHTML='<div class="alt ai">&#x23F3; Server bilan bog\'lanilmoqda... Rasmlar o\'girilmoqda, 2-5 daqiqa kutish mumkin</div>';
-  sendToServer(file,msg);
+  msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; Server bilan bog\'lanilmoqda... Rasmlar o\'girilmoqda, 2-5 daqiqa kutish mumkin</div>';
+  acquireImportWakeLock();
+  sendToServer(file,msg).then(function(){ releaseImportWakeLock(); });
 }
 function importExeAsync(file){
   var msg=document.getElementById('imp-msg');
@@ -3915,7 +4099,8 @@ function sendDocumentToServer(file){
     reader.onload=function(e){
       var dataUrl=e.target.result;
       var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
-      fetch(pickServer()+'/parse_document', {
+      var server=pickServer();
+      fetchVM(server,'/parse_document', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({data:base64, filename:file.name})
@@ -3943,10 +4128,11 @@ async function importDocumentFiles(files, suggestedFolder, unsupportedNote){
     folderName=folderName.trim()||'Kitob';
   }
   if(folderName) _pendingImportFolder=folderName;
+  await acquireImportWakeLock();
   var okTotal=0, errTotal=0, failedNames=[];
   for(var i=0;i<files.length;i++){
     if(!checkAndIncrementUsage('questions', 5)){ break; }
-    msg.innerHTML='<div class="alt ai">&#x23F3; AI orqali tahlil qilinmoqda: "'+files[i].name+'" ('+(i+1)+'/'+files.length+')...'+(unsupportedNote||'')+'</div>';
+    msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; AI orqali tahlil qilinmoqda: "'+files[i].name+'" ('+(i+1)+'/'+files.length+')...'+(unsupportedNote||'')+'</div>';
     var res=await sendDocumentToServer(files[i]);
     if(res.ok){
       var qs=(res.data.questions||[]).map(function(q){ if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1; return q; });
@@ -3958,9 +4144,11 @@ async function importDocumentFiles(files, suggestedFolder, unsupportedNote){
     }
   }
   _pendingImportFolder=null;
+  var bgNote=_importWasBackgrounded?'<div class="ts tm" style="margin-top:6px">&#x2139;&#xFE0F; Ekran/ilova fonga otganini aniqladik - agar xato uchragan bolsa, shu sabab bolishi mumkin.</div>':'';
   var summary='<div class="alt '+(errTotal?'aw':'as')+'">'+(okTotal?('&#x2705; '+okTotal+' ta fayldan savollar import qilindi!'):'')+
-    (errTotal?('<br>&#x274C; '+errTotal+' ta faylda xato: '+failedNames.join('; ')):'')+'</div>';
+    (errTotal?('<br>&#x274C; '+errTotal+' ta faylda xato: '+failedNames.join('; ')):'')+'</div>'+bgNote;
   msg.innerHTML=summary;
+  releaseImportWakeLock();
   renderQT();
 }
 
@@ -3974,7 +4162,8 @@ function sendImageToServer(file){
     reader.onload=function(e){
       var dataUrl=e.target.result;
       var base64=dataUrl.substring(dataUrl.indexOf(',')+1);
-      fetch(pickServer()+'/parse_image', {
+      var server=pickServer();
+      fetchVM(server,'/parse_image', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({data:base64, filename:file.name})
@@ -4002,10 +4191,11 @@ async function importImageFiles(files, suggestedFolder, unsupportedNote){
     folderName=folderName.trim()||'Kitob';
   }
   if(folderName) _pendingImportFolder=folderName;
+  await acquireImportWakeLock();
   var okTotal=0, errTotal=0, failedNames=[];
   for(var i=0;i<files.length;i++){
     if(!checkAndIncrementUsage('images', 1)){ break; }
-    msg.innerHTML='<div class="alt ai">&#x1F4F7; Rasm AI orqali oqilmoqda: "'+files[i].name+'" ('+(i+1)+'/'+files.length+')...'+(unsupportedNote||'')+'</div>';
+    msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x1F4F7; Rasm AI orqali oqilmoqda: "'+files[i].name+'" ('+(i+1)+'/'+files.length+')...'+(unsupportedNote||'')+'</div>';
     var res=await sendImageToServer(files[i]);
     if(res.ok){
       var qs=(res.data.questions||[]).map(function(q){ if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1; return q; });
@@ -4017,6 +4207,7 @@ async function importImageFiles(files, suggestedFolder, unsupportedNote){
     }
   }
   _pendingImportFolder=null;
+  releaseImportWakeLock();
   var summary='<div class="alt '+(errTotal?'aw':'as')+'">'+(okTotal?('&#x2705; '+okTotal+' ta rasmdan savollar import qilindi!'):'')+
     (errTotal?('<br>&#x274C; '+errTotal+' ta rasmda xato: '+failedNames.join('; ')):'')+'</div>';
   msg.innerHTML=summary;
@@ -4359,12 +4550,17 @@ function aiCheckTopic(topic) {
 }
 
 // ── INTERNET YOQLIGINI KUZATISH ──────────────────────────────────────────
-// Sayt Supabase/Render bilan doimiy aloqada ishlaydi (savol/natija saqlash,
-// AI chaqiruvlari) - internet bolmasa hech narsa ishlamaydi, shuning uchun
-// foydalanuvchiga tushunarli xabar korsatib, ilovani bloklab qoyamiz.
+// MUHIM O'ZGARISH (offline-test qollab-quvvatlash qoshilgandan keyin):
+// avval bu overlay HAR QANDAY holatda (test yechilayotganda ham) butun
+// ekranni tosib qoyar edi - bu yangi talabga ("test paytida internet
+// ochib qolsa, test TOXTAMASIN") ZID edi. Endi test faol bolsa (S.mode
+// toldirilgan bolsa), bu tolib qoluvchi overlay UMUMAN korsatilmaydi -
+// uning ornini kichik, tolamaydigan #conn-banner bosadi (u ham aslida
+// test paytida ozi yashirin turadi, faqat test tashqarisida ishlaydi).
 function updateOfflineOverlay(){
   var ov=document.getElementById('offline-overlay');
   if(!ov)return;
+  if(S.mode){ ov.style.display='none'; return; }
   ov.style.display = navigator.onLine ? 'none' : 'flex';
 }
 window.addEventListener('online', updateOfflineOverlay);
@@ -4411,7 +4607,7 @@ function warmUpImportServers(){
   // haqiqiy import so'rovidan oldin ikkalasi ham javob berayotganini
   // tekshirib qoyamiz (bitta VM vaqtincha tushib qolgan bolsa, buni tez
   // aniqlash uchun ham foydali).
-  RENDER_SERVERS.forEach(function(s){ fetch(s+'/health').catch(function(){}); });
+  RENDER_SERVERS.forEach(function(s){ fetchVM(s,'/health').catch(function(){}); });
 }
 
 sbInit();
