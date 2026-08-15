@@ -3590,6 +3590,253 @@ function uniqueTopicName(base){
   while(existing.indexOf(base+' ('+i+')')>=0) i++;
   return base+' ('+i+')';
 }
+
+// ─── SERVER HAVZASI (server pool) - TARQATILGAN IMPORT ────────────────────
+// MUHIM: bu yerga qo'shilgan har bir server, .exe import paytida BARCHA
+// boshqa serverlar bilan BIRGA, umumiy EMF (formula/rasm) navbatidan ish
+// oladi - fayllar oldindan kichik guruhlarga bo'lib, alohida-alohida
+// serverlarga "qattiq" biriktirilmaydi. Yangi server (masalan yangi Oracle
+// Ampere VM, yoki Koyeb) tayyor bo'lganda, shunchaki shu ro'yxatga bitta
+// qator qo'shish YETARLI - kod avtomatik uni ishga qo'shadi.
+//
+// "weight" - bitta so'rovda shu serverga necha EMF beriladi. Bu HOZIRCHA
+// QO'LDA belgilanadi (haqiqiy tezlikni avtomatik olchash - benchmark -
+// bu sessiyada qilinmadi, keyingi qadam bo'lishi mumkin). Taxminiy
+// yo'riqnoma: 1 OCPU/6GB Oracle VM -> 12-15, kuchli AMD VM -> 15-20,
+// Koyeb bepul (0.1 vCPU/512MB) -> 2-3 (aks holda OOM/juda sekin bo'ladi).
+//
+// "dailyBudgetSec" - IXTIYORIY. Oracle va Koyeb'ning HAR IKKALASI ham
+// vaqt/soat chegarasiga ega EMAS (ikkalasi ham "always free", muddatsiz) -
+// shuning uchun hozircha bu maydon deyarli hech qaysi serverda ishlatilmaydi.
+// Faqat kelajakda Render kabi SOATLIK LIMITI bor provayder qo'shilsa foydali
+// bo'ladi - shu kunlik soniya byudjeti tugasa, server avtomatik navbatdan
+// chetlashadi va indikator DB'da (`db.serverBudgetUsed`) saqlanadi, ertasi
+// kun (UTC) qayta tiklanadi. null = cheklovsiz.
+var SERVER_POOL=[
+  {url:IMPORT_SERVER,   name:'VM1 (Oracle AMD)',     weight:15, dailyBudgetSec:null},
+  {url:IMPORT_SERVER_2, name:'VM2 (Oracle AMD)',     weight:15, dailyBudgetSec:null}
+  // Yangi server tayyor bo'lganda, shu yerga qo'shiladi, masalan:
+  // {url:'https://edutest-vm3.duckdns.org', name:'VM3 (Ampere)', weight:12, dailyBudgetSec:null},
+  // {url:'https://edutest-koyeb.koyeb.app', name:'Koyeb (bepul)', weight:3,  dailyBudgetSec:null},
+];
+// MUHIM: RENDER_SERVERS (pickServer/warmUpImportServers/parse_document va
+// h.k. ishlatadigan eski nom) endi SERVER_POOL'dan AVTOMATIK hosil bo'ladi -
+// shuning uchun yangi server qo'shishda FAQAT yuqoridagi SERVER_POOL'ga
+// qator qo'shish yetarli, ikkinchi joyni yangilash shart emas.
+RENDER_SERVERS=SERVER_POOL.map(function(s){return s.url;});
+
+function todayKey(){ var d=new Date(); return d.getUTCFullYear()+'-'+(d.getUTCMonth()+1)+'-'+d.getUTCDate(); }
+// Server kunlik soniya byudjetini DB'dan o'qiydi/yangilaydi - hozircha
+// deyarli hech qaysi serverda ishlatilmaydi (yuqoridagi izohga qarang),
+// lekin infratuzilma tayyor - kelajakda soatlik-limitli server qo'shilsa,
+// shunchaki dailyBudgetSec qiymatini to'ldirish kifoya.
+function getServerBudgetUsed(url){
+  var db=getDB();
+  var rec=(db.serverBudgetUsed||{})[url];
+  if(!rec || rec.day!==todayKey()) return 0;
+  return rec.usedSec||0;
+}
+function addServerBudgetUsed(url, sec){
+  var db=getDB();
+  db.serverBudgetUsed=db.serverBudgetUsed||{};
+  var rec=db.serverBudgetUsed[url];
+  if(!rec || rec.day!==todayKey()) rec={day:todayKey(), usedSec:0};
+  rec.usedSec=(rec.usedSec||0)+sec;
+  db.serverBudgetUsed[url]=rec;
+  saveDB(db);
+}
+function isServerBudgetAvailable(srv){
+  if(srv.dailyBudgetSec==null) return true; // cheklovsiz (Oracle, Koyeb)
+  return getServerBudgetUsed(srv.url) < srv.dailyBudgetSec;
+}
+
+// ─── UMUMIY EMF ISH-NAVBATI (work-stealing) ────────────────────────────────
+// Bitta katta ro'yxat ("bitta guruh") - har bir SERVER_POOL'dagi server
+// shu ro'yxatdan o'z tezligiga (weight) qarab bo'lib-bo'lib ish oladi.
+// Server o'z kunlik byudjetini tugatsa yoki javob bermasa - navbatdan
+// avtomatik chiqadi, qolganlar davom etadi.
+function makeWorkQueue(items){
+  var idx=0;
+  return {
+    claim:function(n){
+      if(idx>=items.length) return [];
+      var chunk=items.slice(idx, idx+n);
+      idx+=chunk.length;
+      return chunk;
+    },
+    requeueFront:function(chunk){ idx-=chunk.length; }, // xato bo'lsa, orqaga qaytarish
+    remaining:function(){ return items.length-idx; },
+    total:items.length
+  };
+}
+
+// Barcha EMF vazifalarini SERVER_POOL bo'yicha parallel konvertatsiya
+// qiladi. `onProgress(done,total,activeServers)` - UI yangilash uchun.
+// Qaytaradi: {id: png_data_url, ...}
+async function distributeEmfConversion(emfTasks, onProgress){
+  var results={};
+  if(!emfTasks.length) return results;
+  var queue=makeWorkQueue(emfTasks);
+  var done=0, total=emfTasks.length;
+  var activeServers={};
+
+  async function worker(srv){
+    while(true){
+      if(!isServerBudgetAvailable(srv)){ delete activeServers[srv.name]; return; } // kunlik limit tugadi
+      var chunk=queue.claim(srv.weight);
+      if(!chunk.length){ delete activeServers[srv.name]; return; }
+      activeServers[srv.name]=true;
+      if(onProgress) onProgress(done,total,Object.keys(activeServers));
+      var t0=Date.now();
+      try{
+        var res=await fetchVM(srv.url,'/convert_emfs',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({tasks: chunk.map(function(t){return {id:t.id, emf_b64:t.emf_b64};})})
+        }).then(function(r){return r.json();});
+        if(res && res.results){
+          Object.keys(res.results).forEach(function(id){ results[id]=res.results[id]; });
+        }
+        addServerBudgetUsed(srv.url, Math.round((Date.now()-t0)/1000));
+      }catch(e){
+        // Bu server ishlamadi - vazifalarni navbatga QAYTARIB, boshqa
+        // serverlar davom etsin, shu server esa bu import uchun to'xtaydi.
+        console.warn('Server '+srv.name+' xato berdi, navbatdan chetlatildi:', e);
+        queue.requeueFront(chunk);
+        delete activeServers[srv.name];
+        return;
+      }
+      done+=chunk.length;
+      if(onProgress) onProgress(done,total,Object.keys(activeServers));
+    }
+  }
+
+  await Promise.all(SERVER_POOL.map(worker));
+
+  // Agar biror server ishlamay qolib, ba'zi vazifalar hali navbatda
+  // qolgan bo'lsa (masalan hammasi bir vaqtda xato bergan bo'lsa) -
+  // qolganlarini ishlayotgan (birinchi) serverga qayta yuboramiz.
+  if(queue.remaining()>0 && SERVER_POOL.length){
+    var leftover=queue.claim(queue.remaining());
+    var srv=SERVER_POOL[0];
+    try{
+      var res2=await fetchVM(srv.url,'/convert_emfs',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({tasks: leftover.map(function(t){return {id:t.id, emf_b64:t.emf_b64};})})
+      }).then(function(r){return r.json();});
+      if(res2 && res2.results) Object.keys(res2.results).forEach(function(id){ results[id]=res2.results[id]; });
+    }catch(e){ console.error('Qoldiq EMF vazifalarini ham konvertatsiya qilib bolmadi:', e); }
+  }
+  return results;
+}
+
+// Fayllarni (extract_batch_start orqali) EMF-siz ochib, keyin barcha
+// EMF vazifalarini bitta umumiy navbatga yig'ib, distributeEmfConversion()
+// orqali BUTUN server havzasiga tarqatadi. Bu — eski "fayl-guruh->bitta
+// server" modelidan farqli, EMF-darajasidagi tarqatish.
+async function distributedExeImport(files, folderName, msg){
+  _pendingImportFolder=folderName;
+  await acquireImportWakeLock();
+  msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; Fayllar ochilmoqda (0/'+files.length+')...</div>';
+
+  // 1-BOSQICH: fayllarni kichik guruhlarga bo'lib, EXTRACT (tez, LibreOffice
+  // yo'q) - bir nechta serverga PARALLEL yuboramiz, chunki bu ham
+  // vaqt oladi (yuzlab fayl bo'lsa).
+  var EXTRACT_GROUP=4;
+  var extractGroups=[];
+  for(var i=0;i<files.length;i+=EXTRACT_GROUP){
+    var group=files.slice(i,i+EXTRACT_GROUP);
+    var fdPromises=group.map(function(f){
+      return new Promise(function(res){
+        var r=new FileReader();
+        r.onload=function(e){ res({filename:f.name, data:e.target.result.split(',')[1]}); };
+        r.onerror=function(){ res(null); };
+        r.readAsDataURL(f);
+      });
+    });
+    extractGroups.push(fdPromises);
+  }
+
+  var allFileResults=[]; // {filename, topic, questions, questionsToAsk, error?}
+  var allEmfTasks=[];    // {id, emf_b64} - global id: "<globalFileIdx>_<kind>_<qIdx>_<optIdx>"
+  var extractedCount=0;
+  var srvIdx=0;
+
+  async function extractOneGroup(fdPromiseGroup){
+    var filesData=(await Promise.all(fdPromiseGroup)).filter(Boolean);
+    if(!filesData.length) return;
+    var srv=SERVER_POOL[srvIdx % SERVER_POOL.length]; srvIdx++;
+    var startFileIdx=allFileResults.length; // shu guruh fayllari globalIdx boshlanishi
+    // Joy band qilib qo'yamiz (tartib buzilmasligi uchun)
+    filesData.forEach(function(){ allFileResults.push(null); });
+    try{
+      var res=await fetchVM(srv.url,'/extract_batch_start',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({files: filesData})
+      }).then(function(r){return r.json();});
+      if(res.error) throw new Error(res.error);
+      (res.files||[]).forEach(function(fr, localIdx){
+        allFileResults[startFileIdx+localIdx]=fr;
+      });
+      (res.emf_tasks||[]).forEach(function(t){
+        var globalFileIdx=startFileIdx+t.file_index;
+        var idParts=t.id.split('_');
+        var newId=globalFileIdx+'_'+idParts.slice(1).join('_');
+        allEmfTasks.push({id:newId, emf_b64:t.emf_b64});
+      });
+    }catch(e){
+      filesData.forEach(function(fd, localIdx){
+        allFileResults[startFileIdx+localIdx]={filename:fd.filename, error:'Ajratishda xato: '+e.message};
+      });
+    }
+    extractedCount+=filesData.length;
+    msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; Fayllar ochilmoqda ('+extractedCount+'/'+files.length+')...</div>';
+  }
+
+  // Extract bosqichini ham bir nechta serverga PARALLEL yuboramiz (tez, chunki EMF yo'q)
+  var EXTRACT_CONCURRENCY=Math.min(SERVER_POOL.length, extractGroups.length) || 1;
+  var gi=0;
+  async function extractWorker(){
+    while(gi<extractGroups.length){ var g=extractGroups[gi++]; await extractOneGroup(g); }
+  }
+  await Promise.all(Array.from({length:EXTRACT_CONCURRENCY}, extractWorker));
+
+  // 2-BOSQICH: BARCHA fayllardan yig'ilgan EMF vazifalari - BITTA umumiy
+  // navbat, BARCHA serverlarga bir vaqtda tarqatiladi.
+  msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; '+allEmfTasks.length+' ta formula/rasm '+SERVER_POOL.length+' ta serverda birgalikda o\'girilmoqda (0/'+allEmfTasks.length+')...</div>';
+  var emfResults=await distributeEmfConversion(allEmfTasks, function(done,total,activeServers){
+    msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; Formula/rasmlar o\'girilmoqda: '+done+'/'+total+' ('+activeServers.length+' ta server ishlamoqda: '+activeServers.join(', ')+')</div>';
+  });
+
+  // 3-BOSQICH: natijalarni togri joylarga (savol/variant) qo'yish
+  allFileResults.forEach(function(fr, fileIdx){
+    if(!fr || fr.error || !fr.questions) return;
+    fr.questions.forEach(function(q, qIdx){
+      var qKey=fileIdx+'_q_'+qIdx+'_';
+      if(emfResults[qKey]) q.image=emfResults[qKey];
+      (q.options||[]).forEach(function(opt, oIdx){
+        var oKey=fileIdx+'_a_'+qIdx+'_'+oIdx;
+        if(emfResults[oKey]) q.options[oIdx]=emfResults[oKey];
+      });
+    });
+  });
+
+  // 4-BOSQICH: saqlash (mavjud saveImportedQs() orqali, avvalgidek)
+  var okTotal=0, errTotal=0, failedNames=[];
+  for(var fi=0; fi<allFileResults.length; fi++){
+    var fr=allFileResults[fi];
+    if(!fr || fr.error){ errTotal++; failedNames.push((fr?fr.filename:'fayl')+(fr&&fr.error?' ('+fr.error+')':'')); continue; }
+    var qs=(fr.questions||[]).map(function(q){ if(q.image){} if(q.isMulti===undefined) q.isMulti=(q.correct||[]).length>1; return q; });
+    await saveImportedQs({qs:qs, topic:fr.topic, questionsToAsk:fr.questionsToAsk}, msg);
+    okTotal++;
+  }
+
+  _pendingImportFolder=null;
+  releaseImportWakeLock();
+  var bgNote=_importWasBackgrounded?'<br>&#x2139;&#xFE0F; Ekran/ilova fonga otganini aniqladik - xatolar shu sabab bolishi mumkin.':'';
+  msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi ('+allEmfTasks.length+' ta formula/rasm, '+SERVER_POOL.length+' ta server birgalikda ishladi)!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(failedNames.length?'<br>&#x274C; Import bolmadi: '+failedNames.join(', '):'')+bgNote+'</div>';
+  renderQT();
+}
+
 async function saveImportedQs(parsed,msg){
   // MUHIM: mavzu nomi tekshiruvi ENDI birinchi bo'lib ishlaydi - aks holda
   // "Bekor qilish" (yangi mavzu sifatida saqlash) tanlansa ham, har bir
@@ -3890,192 +4137,18 @@ function importMultipleFiles(files,suggestedFolder){
   var folderName=suggestedFolder||prompt('Bu '+valid.length+' ta .exe faylni bitta "kitob" nomiga birlashtiramiz.\nKitob nomini tasdiqlang yoki ozgartiring:', defaultName);
   if(folderName===null)return; // bekor qilindi
   folderName=folderName.trim()||'Kitob';
-  _pendingImportFolder=folderName;
 
   // Import boshlanishi bilan darhol BARCHA import-serverlarni parallel
   // uygotamiz - shunda ular birinchi haqiqiy fayl kelguncha allaqachon
   // tayyor boladi (cold-start kechikishi keyingi bosqichlarga qoshilmaydi)
   warmUpImportServers();
 
-  msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; '+valid.length+' ta fayl oqilmoqda...'+unsupportedNote+'</div>';
-  acquireImportWakeLock();
-
-  // Fayllarni KICHIK GURUHLARGA bolib, ketma-ket yuboramiz - shunda bitta
-  // sorov hech qachon juda katta bolib ketmaydi (bu ba'zi hosting/tarmoq
-  // sozlamalarida sorov hajmi chegarasiga urilib qolishning oldini oladi,
-  // va telefon/kompyuterda bir xil, barqaror ishlashini taminlaydi).
-  // Fayllarni KICHIK GURUHLARGA bolib, BIR NECHTASINI BIR VAQTDA (parallel)
-  // serverga yuboramiz - shunda server imkoniyatidan maksimal foydalanib,
-  // import sezilarli tezlashadi (avval faqat bitta guruh navbat bilan ishlar edi).
-  // MUHIM: avval GROUP_SIZE qatiy 8 edi - agar fayllar soni serverlar
-  // sonidan kam guruh hosil qilsa (masalan 40 fayl / 8 = 5 guruh), aylanma
-  // taqsimlash FAQAT birinchi 5 ta serverga yetib borar, qolgan serverlar
-  // (masalan -1 va -6) hech qachon ish olmasdan bosh turar edi. Endi guruh
-  // hajmi fayllar soni va SERVERLAR SONIGA qarab avtomatik hisoblanadi -
-  // shunda guruhlar soni serverlar sonidan kam bolmaydi (fayllar yetarli
-  // bolsa), va barcha serverlar ishga tortiladi.
-  // MUHIM: avval GROUP_SIZE serverlar soniga qarab hisoblanardi - bu HAR
-  // BIR serverga ANIQ 1 ta guruh tegishini taminlardi. Lekin muammo:
-  // fayllardagi EMF/formula soni juda notekis (ba'zi faylda 300 ta, ba'zida
-  // 4000 ta!) - shuning uchun "1 server = 1 guruh" bolganda, ogir fayllar
-  // tushgan serverlar son marta band bolib qolar, boshqalari esa bosh
-  // turar edi. Endi guruh hajmi KICHIK va QATIY (2 fayl) - shunda kop
-  // guruh hosil bolib, aylanma taqsimlash bir necha MARTA barcha
-  // serverlar boylab aylanadi. Bu ogir va yengil fayllarni statistik
-  // jihatdan barcha serverlar orasida TEKISROQ aralashtirib yuboradi.
-  var GROUP_SIZE=2;
-  // 2026-08-11: ENDI 2 ta mustaqil Oracle VM bor (IMPORT_SERVER,
-  // IMPORT_SERVER_2), shuning uchun 2 ta guruhni PARALLEL yuborish
-  // xavfsiz - har biri ozining alohida VM'ida (alohida LibreOffice
-  // jarayonida) ishlaydi, bitta VM ichida bir nechta jarayon bir vaqtda
-  // ishlamaydi (OOM xavfi yoq). GROUP_CONCURRENCY VM sonidan OSHMASLIGI
-  // kerak - aks holda bitta VM'ga 2 ta guruh bir vaqtda tushib, avvalgi
-  // OOM muammosi qaytadi. Yangi VM qoshilsa, RENDER_SERVERS massiviga
-  // qoshish YETARLI - bu son avtomatik moslashadi.
-  var GROUP_CONCURRENCY=RENDER_SERVERS.length;
-  var okTotal=0, errTotal=0, failedNames=[];
-  function sleepMs(ms){return new Promise(function(res){setTimeout(res,ms);});}
-
-  Promise.all(valid.map(function(f){
-    return new Promise(function(res){
-      var r=new FileReader();
-      r.onload=function(e){ res({filename:f.name, data:e.target.result.split(',')[1]}); };
-      r.onerror=function(){ res(null); };
-      r.readAsDataURL(f);
-    });
-  })).then(async function(allFileDatas){
-    allFileDatas=allFileDatas.filter(Boolean);
-    var groups=[];
-    for(var i=0;i<allFileDatas.length;i+=GROUP_SIZE){
-      groups.push(allFileDatas.slice(i,i+GROUP_SIZE));
-    }
-    var groupStatus=groups.map(function(){return '';});
-    function renderStatus(){
-      var lines=groupStatus.filter(Boolean);
-      msg.innerHTML='<div class="alt ai">'+(lines.length?lines.join('<br>'):'&#x23F3; Boshlanmoqda...')+'</div>';
-    }
-
-    async function fallbackGroupAsync(group,gi,server){
-      server = server || pickServer();
-      // Shu guruhdagi fayllarni ozbeticha (lekin 3 tasini bir vaqtda) qayta yuboramiz
-      var fidx=0;
-      async function worker(){
-        while(fidx<group.length){
-          var i=fidx++;
-          var fd=group[i];
-          groupStatus[gi]='Guruh '+(gi+1)+': ('+(i+1)+'/'+group.length+') "'+fd.filename+'" alohida qayta ishlanmoqda...';
-          renderStatus();
-          var byteChars=atob(fd.data);
-          var byteNums=new Array(byteChars.length);
-          for(var b=0;b<byteChars.length;b++) byteNums[b]=byteChars.charCodeAt(b);
-          var blob=new Blob([new Uint8Array(byteNums)]);
-          blob.name=fd.filename;
-          var msgProxy={set innerHTML(html){groupStatus[gi]='Guruh '+(gi+1)+': ('+(i+1)+'/'+group.length+') '+html.replace(/<[^>]+>/g,'');renderStatus();}};
-          var ok=await sendToServer(blob,msgProxy,server);
-          if(ok)okTotal++; else { errTotal++; failedNames.push(fd.filename); }
-        }
-      }
-      var ws=[];
-      for(var w=0;w<Math.min(3,group.length);w++) ws.push(worker());
-      await Promise.all(ws);
-    }
-
-    async function processOneGroup(gi){
-      var group=groups[gi];
-      var server=pickServer();
-      var serverLabel=server.replace('https://','').replace('.onrender.com','');
-      groupStatus[gi]='Guruh '+(gi+1)+'/'+groups.length+' ['+serverLabel+']: serverga yuborilmoqda ('+group.length+' fayl)...';
-      renderStatus();
-      var jobId;
-      try{
-        var startRes=await fetchVM(server,'/parse_batch_start',{
-          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({files:group})
-        }).then(function(r){return r.json();});
-        if(startRes.error)throw new Error(startRes.error);
-        jobId=startRes.job_id;
-      }catch(e){
-        groupStatus[gi]='Guruh '+(gi+1)+': xatosi ('+e.message+'), birma-bir otkazilmoqda...';
-        renderStatus();
-        await fallbackGroupAsync(group,gi,server);
-        groupStatus[gi]='';renderStatus();
-        return;
-      }
-      var pollCount=0;
-      while(true){
-        pollCount++;
-        if(pollCount>400){
-          groupStatus[gi]='Guruh '+(gi+1)+': juda uzoq davom etdi, birma-bir otkazilmoqda...';
-          renderStatus();
-          await fallbackGroupAsync(group,gi,server);
-          groupStatus[gi]='';renderStatus();
-          return;
-        }
-        var st;
-        try{
-          st=await fetchVM(server,'/parse_batch_status/'+jobId).then(function(r){return r.json();});
-        }catch(e){
-          await sleepMs(3000); continue; // vaqtincha tarmoq xatosi - qayta urinamiz
-        }
-        if(st.error){
-          groupStatus[gi]='Guruh '+(gi+1)+': xatosi ('+st.error+'), birma-bir otkazilmoqda...';
-          renderStatus();
-          await fallbackGroupAsync(group,gi,server);
-          groupStatus[gi]='';renderStatus();
-          return;
-        }
-        if(st.status==='processing'){
-          groupStatus[gi]='Guruh '+(gi+1)+'/'+groups.length+': '+(st.progress||'qayta ishlanmoqda...');
-          renderStatus();
-          await sleepMs(3000);
-          continue;
-        }
-        if(st.status==='done'){
-          var results=st.results||[];
-          var retryFiles=[];
-          for(var ri=0;ri<results.length;ri++){
-            var r=results[ri];
-            if(r.error){
-              var origFd=group.find(function(g){return g.filename===r.filename;});
-              if(origFd) retryFiles.push(origFd);
-              else { errTotal++; failedNames.push(r.filename||('fayl '+(ri+1))); }
-              continue;
-            }
-            var qs=(r.questions||[]).map(function(q){if(q.image){q.img=q.image;delete q.image;}if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1;return q;});
-            var qMsgProxy={set innerHTML(html){groupStatus[gi]='Guruh '+(gi+1)+': '+html.replace(/<[^>]+>/g,'');renderStatus();}};
-            await saveImportedQs({qs:qs,topic:r.topic,questionsToAsk:r.questionsToAsk},qMsgProxy);
-            okTotal++;
-          }
-          if(retryFiles.length){
-            groupStatus[gi]='Guruh '+(gi+1)+': '+retryFiles.length+' ta fayl alohida qayta uriniladi...';
-            renderStatus();
-            await fallbackGroupAsync(retryFiles,gi);
-          }
-          groupStatus[gi]='';renderStatus();
-          return;
-        }
-      }
-    }
-
-    // GROUP_CONCURRENCY tagacha guruhni BIR VAQTDA ishga tushiramiz - shunda
-    // server bir vaqtning ozida bir nechta guruh ustida ishlaydi, jami vaqt
-    // sezilarli qisqaradi (avval har bir guruh oldingisi tugashini kutar edi).
-    var nextIdx=0;
-    async function groupWorker(){
-      while(nextIdx<groups.length){
-        var gi=nextIdx++;
-        await processOneGroup(gi);
-      }
-    }
-    var gws=[];
-    for(var gw=0;gw<Math.min(GROUP_CONCURRENCY,groups.length);gw++) gws.push(groupWorker());
-    await Promise.all(gws);
-
-    _pendingImportFolder=null;
-    releaseImportWakeLock();
-    var bgNote2=_importWasBackgrounded?'<br>&#x2139;&#xFE0F; Ekran/ilova fonga otganini aniqladik - xatolar shu sabab bolgan bolishi mumkin.':'';
-    msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(skipped?' ('+skipped+' ta elementi papka bolgani uchun otkazib yuborildi)':'')+(failedNames.length?'<br>&#x274C; Import bolmadi ('+failedNames.length+' ta): '+failedNames.join(', ')+' &#8212; bularni qayta yuklab koring.':'')+bgNote2+'</div>';
-    renderQT();
-  });
+  // YANGI (2026-08): fayllar endi ALOHIDA-ALOHIDA serverlarga "qattiq"
+  // biriktirilmaydi. Avval XML ochiladi (tez), keyin BARCHA formula/rasm
+  // (EMF) vazifalari BITTA umumiy navbatga yigiladi va SERVER_POOL'dagi
+  // hamma serverga bir vaqtda, ularning tezligiga (weight) qarab
+  // tarqatiladi - distributedExeImport() shu ishni bajaradi.
+  distributedExeImport(valid, folderName, msg);
 }
 function importExe(file){
   var msg=document.getElementById('imp-msg');
