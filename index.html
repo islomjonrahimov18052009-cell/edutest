@@ -3548,8 +3548,9 @@ var RENDER_SERVER='https://edutest-server-7.onrender.com';
 // Certbot SSL) bilan ishlaydi - VM sozlash tarixi va uchragan xatolar
 // (OCI route-table bug, nginx default_server/IPv6 masalasi va h.k.)
 // uchun edutest-pro skill faylining Changelog bolimiga qarang.
-var IMPORT_SERVER='https://edutest-oracle.duckdns.org';      // VM1
-var IMPORT_SERVER_2='https://edutest-oracle-2.duckdns.org';  // VM2
+var IMPORT_SERVER='https://edutest-oracle.duckdns.org';      // VM1 (Oracle)
+var IMPORT_SERVER_2='https://edutest-oracle-2.duckdns.org';  // VM2 (Oracle)
+var IMPORT_SERVER_3='https://edutest-vm5.duckdns.org';       // VM5 (Google Cloud e2-micro)
 var RENDER_SERVERS=[IMPORT_SERVER,IMPORT_SERVER_2]; // round-robin pool - pickServer() va warmUpImportServers shundan foydalanadi
 var _serverIdx=0;
 function pickServer(){
@@ -3569,6 +3570,7 @@ function pickServer(){
 var VM_FALLBACK={};
 VM_FALLBACK[IMPORT_SERVER]='https://92-5-41-212.nip.io';
 VM_FALLBACK[IMPORT_SERVER_2]='https://92-5-126-0.nip.io';
+VM_FALLBACK[IMPORT_SERVER_3]='https://34-58-106-227.nip.io';
 async function fetchVM(server, path, opts){
   try{
     return await fetch(server+path, opts);
@@ -3613,8 +3615,9 @@ function uniqueTopicName(base){
 // chetlashadi va indikator DB'da (`db.serverBudgetUsed`) saqlanadi, ertasi
 // kun (UTC) qayta tiklanadi. null = cheklovsiz.
 var SERVER_POOL=[
-  {url:IMPORT_SERVER,   name:'VM1 (Oracle AMD)',     weight:15, dailyBudgetSec:null},
-  {url:IMPORT_SERVER_2, name:'VM2 (Oracle AMD)',     weight:15, dailyBudgetSec:null}
+  {url:IMPORT_SERVER,   name:'VM1 (Oracle AMD)',  weight:15, dailyBudgetSec:null},
+  {url:IMPORT_SERVER_2, name:'VM2 (Oracle AMD)',  weight:15, dailyBudgetSec:null},
+  {url:IMPORT_SERVER_3, name:'VM5 (Google e2-micro)', weight:8, dailyBudgetSec:null}
   // Yangi server tayyor bo'lganda, shu yerga qo'shiladi, masalan:
   // {url:'https://edutest-vm3.duckdns.org', name:'VM3 (Ampere)', weight:12, dailyBudgetSec:null},
   // {url:'https://edutest-koyeb.koyeb.app', name:'Koyeb (bepul)', weight:3,  dailyBudgetSec:null},
