@@ -3764,31 +3764,53 @@ async function distributedExeImport(files, folderName, msg){
   var extractedCount=0;
   var srvIdx=0;
 
+  function _sleepMs(ms){ return new Promise(function(res){ setTimeout(res,ms); }); }
+  // MUHIM: avval bu yerda RETRY YO'Q edi - bitta vaqtinchalik tarmoq xatosi
+  // (ekran o'chishi, ilova fonga o'tishi, qisqa uzilish) butun guruhni
+  // QAYTARIB BO'LMAS holda "xato" deb belgilardi (2026-08-xx kuzatilgan:
+  // 24 tadan 11 tasi shu sababdan "Failed to fetch" bilan tushib qolgan).
+  // Endi: har guruh uchun 3 marta urinadi (2s/5s/10s kutish bilan), va har
+  // urinishda BOSHQA serverga o'tadi (round-robin ichida) - agar bitta VM
+  // vaqtincha band/sekin bo'lsa, keyingi urinish avtomatik boshqa VM'ga
+  // tushadi.
   async function extractOneGroup(fdPromiseGroup){
     var filesData=(await Promise.all(fdPromiseGroup)).filter(Boolean);
     if(!filesData.length) return;
-    var srv=SERVER_POOL[srvIdx % SERVER_POOL.length]; srvIdx++;
     var startFileIdx=allFileResults.length; // shu guruh fayllari globalIdx boshlanishi
     // Joy band qilib qo'yamiz (tartib buzilmasligi uchun)
     filesData.forEach(function(){ allFileResults.push(null); });
-    try{
-      var res=await fetchVM(srv.url,'/extract_batch_start',{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({files: filesData})
-      }).then(function(r){return r.json();});
-      if(res.error) throw new Error(res.error);
-      (res.files||[]).forEach(function(fr, localIdx){
-        allFileResults[startFileIdx+localIdx]=fr;
-      });
-      (res.emf_tasks||[]).forEach(function(t){
-        var globalFileIdx=startFileIdx+t.file_index;
-        var idParts=t.id.split('_');
-        var newId=globalFileIdx+'_'+idParts.slice(1).join('_');
-        allEmfTasks.push({id:newId, emf_b64:t.emf_b64});
-      });
-    }catch(e){
+    var RETRY_DELAYS=[2000,5000,10000];
+    var lastErr=null;
+    var ok=false;
+    for(var attempt=0; attempt<=RETRY_DELAYS.length && !ok; attempt++){
+      var srv=SERVER_POOL[srvIdx % SERVER_POOL.length]; srvIdx++;
+      try{
+        var res=await fetchVM(srv.url,'/extract_batch_start',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({files: filesData})
+        }).then(function(r){return r.json();});
+        if(res.error) throw new Error(res.error);
+        (res.files||[]).forEach(function(fr, localIdx){
+          allFileResults[startFileIdx+localIdx]=fr;
+        });
+        (res.emf_tasks||[]).forEach(function(t){
+          var globalFileIdx=startFileIdx+t.file_index;
+          var idParts=t.id.split('_');
+          var newId=globalFileIdx+'_'+idParts.slice(1).join('_');
+          allEmfTasks.push({id:newId, emf_b64:t.emf_b64});
+        });
+        ok=true;
+      }catch(e){
+        lastErr=e;
+        if(attempt<RETRY_DELAYS.length){
+          msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; '+filesData.length+' ta fayl uchun vaqtinchalik xato ('+srv.name+'), '+(RETRY_DELAYS[attempt]/1000)+'s dan keyin boshqa serverda qayta urinadi ('+(attempt+1)+'/'+RETRY_DELAYS.length+')...</div>';
+          await _sleepMs(RETRY_DELAYS[attempt]);
+        }
+      }
+    }
+    if(!ok){
       filesData.forEach(function(fd, localIdx){
-        allFileResults[startFileIdx+localIdx]={filename:fd.filename, error:'Ajratishda xato: '+e.message};
+        allFileResults[startFileIdx+localIdx]={filename:fd.filename, error:'Ajratishda xato ('+RETRY_DELAYS.length+' marta urinildi): '+(lastErr?lastErr.message:'nomalum')};
       });
     }
     extractedCount+=filesData.length;
