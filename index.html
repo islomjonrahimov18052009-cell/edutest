@@ -291,6 +291,14 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <button class="btn bg bsm" onclick="logout();showPg('pg-home')">Chiqish</button>
       </div>
     </div>
+    <div class="fg" id="battle-join-box" style="background:#f5f3ff;border:1.5px dashed var(--purd);border-radius:11px;padding:14px;margin-bottom:14px">
+      <label style="margin-bottom:8px">&#x1F3AE; Sinf jangiga qo'shilish</label>
+      <div class="fx" style="gap:8px">
+        <input type="text" id="battle-pin-inp" placeholder="6 xonali PIN" maxlength="6" style="letter-spacing:3px;font-weight:700;text-align:center;font-size:18px">
+        <button class="btn bpu" onclick="joinBattle()">Qo'shilish</button>
+      </div>
+      <div id="battle-join-msg" class="mt8"></div>
+    </div>
     <div class="fg">
       <label>Fan</label>
       <div id="subj-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
@@ -355,6 +363,12 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="fg"><label>Yangi parol (ixtiyoriy)</label><div style="position:relative"><input type="password" id="spw-new" autocomplete="new-password" data-lpignore="true" data-1p-ignore placeholder="Yangi parol" style="padding-right:38px" readonly onfocus="this.removeAttribute('readonly')"><span onclick="togglePw('spw-new',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
     <button class="btn bpu bsm" onclick="changeMyPassword('spw')">Saqlash</button>
     <div id="spw-msg"></div>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:8px">&#x1F468;&#x200D;&#x1F469;&#x200D;&#x1F467; Ota-onani ulash</h3>
+    <p style="font-size:13px;color:var(--mut);margin-bottom:10px">Ota-onangiz shu havolani Telegram'da bossa, har hafta sizning progressingiz haqida avtomatik xabar oladi - hech qanday login/parol kerak emas.</p>
+    <button class="btn bpu bsm" onclick="createParentLink()">&#x1F517; Havola yaratish</button>
+    <div id="parent-link-msg" class="mt8"></div>
   </div>
 </div>
 
@@ -436,6 +450,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
           <h2 id="q-detail-title" style="margin:0"></h2>
           <div style="display:flex;gap:8px;align-items:center">
             <button class="btn bsm" style="background:#e8f4fd;color:#1565c0;font-size:13px" onclick="aiCheckTopic(_curTopicDetail)">🤖 Mavzuni tekshirish</button>
+            <button class="btn bpu bsm" onclick="startBattle(_curTopicDetail)">&#x1F3AE; Sinf jangi</button>
             <label style="font-size:13px;font-weight:500" title="Faqat shu mavzu uchun, umumiy standartni ustidan bosib qoyadi">⏱ Timer (shu mavzu uchun):</label>
             <input type="checkbox" id="topic-timer-toggle" onchange="saveTopicTimer(this.checked)" style="width:16px;height:16px">
             <span id="topic-timer-label" style="font-size:12px">Yoqiq</span>
@@ -1898,7 +1913,7 @@ function afterLogin(){
   renderNotifBell();
   if(ME.role==='admin'){resetTheme();showPg('pg-admin');initAdmin();}
   else if(ME.role==='teacher'){applySubjectTheme(ME.subject);showPg('pg-teacher');renderQT();}
-  else{resetTheme();selTopic=null;_curFolder=null;showPg('pg-topic');renderTopics();loadMyHist();}
+  else{resetTheme();selTopic=null;_curFolder=null;showPg('pg-topic');renderTopics();loadMyHist();var bjb=document.getElementById('battle-join-box');if(bjb)bjb.style.display='block';}
 }
 var _logoutWarned = false;
 function safeLogout(){
@@ -4708,6 +4723,189 @@ function warmUpImportServers(){
   RENDER_SERVERS.forEach(function(s){ fetchVM(s,'/health').catch(function(){}); });
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// SINF JANGI (Class Battle) - jonli, sinfda birgalikda ishlanadigan viktorina
+// ═══════════════════════════════════════════════════════════════════════
+// MUHIM: bu qism ASOSIY edutest_store blobiga TEGMAYDI - alohida, kichik va
+// tez jadvallar (battle_sessions, battle_answers) ishlatiladi, chunki
+// asosiy blob 20s'da bir marta sinxronlanadi (o'yin uchun juda sekin).
+// Realtime Supabase kanali orqali darhol yangilanadi.
+var BT={session:null,pin:null,role:'',qs:[],idx:0,chan:null,answered:{}};
+
+function genPin(){var s='';for(var i=0;i<6;i++)s+=Math.floor(Math.random()*10);return s;}
+
+async function startBattle(topic){
+  if(!_sbReady||!_sb){alert('Supabase ulanmagan - Sinf jangi ishlamaydi.');return;}
+  var qs=getMyQsByTopic(topic);
+  if(qs.length<3){alert('Sinf jangi uchun kamida 3 ta savol kerak!');return;}
+  var pin=genPin();
+  try{
+    var ins=await _sb.from('battle_sessions').insert({pin:pin,teacher_id:ME.id,topic:topic,status:'lobby'}).select().single();
+    if(ins.error){alert('Sessiya yaratishda xato: '+ins.error.message);return;}
+    BT.session=ins.data; BT.pin=pin; BT.role='teacher';
+    BT.qs=shuf(qs).slice(0,Math.min(10,qs.length));
+    openBattleModal();
+    renderBattleLobby();
+    subscribeBattle();
+  }catch(e){alert('Xato: '+e.message);}
+}
+function openBattleModal(){document.getElementById('battle-modal').style.display='flex';}
+function closeBattleModal(){
+  document.getElementById('battle-modal').style.display='none';
+  if(BT.chan){_sb.removeChannel(BT.chan);BT.chan=null;}
+  BT={session:null,pin:null,role:'',qs:[],idx:0,chan:null,answered:{}};
+}
+function subscribeBattle(){
+  if(!BT.session)return;
+  BT.chan=_sb.channel('battle_'+BT.session.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'battle_sessions',filter:'id=eq.'+BT.session.id},function(payload){
+      BT.session=payload.new;
+      if(BT.role==='teacher')renderBattleTeacherView();
+      else renderBattleStudentView();
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'battle_answers',filter:'session_id=eq.'+BT.session.id},function(payload){
+      if(BT.role==='teacher')renderBattleLeaderboard();
+    })
+    .subscribe();
+}
+function renderBattleLobby(){
+  document.getElementById('battle-modal-body').innerHTML=
+    '<div style="text-align:center;padding:10px 0">'+
+    '<div class="ts tm" style="margin-bottom:6px">O\'quvchilar shu PIN\'ni kiritsin:</div>'+
+    '<div style="font-family:JetBrains Mono,monospace;font-size:48px;font-weight:800;letter-spacing:8px;color:var(--pri);margin-bottom:16px">'+BT.pin+'</div>'+
+    '<div id="battle-lobby-list" style="min-height:60px;margin-bottom:16px"><span class="ts tm">Hali hech kim qoshilmadi...</span></div>'+
+    '<button class="btn bpu blg" onclick="beginBattleQuestion()">&#x25B6;&#xFE0F; Boshlash</button>'+
+    '</div>';
+  pollLobby();
+}
+var _lobbyPoll=null;
+function pollLobby(){
+  if(_lobbyPoll)clearInterval(_lobbyPoll);
+  _lobbyPoll=setInterval(async function(){
+    if(!BT.session||BT.session.status!=='lobby'){clearInterval(_lobbyPoll);return;}
+    var res=await _sb.from('battle_answers').select('student_name').eq('session_id',BT.session.id).eq('q_idx',-1);
+    var names=(res.data||[]).map(function(r){return r.student_name;});
+    var el=document.getElementById('battle-lobby-list');
+    if(el)el.innerHTML=names.length?names.map(function(n){return '<span class="bdg bpu2" style="margin:3px">'+n+'</span>';}).join(''):'<span class="ts tm">Hali hech kim qoshilmadi...</span>';
+  },2000);
+}
+async function beginBattleQuestion(){
+  if(_lobbyPoll)clearInterval(_lobbyPoll);
+  BT.idx=0;
+  await _sb.from('battle_sessions').update({status:'running',current_q_idx:0,question_started_at:new Date().toISOString()}).eq('id',BT.session.id);
+  renderBattleTeacherView();
+}
+function renderBattleTeacherView(){
+  if(!BT.session)return;
+  if(BT.session.status==='finished'){renderBattleFinal();return;}
+  var q=BT.qs[BT.session.current_q_idx];
+  if(!q){finishBattle();return;}
+  document.getElementById('battle-modal-body').innerHTML=
+    '<div style="text-align:center;margin-bottom:10px" class="ts tm">Savol '+(BT.session.current_q_idx+1)+' / '+BT.qs.length+'</div>'+
+    '<div style="font-weight:700;font-size:16px;margin-bottom:14px;text-align:center">'+q.text+'</div>'+
+    '<div id="battle-leaderboard" style="margin-bottom:14px"></div>'+
+    '<div class="fx center" style="gap:8px">'+
+    (BT.session.current_q_idx<BT.qs.length-1?'<button class="btn bpu" onclick="nextBattleQuestion()">Keyingi savol &#x2192;</button>':'<button class="btn bs" onclick="finishBattle()">&#x1F3C1; Yakunlash</button>')+
+    '</div>';
+  renderBattleLeaderboard();
+}
+async function renderBattleLeaderboard(){
+  if(!BT.session)return;
+  var res=await _sb.from('battle_answers').select('*').eq('session_id',BT.session.id).gte('q_idx',0);
+  var rows=res.data||[];
+  var scores={};
+  rows.forEach(function(r){
+    if(!scores[r.student_name])scores[r.student_name]=0;
+    if(r.correct)scores[r.student_name]+=Math.max(50,1000-r.answer_ms/20|0);
+  });
+  var arr=Object.keys(scores).map(function(n){return {name:n,score:scores[n]};}).sort(function(a,b){return b.score-a.score;});
+  var el=document.getElementById('battle-leaderboard');
+  if(!el)return;
+  el.innerHTML='<table><thead><tr><th>#</th><th>Ism</th><th>Ball</th></tr></thead><tbody>'+
+    arr.slice(0,10).map(function(r,i){return '<tr><td>'+(i+1)+'</td><td>'+r.name+'</td><td><b>'+r.score+'</b></td></tr>';}).join('')+
+    '</tbody></table>'+(!arr.length?'<p class="ts tm" style="text-align:center">Hali javoblar yoq</p>':'');
+}
+async function nextBattleQuestion(){
+  var ni=BT.session.current_q_idx+1;
+  await _sb.from('battle_sessions').update({current_q_idx:ni,question_started_at:new Date().toISOString()}).eq('id',BT.session.id);
+}
+async function finishBattle(){
+  await _sb.from('battle_sessions').update({status:'finished'}).eq('id',BT.session.id);
+}
+function renderBattleFinal(){
+  document.getElementById('battle-modal-body').innerHTML='<div style="text-align:center;padding:10px 0"><div style="font-size:40px;margin-bottom:10px">&#x1F3C6;</div><h2 style="margin-bottom:14px">O\'yin tugadi!</h2><div id="battle-leaderboard"></div><button class="btn bg mt12" onclick="closeBattleModal()">Yopish</button></div>';
+  renderBattleLeaderboard();
+}
+
+// ── O'QUVCHI TOMONI ─────────────────────────────────────────────────────
+async function joinBattle(){
+  var pin=(document.getElementById('battle-pin-inp').value||'').trim();
+  var msg=document.getElementById('battle-join-msg');
+  if(!pin||pin.length!==6){msg.innerHTML='<div class="alt ar">6 xonali PIN kiriting!</div>';return;}
+  if(!_sbReady||!_sb){msg.innerHTML='<div class="alt ar">Ulanish yoq.</div>';return;}
+  var res=await _sb.from('battle_sessions').select('*').eq('pin',pin).order('created_at',{ascending:false}).limit(1);
+  if(res.error||!res.data||!res.data.length){msg.innerHTML='<div class="alt ar">Bunday PIN topilmadi.</div>';return;}
+  var session=res.data[0];
+  if(session.status==='finished'){msg.innerHTML='<div class="alt ar">Bu o\'yin allaqachon tugagan.</div>';return;}
+  BT.session=session; BT.role='student'; BT.answered={};
+  var qs=getQsByTopic(session.topic);
+  BT.qs=qs;
+  await _sb.from('battle_answers').insert({session_id:session.id,student_login:ME.login,student_name:ME.name,q_idx:-1,correct:false,answer_ms:0}).select();
+  openBattleModal();
+  msg.innerHTML='';
+  renderBattleStudentWaiting();
+  subscribeBattle();
+}
+function renderBattleStudentWaiting(){
+  document.getElementById('battle-modal-body').innerHTML='<div style="text-align:center;padding:20px 0"><div style="font-size:36px;margin-bottom:10px">&#x23F3;</div><h3>Ustoz boshlashini kuting...</h3><p class="ts tm">PIN: '+BT.session.pin+'</p></div>';
+}
+var _battleQStart=0, _battleAnsweredIdx=-1;
+function renderBattleStudentView(){
+  if(!BT.session)return;
+  if(BT.session.status==='lobby'){renderBattleStudentWaiting();return;}
+  if(BT.session.status==='finished'){
+    document.getElementById('battle-modal-body').innerHTML='<div style="text-align:center;padding:20px 0"><div style="font-size:40px;margin-bottom:10px">&#x1F3C1;</div><h3>O\'yin tugadi!</h3><button class="btn bg mt12" onclick="closeBattleModal()">Yopish</button></div>';
+    return;
+  }
+  var qi=BT.session.current_q_idx;
+  if(qi===_battleAnsweredIdx)return;
+  var origQs=getQsByTopic(BT.session.topic);
+  var q=shuf(origQs)[qi%origQs.length];
+  if(!q)return;
+  _battleQStart=Date.now();
+  document.getElementById('battle-modal-body').innerHTML=
+    '<div style="text-align:center;margin-bottom:10px" class="ts tm">Savol '+(qi+1)+'</div>'+
+    '<div style="font-weight:700;font-size:16px;margin-bottom:14px">'+q.text+'</div>'+
+    q.options.map(function(opt,i){return '<div class="opt" onclick="answerBattle('+qi+','+i+','+JSON.stringify(q.correct).replace(/"/g,'&quot;')+')"><span>'+String.fromCharCode(65+i)+'. '+opt+'</span></div>';}).join('');
+}
+async function answerBattle(qIdx,optIdx,correctArr){
+  if(qIdx===_battleAnsweredIdx)return;
+  _battleAnsweredIdx=qIdx;
+  var ms=Date.now()-_battleQStart;
+  var isOk=correctArr.indexOf(optIdx)>=0;
+  document.getElementById('battle-modal-body').innerHTML='<div style="text-align:center;padding:20px 0"><div style="font-size:36px">'+(isOk?'✅':'❌')+'</div><p class="ts tm mt8">Keyingi savolni kuting...</p></div>';
+  try{
+    await _sb.from('battle_answers').insert({session_id:BT.session.id,student_login:ME.login,student_name:ME.name,q_idx:qIdx,correct:isOk,answer_ms:ms});
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// OTA-ONA TELEGRAM ULASH
+// ═══════════════════════════════════════════════════════════════════════
+async function createParentLink(){
+  var msg=document.getElementById('parent-link-msg');
+  msg.innerHTML='<div class="alt ai">&#x23F3; Havola yaratilmoqda...</div>';
+  try{
+    var res=await fetch(RENDER_SERVER+'/parent_link_create',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({student_login:ME.login})
+    }).then(function(r){return r.json();});
+    if(res.error){msg.innerHTML='<div class="alt ar">Xato: '+res.error+'</div>';return;}
+    msg.innerHTML='<div class="alt as">Tayyor! Ota-onangizga shu havolani yuboring (Telegram\'da ochib, "Start" bosishi kifoya):</div>'+
+      '<div class="fx" style="gap:8px;margin-top:8px"><input type="text" readonly value="'+res.link+'" style="flex:1;font-size:12px" id="parent-link-out" onclick="this.select()"><button class="btn bg bsm" onclick="navigator.clipboard.writeText(\''+res.link+'\');this.textContent=\'Nusxalandi!\'">Nusxalash</button></div>';
+  }catch(e){msg.innerHTML='<div class="alt ar">Xato: '+e.message+'</div>';}
+}
+
 sbInit();
 // Bulutdan malumot orqa fonda tortib olinadi - foydalanuvchiga korinmaydi.
 // initMeta() endi FAQAT shu tortib olish tugagandan keyin ishga tushadi -
@@ -4863,6 +5061,14 @@ history.pushState(null, '', location.href);
     <div class="modal" style="max-width:480px;width:95%">
       <div class="mh"><h3>🤖 AI tekshirish natijasi</h3><button class="xb" onclick="document.getElementById('ai-modal').style.display='none'">&#x2715;</button></div>
       <div id="ai-modal-body" style="padding:8px"></div>
+    </div>
+  </div>
+
+  <!-- SINF JANGI MODAL -->
+  <div class="mbg" id="battle-modal" style="display:none;z-index:280">
+    <div class="modal" style="max-width:460px">
+      <div class="mh"><h3>&#x1F3AE; Sinf jangi</h3><button class="xb" onclick="closeBattleModal()">&#x2715;</button></div>
+      <div id="battle-modal-body"></div>
     </div>
   </div>
 
