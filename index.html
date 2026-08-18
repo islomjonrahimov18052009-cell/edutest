@@ -1829,6 +1829,21 @@ function goAuth(role){
   // Xavfsizlik: parol maydonlari har safar bosh sahifadan qayta ochilganda tozalanadi
   // (brauzerning avtomatik toldirish/eslab qolishidan himoya uchun)
   ['li-u','li-p'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  // QO'SHIMCHA XAVFSIZLIK (2026-08-18): umumiy/maktab kompyuterlarida Chrome
+  // parolni saqlab qo'yishi va KEYINGI o'quvchiga oldingi o'quvchining
+  // login/parolini avtomatik taklif qilib ko'rsatishi - jiddiy xavf edi.
+  // autocomplete="off" YOLGIZ O'ZI YETARLI EMAS - Chrome buni ataylab
+  // e'tiborsiz qoldiradi (2014'dan buyon, "foydalanuvchiga yordam" nomi
+  // bilan). Eng samarali qo'shimcha usul: har safar login ekrani ochilganda
+  // maydon `name` atributini TASODIFIY qilib qo'yamiz - shunda Chrome'ning
+  // saqlangan hisob ma'lumotlari YANGI (hech qachon ko'rmagan) `name`ga mos
+  // kelmaydi va avtomatik taklif qilmaydi. `id` o'zgarmaydi (kodning qolgan
+  // qismi shu orqali ishlaydi), faqat `name` o'zgaradi.
+  var _rndSuffix=Math.random().toString(36).slice(2,10);
+  ['li-u','li-p','rg-u','rg-p'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.setAttribute('name','f_'+_rndSuffix+'_'+id);
+  });
   showAuthTab('li');
   showPg('pg-auth');
 }
@@ -1867,6 +1882,13 @@ async function doLogin(){
   db.users.forEach(function(x){if(x.login===u&&x.pass===p&&x.role===authRole)found=x;});
   if(!found){showErr("Login yoki parol noto'g'ri!");return;}
   if(found.role==='teacher' && found.approved===false){showErr("Hisobingiz hali admin tomonidan tasdiqlanmagan. Iltimos, kuting yoki admin bilan boglaning.");return;}
+  // Xavfsizlik: kirish muvaffaqiyatli bo'lishi bilanoq maydonlarni darhol
+  // tozalaymiz - qiymat DOM'da qancha kam tursa, brauzerning "parolni
+  // saqlashni xohlaysizmi?" so'rovi (agar chiqsa) ham kamroq ma'lumotga ega
+  // bo'ladi. Bu Chrome'ning saqlash-taklifini kafolatlangan holda
+  // to'xtatmaydi (brauzer bunga o'zi qaror qiladi), lekin xavfni kamaytiradi.
+  document.getElementById('li-u').value='';
+  document.getElementById('li-p').value='';
   ME=found;afterLogin();
 }
 function doRegister(){
@@ -1918,32 +1940,22 @@ function afterLogin(){
 var _logoutWarned = false;
 function safeLogout(){
   if(S.mode){
-    if(!_logoutWarned){
-      _logoutWarned = true;
-      _ignoreBlur = true;
-      alert('⚠️ Diqqat! Test hali tugamagan!\n\nAgar chiqib ketsangiz — test tugaydi.\n' + (S.mode==='exam'?'Imtihon rejimida ishlayotganingiz sababli natijangiz saqlanib qoladi.':'Sinov rejimi — natija saqlanmaydi.') + '\n\nChiqish uchun "Chiqish" tugmasini yana bir marta bosing.');
-      // MUHIM: ko'pchilik brauzer alert() chiqqanda AVTOMATIK fullscreen'dan
-      // chiqarib yuboradi (bu bizning nazoratimizda emas). Avval bu yerda
-      // qayta fullscreen'ga qaytarish yo'q edi - shuning uchun alert
-      // yopilgach o'quvchi brauzer panelini (boshqa tablar, manzil satri
-      // va h.k.) ko'rib, ularga o'tib ketishi mumkin edi. Endi darhol
-      // qayta fullscreen so'raymiz.
-      var _elFs=document.documentElement;
-      if(!document.fullscreenElement&&!document.webkitFullscreenElement){
-        if(_elFs.requestFullscreen)_elFs.requestFullscreen().catch(function(){});
-        else if(_elFs.webkitRequestFullscreen)_elFs.webkitRequestFullscreen();
-      }
-      setTimeout(function(){ _ignoreBlur = false; }, 500);
-      return;
-    } else {
-      _logoutWarned = false;
-      _ignoreBlur = false;
-      submitTest(true);
-      setTimeout(function(){logout();}, 300);
-      return;
-    }
+    var body=document.getElementById('logout-warn-body');
+    body.innerHTML='<div style="font-size:32px;margin-bottom:10px">⚠️</div><h3 style="margin-bottom:10px">Diqqat! Test hali tugamagan</h3>'+
+      '<p class="ts" style="margin-bottom:6px">Agar chiqib ketsangiz — test tugaydi.</p>'+
+      '<p class="ts" style="color:'+(S.mode==='exam'?'var(--ok)':'var(--mut)')+';font-weight:600">'+(S.mode==='exam'?'Imtihon rejimida ishlayotganingiz sababli natijangiz saqlanib qoladi.':'Sinov rejimi — natija saqlanmaydi.')+'</p>';
+    document.getElementById('logout-warn-modal').style.display='flex';
+    return;
   }
   logout();
+}
+function closeLogoutWarn(){
+  document.getElementById('logout-warn-modal').style.display='none';
+}
+function confirmLogoutWarn(){
+  document.getElementById('logout-warn-modal').style.display='none';
+  submitTest(true);
+  setTimeout(function(){logout();}, 300);
 }
 function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
   // To'liq ekrandan chiqish - faqat haqiqatan fullscreen bolsa
@@ -5076,6 +5088,22 @@ history.pushState(null, '', location.href);
       <div style="display:flex;gap:10px;margin-top:16px">
         <button class="btn bg bfw" onclick="closeFinishModal()">Bekor qilish</button>
         <button class="btn bs bfw" onclick="confirmFinishTest()">Ha, yakunlash</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHIQISH OGOHLANTIRISH MODALI (test davomida) -->
+  <!-- native alert() o'rniga ATAYLAB shu modal ishlatiladi: alert() ko'pchilik
+       brauzerda fullscreen'dan avtomatik chiqarib yuboradi va buni ishonchli
+       qaytarib bo'lmaydi (2026-08-18: shu sabab "chiqish" bosilganda boshqa
+       brauzer panellariga otish imkoni paydo bolgan edi). Bu modal sahifa
+       ICHIDA ekani uchun fullscreen'ga umuman ta'sir qilmaydi. -->
+  <div class="mbg" id="logout-warn-modal" style="display:none;z-index:300">
+    <div class="modal" style="max-width:420px;text-align:center">
+      <div id="logout-warn-body"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn bg bfw" onclick="closeLogoutWarn()">Bekor qilish</button>
+        <button class="btn bd bfw" onclick="confirmLogoutWarn()">Ha, chiqish</button>
       </div>
     </div>
   </div>
