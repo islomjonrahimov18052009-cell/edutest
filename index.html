@@ -1922,6 +1922,17 @@ function safeLogout(){
       _logoutWarned = true;
       _ignoreBlur = true;
       alert('⚠️ Diqqat! Test hali tugamagan!\n\nAgar chiqib ketsangiz — test tugaydi.\n' + (S.mode==='exam'?'Imtihon rejimida ishlayotganingiz sababli natijangiz saqlanib qoladi.':'Sinov rejimi — natija saqlanmaydi.') + '\n\nChiqish uchun "Chiqish" tugmasini yana bir marta bosing.');
+      // MUHIM: ko'pchilik brauzer alert() chiqqanda AVTOMATIK fullscreen'dan
+      // chiqarib yuboradi (bu bizning nazoratimizda emas). Avval bu yerda
+      // qayta fullscreen'ga qaytarish yo'q edi - shuning uchun alert
+      // yopilgach o'quvchi brauzer panelini (boshqa tablar, manzil satri
+      // va h.k.) ko'rib, ularga o'tib ketishi mumkin edi. Endi darhol
+      // qayta fullscreen so'raymiz.
+      var _elFs=document.documentElement;
+      if(!document.fullscreenElement&&!document.webkitFullscreenElement){
+        if(_elFs.requestFullscreen)_elFs.requestFullscreen().catch(function(){});
+        else if(_elFs.webkitRequestFullscreen)_elFs.webkitRequestFullscreen();
+      }
       setTimeout(function(){ _ignoreBlur = false; }, 500);
       return;
     } else {
@@ -2134,7 +2145,12 @@ function renderQ(){
       btnSub.style.opacity='1';
     }
   }
-  var imgSrc = q.img ? imgSrcVal(q.img) : '';
+  // MUHIM: ba'zi eski import qilingan savollarda rasm q.img o'rniga
+  // q.image maydonida saqlangan (2026-08-18'gacha bo'lgan EMF import
+  // xatosi tufayli) - shuning uchun ikkalasini ham tekshiramiz, aks holda
+  // eski (avvalgi xato bilan import qilingan) savollarda rasm hali ham
+  // ko'rinmay qolaveradi, garchi import xatosi tuzatilgan bo'lsa ham.
+  var imgSrc = (q.img||q.image) ? imgSrcVal(q.img||q.image) : '';
   var imgHtml = imgSrc ? '<div style="text-align:center;margin:10px 0"><img src="'+imgSrc+'" style="max-width:100%;max-height:200px;border-radius:8px;background:#fff;padding:4px"></div>' : '';
   document.getElementById('t-qbody').innerHTML='<div style="font-weight:700;font-size:17px;margin-bottom:8px;line-height:1.6">'+(S.idx+1)+'. '+q.text+'</div>'+imgHtml+(q.isMulti?'<div class="alt ai ts" style="margin-bottom:10px">Ko\'p javobli: bir nechta to\'g\'ri</div>':'')+
     q.options.map(function(opt,i){var sel=ans.indexOf(i)>=0;var ctrl=q.isMulti?'<div class="chk'+(sel?' on':'')+'"><span>'+(sel?'&#x2713;':'')+'</span></div>':'<div class="radio'+(sel?' on':'')+'"></div>';var isImg=isImgVal(opt);var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-width:100%;max-height:150px;display:block;margin:6px 0 2px 0;background:#fff;border-radius:6px;padding:4px">':'<span> '+opt+'</span>';return '<div class="opt'+(sel?' sel':'')+'" onclick="selAns('+i+')">'+ctrl+'<div style="flex:1"><span>'+String.fromCharCode(65+i)+'.</span>'+optContent+'</div></div>';}).join('');
@@ -3868,7 +3884,13 @@ async function distributedExeImport(files, folderName, msg){
   for(var fi=0; fi<allFileResults.length; fi++){
     var fr=allFileResults[fi];
     if(!fr || fr.error){ errTotal++; failedNames.push((fr?fr.filename:'fayl')+(fr&&fr.error?' ('+fr.error+')':'')); continue; }
-    var qs=(fr.questions||[]).map(function(q){ if(q.image){} if(q.isMulti===undefined) q.isMulti=(q.correct||[]).length>1; return q; });
+    // TUZATISH (2026-08-18): bu yerda avval "if(q.image){}" - BO'SH BLOK
+    // edi, hech narsa qilmasdi. Natijada rasm q.image maydonida qolib
+    // ketardi, q.img'ga ko'chmasdi. Ustoz paneli va "Batafsil" ko'rinishi
+    // ikkalasi ham q.img||q.image tekshiradi (shu sabab ular to'g'ri
+    // ko'rsatardi), lekin test yechish ekrani (renderQ) FAQAT q.img'ni
+    // tekshiradi - shu sababdan aynan test ichida rasm ko'rinmasdi.
+    var qs=(fr.questions||[]).map(function(q){ if(q.image){q.img=q.image;delete q.image;} if(q.isMulti===undefined) q.isMulti=(q.correct||[]).length>1; return q; });
     await saveImportedQs({qs:qs, topic:fr.topic, questionsToAsk:fr.questionsToAsk}, msg);
     okTotal++;
   }
