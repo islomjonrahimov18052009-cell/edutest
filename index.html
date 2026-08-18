@@ -3523,11 +3523,13 @@ async function startBookGeneration(file, mode, count){
         // Papka allaqachon foydalanuvchi tomonidan tanlangan (fp-modal orqali,
         // _pendingImportFolder ichida saqlangan) - qayta sorash shart emas.
         var totalQs=0;
+        window._batchImportMode=true; // duplikat mavzu nomida BLOKLOVCHI dialog chiqmasin
         for(var i=0;i<results.length;i++){
           msg.innerHTML='<div class="alt ai">&#x23F3; Saqlanmoqda: "'+results[i].topic+'" ('+(i+1)+'/'+results.length+')...</div>';
           await saveImportedQs({qs:results[i].questions, topic:results[i].topic, questionsToAsk:results[i].questionsToAsk}, msg);
           totalQs+=results[i].questions.length;
         }
+        window._batchImportMode=false;
         _pendingImportFolder=null;
         msg.innerHTML='<div class="alt as">&#x2705; Tayyor! '+results.length+' ta mavzudan jami '+totalQs+' ta savol yaratildi.</div>';
         renderQT();
@@ -3861,6 +3863,7 @@ async function distributedExeImport(files, folderName, msg){
   });
 
   // 4-BOSQICH: saqlash (mavjud saveImportedQs() orqali, avvalgidek)
+  window._batchImportMode=true; // duplikat mavzu nomida BLOKLOVCHI dialog chiqmasin
   var okTotal=0, errTotal=0, failedNames=[];
   for(var fi=0; fi<allFileResults.length; fi++){
     var fr=allFileResults[fi];
@@ -3871,6 +3874,7 @@ async function distributedExeImport(files, folderName, msg){
   }
 
   _pendingImportFolder=null;
+  window._batchImportMode=false;
   releaseImportWakeLock();
   var bgNote=_importWasBackgrounded?'<br>&#x2139;&#xFE0F; Ekran/ilova fonga otganini aniqladik - xatolar shu sabab bolishi mumkin.':'';
   msg.innerHTML='<div class="alt as">&#x2705; "'+folderName+'" kitobiga '+okTotal+' ta mavzu import qilindi ('+allEmfTasks.length+' ta formula/rasm, '+SERVER_POOL.length+' ta server birgalikda ishladi)!'+(errTotal?' ('+errTotal+' ta faylda xato bordi)':'')+(failedNames.length?'<br>&#x274C; Import bolmadi: '+failedNames.join(', '):'')+bgNote+'</div>';
@@ -3881,12 +3885,27 @@ async function saveImportedQs(parsed,msg){
   // MUHIM: mavzu nomi tekshiruvi ENDI birinchi bo'lib ishlaydi - aks holda
   // "Bekor qilish" (yangi mavzu sifatida saqlash) tanlansa ham, har bir
   // savolga ESKI nom allaqachon yozib bo'lingan bo'lib qolar edi.
+  // 2026-08-18 TUZATISH: avval bu yerda confirm() BLOKLOVCHI dialog chiqarardi.
+  // Ko'p faylli (masalan 16 ta) import paytida, agar 2+ fayldan bir xil
+  // nomli mavzu chiqsa, har birida shu savol so'ralardi. Agar shu payt
+  // ekran o'chgan/fon rejimiga o'tgan bo'lsa (yoki foydalanuvchi darhol
+  // javob bermasa), ba'zi brauzerlar bunday "kutilmagan" dialoglarni
+  // AVTOMATIK "OK" (=Yangilash, eskisini o'chirib yuborish) deb javob
+  // beradi - natijada bir nechta mavzu jimgina BIR-BIRINI EZIB YUBORARDI
+  // (16 ta import qilingan deyilsa-yu, faqat 11 tasi qolgani shu sabab
+  // edi). Endi: KO'P FAYLLI (batch) import paytida hech qachon so'ralmaydi -
+  // duplikat nom avtomatik noyob qilinadi (hech narsa yo'qolmaydi). Faqat
+  // BITTA fayl qo'lda import qilinganda (odatiy holat) so'raladi.
   var _dbCheck=getDB();
   var topicExists=(_dbCheck.userQs||[]).some(function(q){return q.topic===parsed.topic&&q.teacherId===ME.id;});
   if(topicExists){
-    var doUpdate=confirm('"'+parsed.topic+'" nomli mavzu allaqachon mavjud.\n\nOK — Yangilash (eskisi o\'chib, yangi savollar bilan almashtiriladi)\nBekor qilish — Yangi, alohida mavzu sifatida saqlash');
-    if(!doUpdate){
+    if(window._batchImportMode){
       parsed.topic=uniqueTopicName(parsed.topic);
+    } else {
+      var doUpdate=confirm('"'+parsed.topic+'" nomli mavzu allaqachon mavjud.\n\nOK — Yangilash (eskisi o\'chib, yangi savollar bilan almashtiriladi)\nBekor qilish — Yangi, alohida mavzu sifatida saqlash');
+      if(!doUpdate){
+        parsed.topic=uniqueTopicName(parsed.topic);
+      }
     }
   }
 
@@ -4242,6 +4261,7 @@ async function importDocumentFiles(files, suggestedFolder, unsupportedNote){
   }
   if(folderName) _pendingImportFolder=folderName;
   await acquireImportWakeLock();
+  window._batchImportMode=true; // duplikat mavzu nomida BLOKLOVCHI dialog chiqmasin
   var okTotal=0, errTotal=0, failedNames=[];
   for(var i=0;i<files.length;i++){
     if(!checkAndIncrementUsage('questions', 5)){ break; }
@@ -4257,6 +4277,7 @@ async function importDocumentFiles(files, suggestedFolder, unsupportedNote){
     }
   }
   _pendingImportFolder=null;
+  window._batchImportMode=false;
   var bgNote=_importWasBackgrounded?'<div class="ts tm" style="margin-top:6px">&#x2139;&#xFE0F; Ekran/ilova fonga otganini aniqladik - agar xato uchragan bolsa, shu sabab bolishi mumkin.</div>':'';
   var summary='<div class="alt '+(errTotal?'aw':'as')+'">'+(okTotal?('&#x2705; '+okTotal+' ta fayldan savollar import qilindi!'):'')+
     (errTotal?('<br>&#x274C; '+errTotal+' ta faylda xato: '+failedNames.join('; ')):'')+'</div>'+bgNote;
@@ -4305,6 +4326,7 @@ async function importImageFiles(files, suggestedFolder, unsupportedNote){
   }
   if(folderName) _pendingImportFolder=folderName;
   await acquireImportWakeLock();
+  window._batchImportMode=true; // duplikat mavzu nomida BLOKLOVCHI dialog chiqmasin
   var okTotal=0, errTotal=0, failedNames=[];
   for(var i=0;i<files.length;i++){
     if(!checkAndIncrementUsage('images', 1)){ break; }
@@ -4320,6 +4342,7 @@ async function importImageFiles(files, suggestedFolder, unsupportedNote){
     }
   }
   _pendingImportFolder=null;
+  window._batchImportMode=false;
   releaseImportWakeLock();
   var summary='<div class="alt '+(errTotal?'aw':'as')+'">'+(okTotal?('&#x2705; '+okTotal+' ta rasmdan savollar import qilindi!'):'')+
     (errTotal?('<br>&#x274C; '+errTotal+' ta rasmda xato: '+failedNames.join('; ')):'')+'</div>';
