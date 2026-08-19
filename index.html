@@ -239,6 +239,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <div class="fg"><label>Login</label><input type="text" id="li-u" placeholder="Login" autocomplete="off" data-lpignore="true" data-1p-ignore readonly onfocus="this.removeAttribute('readonly')"></div>
         <div class="fg"><label>Parol</label><div style="position:relative"><input type="password" id="li-p" placeholder="Parol" style="padding-right:38px" autocomplete="new-password" data-lpignore="true" data-1p-ignore onkeydown="if(event.key==='Enter')doLogin()" readonly onfocus="this.removeAttribute('readonly')"><span onclick="togglePw('li-p',this)" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px">&#x1F441;</span></div></div>
         <button class="btn bp bfw blg mt8" onclick="doLogin()">Kirish</button>
+        <p class="ts tm" style="margin-top:10px;text-align:center;line-height:1.5">&#x1F4A1; Umumiy/maktab kompyuteridan foydalansangiz, brauzer parolni saqlashni so'rasa <b>"Hech qachon"</b> yoki <b>"Yo'q, rahmat"</b> tugmasini bosing - shunda boshqa o'quvchi sizning hisobingizdan foydalana olmaydi.</p>
       </div>
       <div id="form-rg" style="display:none">
         <div class="fg"><label>Ism Familiya</label><input type="text" id="rg-n" placeholder="Masalan: Abror Karimov"></div>
@@ -4951,16 +4952,26 @@ async function answerBattle(qIdx,optIdx,correctArr){
 // ═══════════════════════════════════════════════════════════════════════
 async function createParentLink(){
   var msg=document.getElementById('parent-link-msg');
-  msg.innerHTML='<div class="alt ai">&#x23F3; Havola yaratilmoqda...</div>';
-  try{
-    var res=await fetch(RENDER_SERVER+'/parent_link_create',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({student_login:ME.login})
-    }).then(function(r){return r.json();});
-    if(res.error){msg.innerHTML='<div class="alt ar">Xato: '+res.error+'</div>';return;}
-    msg.innerHTML='<div class="alt as">Tayyor! Ota-onangizga shu havolani yuboring (Telegram\'da ochib, "Start" bosishi kifoya):</div>'+
-      '<div class="fx" style="gap:8px;margin-top:8px"><input type="text" readonly value="'+res.link+'" style="flex:1;font-size:12px" id="parent-link-out" onclick="this.select()"><button class="btn bg bsm" onclick="navigator.clipboard.writeText(\''+res.link+'\');this.textContent=\'Nusxalandi!\'">Nusxalash</button></div>';
-  }catch(e){msg.innerHTML='<div class="alt ar">Xato: '+e.message+'</div>';}
+  var RETRY_DELAYS=[1500,3500,7000]; // sekin/beqaror mobil aloqa uchun avtomatik qayta urinish
+  for(var attempt=0; attempt<=RETRY_DELAYS.length; attempt++){
+    msg.innerHTML='<div class="alt ai">&#x23F3; Havola yaratilmoqda'+(attempt?' ('+(attempt+1)+'-urinish)':'')+'...</div>';
+    try{
+      var res=await fetch(RENDER_SERVER+'/parent_link_create',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({student_login:ME.login})
+      }).then(function(r){return r.json();});
+      if(res.error){msg.innerHTML='<div class="alt ar">Xato: '+res.error+'</div>';return;}
+      msg.innerHTML='<div class="alt as">Tayyor! Ota-onangizga shu havolani yuboring (Telegram\'da ochib, "Start" bosishi kifoya):</div>'+
+        '<div class="fx" style="gap:8px;margin-top:8px"><input type="text" readonly value="'+res.link+'" style="flex:1;font-size:12px" id="parent-link-out" onclick="this.select()"><button class="btn bg bsm" onclick="navigator.clipboard.writeText(\''+res.link+'\');this.textContent=\'Nusxalandi!\'">Nusxalandi!</button></div>';
+      return;
+    }catch(e){
+      if(attempt<RETRY_DELAYS.length){
+        await new Promise(function(r){setTimeout(r,RETRY_DELAYS[attempt]);});
+      } else {
+        msg.innerHTML='<div class="alt ar">Xato: internet aloqasi beqaror ('+e.message+'). Iltimos, aloqa yaxshilanganda "Havola yaratish"ni qayta bosing.</div>';
+      }
+    }
+  }
 }
 
 sbInit();
