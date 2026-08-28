@@ -3597,6 +3597,10 @@ var RENDER_SERVER='https://edutest-server-7.onrender.com';
 var IMPORT_SERVER='https://edutest-oracle.duckdns.org';      // VM1 (Oracle)
 var IMPORT_SERVER_2='https://edutest-oracle-2.duckdns.org';  // VM2 (Oracle)
 var IMPORT_SERVER_3='https://edutest-vm5.duckdns.org';       // VM5 (Google Cloud e2-micro)
+var IMPORT_SERVER_4='https://edutest-vm4.duckdns.org';       // VM4 (Oracle Ampere, 2026-08-28 qoshildi)
+var IMPORT_SERVER_5='https://edutest-vm7.duckdns.org';       // VM7 (Oracle Ampere, oldinroq sozlangan, 2026-08-28 kodga ulandi)
+var IMPORT_SERVER_6='https://130-61-168-154.nip.io';         // VM8 (Oracle Ampere, DuckDNS limiti tugagani uchun nip.io ishlatilgan, 2026-08-28)
+var IMPORT_SERVER_7='https://130-61-20-188.nip.io';          // VM9 (Oracle Ampere, nip.io, 2026-08-28)
 var RENDER_SERVERS=[IMPORT_SERVER,IMPORT_SERVER_2]; // round-robin pool - pickServer() va warmUpImportServers shundan foydalanadi
 var _serverIdx=0;
 function pickServer(){
@@ -3617,6 +3621,8 @@ var VM_FALLBACK={};
 VM_FALLBACK[IMPORT_SERVER]='https://92-5-41-212.nip.io';
 VM_FALLBACK[IMPORT_SERVER_2]='https://92-5-126-0.nip.io';
 VM_FALLBACK[IMPORT_SERVER_3]='https://34-58-106-227.nip.io';
+VM_FALLBACK[IMPORT_SERVER_4]='https://130-61-74-112.nip.io';
+VM_FALLBACK[IMPORT_SERVER_5]='https://130-61-172-212.nip.io';
 async function fetchVM(server, path, opts){
   try{
     return await fetch(server+path, opts);
@@ -3663,7 +3669,11 @@ function uniqueTopicName(base){
 var SERVER_POOL=[
   {url:IMPORT_SERVER,   name:'VM1 (Oracle AMD)',  weight:15, dailyBudgetSec:null},
   {url:IMPORT_SERVER_2, name:'VM2 (Oracle AMD)',  weight:15, dailyBudgetSec:null},
-  {url:IMPORT_SERVER_3, name:'VM5 (Google e2-micro)', weight:8, dailyBudgetSec:null}
+  {url:IMPORT_SERVER_3, name:'VM5 (Google e2-micro)', weight:8, dailyBudgetSec:null},
+  {url:IMPORT_SERVER_4, name:'VM4 (Oracle Ampere)', weight:15, dailyBudgetSec:null},
+  {url:IMPORT_SERVER_5, name:'VM7 (Oracle Ampere)', weight:15, dailyBudgetSec:null},
+  {url:IMPORT_SERVER_6, name:'VM8 (Oracle Ampere)', weight:15, dailyBudgetSec:null},
+  {url:IMPORT_SERVER_7, name:'VM9 (Oracle Ampere)', weight:15, dailyBudgetSec:null}
   // Yangi server tayyor bo'lganda, shu yerga qo'shiladi, masalan:
   // {url:'https://edutest-vm3.duckdns.org', name:'VM3 (Ampere)', weight:12, dailyBudgetSec:null},
   // {url:'https://edutest-koyeb.koyeb.app', name:'Koyeb (bepul)', weight:3,  dailyBudgetSec:null},
