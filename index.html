@@ -265,6 +265,11 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
             <option value="">-- Fan tanlang --</option>
           </select>
         </div>
+        <div id="rg-email-fg" class="fg" style="display:none">
+          <label>Email</label>
+          <input type="email" id="rg-email" placeholder="masalan@gmail.com" autocomplete="off">
+          <p class="ts tm" style="margin-top:5px">Admin ro'yxatdan o'tish so'rovingizni tasdiqlaganda yoki rad etganda, natija shu emailga yuboriladi.</p>
+        </div>
         <div id="rg-tcls-fg" class="fg" style="display:none">
           <label>Qaysi sinf(lar)ga dars berasiz</label>
           <div id="rg-tcls-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;border:1.5px solid var(--bdr);border-radius:9px;max-height:150px;overflow-y:auto"></div>
@@ -1810,6 +1815,7 @@ function goAuth(role){
   document.getElementById('rg-cls-fg').style.display=isT?'none':'block';
   document.getElementById('rg-subj-fg').style.display=isT?'block':'none';
   document.getElementById('rg-tcls-fg').style.display=isT?'block':'none';
+  document.getElementById('rg-email-fg').style.display=isT?'block':'none';
   document.getElementById('tab-rg').style.display=isA?'none':'flex';
   document.getElementById('auth-err').innerHTML='';
   var db=getDB();
@@ -1898,6 +1904,7 @@ function doRegister(){
   var pass=document.getElementById('rg-p').value;
   var cls=authRole==='student'?document.getElementById('rg-cls').value:'';
   var subj=authRole==='teacher'?document.getElementById('rg-subj').value:'';
+  var email=authRole==='teacher'?document.getElementById('rg-email').value.trim():'';
   var tclasses=authRole==='teacher'?Array.prototype.slice.call(document.querySelectorAll('.rg-tcls-chk:checked')).map(function(c){return c.value;}):[];
   var vil=document.getElementById('rg-vil').value;
   var tum=document.getElementById('rg-tum').value;
@@ -1912,6 +1919,8 @@ function doRegister(){
   if(authRole==='student'&&!cls){showErr("Sinf tanlang!");return;}
   if(authRole==='teacher'&&!subj){showErr("Fan tanlang!");return;}
   if(authRole==='teacher'&&!tclasses.length){showErr("Kamida bitta sinfni belgilang!");return;}
+  if(authRole==='teacher'&&!email){showErr("Email kiriting! Admin tasdig'i haqida shu yerga xabar boradi.");return;}
+  if(authRole==='teacher'&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showErr("Email noto'g'ri formatda!");return;}
   var db=getDB();
   var dup=db.users.filter(function(x){return x.login===user;});
   if(dup.length){showErr("Bu login band! Boshqa login tanlang.");return;}
@@ -1919,12 +1928,12 @@ function doRegister(){
   // egallaydi. Yangi ustoz hisobi darhol ISHLAY OLMAYDI (approved:false) -
   // admin uni "Tasdiqlanishi kerak" royxatida korib (ism/maktab/sinflar orqali)
   // tekshirib, keyin tasdiqlaydi. Shu payGacha ustoz kira olmaydi.
-  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,teachClasses:tclasses,viloyat:vil,tuman:tum,maktab:maktab,plan:'free',approved:(authRole!=='teacher'),usage:{month:curMonthKey(),images:0,pages:0,questions:0}};
+  var nu={id:'u'+Date.now(),role:authRole,name:name,login:user,pass:pass,cls:cls,subject:subj,email:email,teachClasses:tclasses,viloyat:vil,tuman:tum,maktab:maktab,plan:'free',approved:(authRole!=='teacher'),usage:{month:curMonthKey(),images:0,pages:0,questions:0}};
   db.users.push(nu);
   saveDB(db);
   if(authRole==='teacher' && !nu.approved){
     showAuthTab('li');
-    document.getElementById('auth-err').innerHTML='<div class="alt as mt8">&#x2705; Ro\'yxatdan o\'tdingiz! Hisobingiz admin tasdig\'ini kutmoqda - tasdiqlangach kirishingiz mumkin bo\'ladi.</div>';
+    document.getElementById('auth-err').innerHTML='<div class="alt as mt8">&#x2705; Ma\'lumotlaringiz adminga jo\'natildi! Admin tasdiqlagandan keyin tizimga kirishingiz mumkin bo\'ladi. Admin tasdiqlagach (yoki rad etsa), natija <b>'+email+'</b> manziliga xabar qilinadi.</div>';
     return;
   }
   ME=nu;afterLogin();
@@ -2011,6 +2020,7 @@ function renderTopics(){
   if(_curFolder){
     // Papka ichidasiz - shu papkadagi mavzularni korsatamiz
     var inFolder=topics.filter(function(t){return folderOf[t]===_curFolder;});
+    inFolder.sort(function(a,b){return a.localeCompare(b,'uz');});
     var html='<div class="tbtn" style="border-style:dashed" onclick="_curFolder=null;renderTopics()"><div style="font-weight:700">&#8592; Orqaga</div><div style="font-size:11px;color:var(--mut);margin-top:3px">Kitoblar royxatiga</div></div>';
     html+=inFolder.map(function(t){
       var cnt=qsCountByTopic[t]||0,meta=metaByTopic[t],ask=meta?meta.questionsToAsk:cnt;
@@ -2024,7 +2034,9 @@ function renderTopics(){
   // Ildiz korinish: papkalar + papkasiz mavzular
   var folderNames=[];
   topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0)folderNames.push(folderOf[t]); });
+  folderNames.sort(function(a,b){return a.localeCompare(b,'uz');});
   var unfoldered=topics.filter(function(t){return !folderOf[t];});
+  unfoldered.sort(function(a,b){return a.localeCompare(b,'uz');});
 
   var html='';
   html+=folderNames.map(function(fn){
@@ -2166,7 +2178,7 @@ function renderQ(){
   var imgSrc = (q.img||q.image) ? imgSrcVal(q.img||q.image) : '';
   var imgHtml = imgSrc ? '<div style="text-align:center;margin:10px 0"><img src="'+imgSrc+'" style="max-width:100%;max-height:200px;border-radius:8px;background:#fff;padding:4px"></div>' : '';
   document.getElementById('t-qbody').innerHTML='<div style="font-weight:700;font-size:17px;margin-bottom:8px;line-height:1.6">'+(S.idx+1)+'. '+q.text+'</div>'+imgHtml+(q.isMulti?'<div class="alt ai ts" style="margin-bottom:10px">Ko\'p javobli: bir nechta to\'g\'ri</div>':'')+
-    q.options.map(function(opt,i){var sel=ans.indexOf(i)>=0;var ctrl=q.isMulti?'<div class="chk'+(sel?' on':'')+'"><span>'+(sel?'&#x2713;':'')+'</span></div>':'<div class="radio'+(sel?' on':'')+'"></div>';var isImg=isImgVal(opt);var optContent=isImg?'<img src="'+imgSrcVal(opt)+'" style="max-width:100%;max-height:150px;display:block;margin:6px 0 2px 0;background:#fff;border-radius:6px;padding:4px">':'<span> '+opt+'</span>';return '<div class="opt'+(sel?' sel':'')+'" onclick="selAns('+i+')">'+ctrl+'<div style="flex:1"><span>'+String.fromCharCode(65+i)+'.</span>'+optContent+'</div></div>';}).join('');
+    q.options.map(function(opt,i){var sel=ans.indexOf(i)>=0;var ctrl=q.isMulti?'<div class="chk'+(sel?' on':'')+'"><span>'+(sel?'&#x2713;':'')+'</span></div>':'<div class="radio'+(sel?' on':'')+'"></div>';var isImg=isImgVal(opt);var isPending=typeof opt==='string'&&opt.indexOf('__IMG_PENDING__')>=0;var optContent=isPending?'<span style="color:#b45309;font-size:13px">&#x26A0;&#xFE0F; Rasm yuklanmadi (ustozga xabar bering)</span>':isImg?'<img src="'+imgSrcVal(opt)+'" style="max-width:100%;max-height:150px;display:block;margin:6px 0 2px 0;background:#fff;border-radius:6px;padding:4px">':'<span> '+opt+'</span>';return '<div class="opt'+(sel?' sel':'')+'" onclick="selAns('+i+')">'+ctrl+'<div style="flex:1"><span>'+String.fromCharCode(65+i)+'.</span>'+optContent+'</div></div>';}).join('');
   renderMathIn(document.getElementById('t-qbody'));
 }
 function goQ(d){S.idx=Math.max(0,Math.min(S.test.length-1,S.idx+d));renderQ();}
@@ -2380,6 +2392,7 @@ function renderQT(){
 
   if(_curQFolder){
     var inFolder=topics.filter(function(t){return folderOf[t]===_curQFolder;});
+    inFolder.sort(function(a,b){return a.localeCompare(b,'uz');});
     var fEsc=_curQFolder.replace(/'/g,"\\'");
     var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'+
       '<button class="btn bg bsm" onclick="_curQFolder=null;renderQT()">&#8592; Fayllar</button>'+
@@ -2394,7 +2407,9 @@ function renderQT(){
 
   var folderNames=emptyFolders.slice();
   topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0)folderNames.push(folderOf[t]); });
+  folderNames.sort(function(a,b){return a.localeCompare(b,'uz');});
   var unfoldered=topics.filter(function(t){return !folderOf[t];});
+  unfoldered.sort(function(a,b){return a.localeCompare(b,'uz');});
 
   var html='';
   html+=folderNames.map(function(fn){
@@ -2552,6 +2567,8 @@ function renderTopicDetail(t){
   tbody.innerHTML=qs.map(function(q,qi){
     var opts=(q.options||[]).map(function(o,oi){
       var isImg=isImgVal(o);
+      var isPending=typeof o==='string'&&o.indexOf('__IMG_PENDING__')>=0;
+      if(isPending) return String.fromCharCode(65+oi)+'.⚠️[rasm yuklanmadi]';
       return String.fromCharCode(65+oi)+(isImg?'.[rasm]':'. '+o.substring(0,30));
     }).join('<br>');
     var correctOpts=(q.correct||[]).map(function(ci){return String.fromCharCode(65+ci);}).join(',');
@@ -3122,15 +3139,27 @@ function approveTeacher(uid){
   u.approved=true;
   addNotification(db, u.id, '\u2705 Ro\'yxatdan muvaffaqiyatli o\'tdingiz!', 'Login: '+u.login+' - Admin hisobingizni tasdiqladi, endi tizimga kirishingiz mumkin.');
   saveDB(db);
+  if(u.email){
+    fetch(RENDER_SERVER+'/notify_teacher_status',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:u.email,name:u.name,login:u.login,status:'approved'})
+    }).catch(function(){});
+  }
   renderPendingTeachers();
   renderAdminAllUsers();
-  alert(u.name+' tasdiqlandi - endi tizimga kira oladi.');
+  alert(u.name+' tasdiqlandi - endi tizimga kira oladi.'+(u.email?' Emailga ham xabar yuborildi.':''));
 }
 function rejectTeacher(uid){
   var db=getDB();
   var u=db.users.find(function(x){return x.id===uid;});
   if(!u)return;
   if(!confirm(u.name+' ("'+u.login+'") hisobini butunlay ochirasizmi?'))return;
+  if(u.email){
+    fetch(RENDER_SERVER+'/notify_teacher_status',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:u.email,name:u.name,login:u.login,status:'blocked'})
+    }).catch(function(){});
+  }
   db.users=db.users.filter(function(x){return x.id!==uid;});
   saveDB(db);
   renderPendingTeachers();
@@ -3738,11 +3767,26 @@ async function distributeEmfConversion(emfTasks, onProgress){
   var queue=makeWorkQueue(emfTasks);
   var done=0, total=emfTasks.length;
   var activeServers={};
+  function sleepMs(ms){return new Promise(function(r){setTimeout(r,ms);});}
+  // MUHIM (2026-08-29 tuzatish): katta importlarda (10,000+ rasm) serverlar
+  // xotira yetishmasligidan "qulab tushishi" (Docker avtomatik qayta
+  // ishga tushiradi, lekin 5-15 soniya vaqt oladi) kuzatildi. Avvalgi kod
+  // bitta xatodan keyin serverni BUTUNLAY tashlab yuborardi - hatto server
+  // sekundlar ichida qayta tiklansa ham. Endi: (1) har so'rovda kamroq
+  // vazifa (server tezligidan qat'iy nazar maksimum 6 tagacha) yuboriladi -
+  // xotira bosimi va bitta xatoning "narxi" kamayadi; (2) server xato
+  // bersa, darhol tashlab yuborilmaydi - qisqa kutish bilan yana 2 marta
+  // qayta uriniladi (Docker avtomatik qayta ishga tushishi uchun vaqt
+  // berish maqsadida).
+  var MAX_CHUNK=6;
+  var MAX_RETRIES_PER_SERVER=2;
+  var RETRY_WAIT_MS=8000;
 
   async function worker(srv){
+    var consecutiveFails=0;
     while(true){
-      if(!isServerBudgetAvailable(srv)){ delete activeServers[srv.name]; return; } // kunlik limit tugadi
-      var chunk=queue.claim(srv.weight);
+      if(!isServerBudgetAvailable(srv)){ delete activeServers[srv.name]; return; }
+      var chunk=queue.claim(Math.min(srv.weight, MAX_CHUNK));
       if(!chunk.length){ delete activeServers[srv.name]; return; }
       activeServers[srv.name]=true;
       if(onProgress) onProgress(done,total,Object.keys(activeServers));
@@ -3756,10 +3800,19 @@ async function distributeEmfConversion(emfTasks, onProgress){
           Object.keys(res.results).forEach(function(id){ results[id]=res.results[id]; });
         }
         addServerBudgetUsed(srv.url, Math.round((Date.now()-t0)/1000));
+        consecutiveFails=0; // muvaffaqiyatli - hisoblagichni tozalaymiz
       }catch(e){
-        // Bu server ishlamadi - vazifalarni navbatga QAYTARIB, boshqa
-        // serverlar davom etsin, shu server esa bu import uchun to'xtaydi.
-        console.warn('Server '+srv.name+' xato berdi, navbatdan chetlatildi:', e);
+        consecutiveFails++;
+        if(consecutiveFails<=MAX_RETRIES_PER_SERVER){
+          // Darhol tashlab yubormaymiz - Docker avtomatik qayta ishga
+          // tushishi uchun qisqa vaqt kutamiz, keyin SHU serverga yana
+          // urinamiz (vazifa hali navbatda, chunki hali requeue qilmadik).
+          console.warn('Server '+srv.name+' xato berdi ('+consecutiveFails+'/'+MAX_RETRIES_PER_SERVER+'), '+(RETRY_WAIT_MS/1000)+'s kutib qayta urinadi:', e);
+          queue.requeueFront(chunk);
+          await sleepMs(RETRY_WAIT_MS);
+          continue;
+        }
+        console.warn('Server '+srv.name+' '+MAX_RETRIES_PER_SERVER+' marta ketma-ket xato berdi, bu import uchun chetlatildi:', e);
         queue.requeueFront(chunk);
         delete activeServers[srv.name];
         return;
@@ -3771,19 +3824,45 @@ async function distributeEmfConversion(emfTasks, onProgress){
 
   await Promise.all(SERVER_POOL.map(worker));
 
-  // Agar biror server ishlamay qolib, ba'zi vazifalar hali navbatda
-  // qolgan bo'lsa (masalan hammasi bir vaqtda xato bergan bo'lsa) -
-  // qolganlarini ishlayotgan (birinchi) serverga qayta yuboramiz.
-  if(queue.remaining()>0 && SERVER_POOL.length){
-    var leftover=queue.claim(queue.remaining());
-    var srv=SERVER_POOL[0];
-    try{
-      var res2=await fetchVM(srv.url,'/convert_emfs',{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({tasks: leftover.map(function(t){return {id:t.id, emf_b64:t.emf_b64};})})
-      }).then(function(r){return r.json();});
-      if(res2 && res2.results) Object.keys(res2.results).forEach(function(id){ results[id]=res2.results[id]; });
-    }catch(e){ console.error('Qoldiq EMF vazifalarini ham konvertatsiya qilib bolmadi:', e); }
+  // Agar hali ham vazifalar navbatda qolgan bo'lsa (masalan hammasi bir
+  // vaqtda vaqtincha ishdan chiqqan bo'lsa) - endi FAQAT VM1'ga emas,
+  // BARCHA serverlarga, bir necha bosqichda (har bosqich orasida kutib,
+  // Docker qayta tiklanishi uchun vaqt berib) qayta taqsimlaymiz.
+  var FALLBACK_ROUNDS=6;
+  var FALLBACK_WAIT_MS=12000;
+  for(var round=0; round<FALLBACK_ROUNDS && queue.remaining()>0; round++){
+    if(round>0) await sleepMs(FALLBACK_WAIT_MS);
+    for(var si=0; si<SERVER_POOL.length && queue.remaining()>0; si++){
+      var srv2=SERVER_POOL[si];
+      var leftover=queue.claim(Math.min(MAX_CHUNK, queue.remaining()));
+      if(!leftover.length) break;
+      try{
+        var res2=await fetchVM(srv2.url,'/convert_emfs',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({tasks: leftover.map(function(t){return {id:t.id, emf_b64:t.emf_b64};})})
+        }).then(function(r){return r.json();});
+        if(res2 && res2.results){
+          Object.keys(res2.results).forEach(function(id){ results[id]=res2.results[id]; });
+          done+=Object.keys(res2.results).length;
+          if(onProgress) onProgress(done,total,[]);
+        }
+      }catch(e){
+        console.warn('Qoldiq bosqich '+(round+1)+'/'+FALLBACK_ROUNDS+': '+srv2.name+' ham xato berdi, keyingi bosqichda qayta uriniladi:', e);
+        queue.requeueFront(leftover);
+      }
+    }
+  }
+  if(queue.remaining()>0){
+    // MUHIM (2026-08-29): oldin bu yerda hech narsa qilinmasdi - xom EMF
+    // ma'lumoti YO'QOLIB ketardi, faqat "__IMG_PENDING__" matni qolib
+    // ketaverardi, va uni HECH QACHON tuzatib bo'lmasdi (chunki manba .exe
+    // fayl allaqachon yopilgan). Endi: muvaffaqiyatsiz qolgan har bir
+    // vazifaning xom EMF baytlari "EMFPENDING:" belgisi bilan natijaga
+    // yoziladi - keyinroq (hatto boshqa kunda ham) "Tuzatish" tugmasi
+    // orqali qayta urinish mumkin bo'ladi, hech narsa yo'qolmaydi.
+    var stillLeft=queue.claim(queue.remaining());
+    stillLeft.forEach(function(t){ results[t.id]='EMFPENDING:'+t.emf_b64; });
+    console.warn(stillLeft.length+' ta rasm/formula '+FALLBACK_ROUNDS+' bosqichdan keyin ham konvertatsiya qilinmadi - xom malumot saqlab qolindi, keyinroq "Tuzatish" tugmasi bilan qayta urinish mumkin.');
   }
   return results;
 }
@@ -3847,6 +3926,20 @@ async function distributedExeImport(files, folderName, msg){
         }).then(function(r){return r.json();});
         if(res.error) throw new Error(res.error);
         (res.files||[]).forEach(function(fr, localIdx){
+          // TUZATISH (2026-08-29): avval mavzu nomi faylning ICHIDAGI
+          // (<Name> tegidagi) nomdan olinardi - lekin ko'p .exe fayllarda
+          // bu ichki nom bir xil yoki juda umumiy bo'lib chiqadi (masalan
+          // hammasi "Yangi mavzu" yoki shunga oxshash), natijada import
+          // qilingandan keyin qaysi mavzu qaysi ekanini ajratish qiyin
+          // bo'lib qolardi. Endi mavzu nomi FAYL NOMINING o'zidan olinadi -
+          // bu har doim noyob va tushunarli bo'ladi (foydalanuvchi faylni
+          // qanday nomlagan bo'lsa, mavzu nomi ham shunday bo'ladi).
+          if(fr && !fr.error){
+            var origFilename=filesData[localIdx] && filesData[localIdx].filename;
+            if(origFilename){
+              fr.topic=origFilename.replace(/\.(exe|docx|pdf|txt|jpe?g|png)$/i,'');
+            }
+          }
           allFileResults[startFileIdx+localIdx]=fr;
         });
         (res.emf_tasks||[]).forEach(function(t){
@@ -4069,7 +4162,8 @@ function sendToServer(file,msg,server){
             if(result.error)throw new Error(result.error);
             if(!result.questions||!result.questions.length)throw new Error('Savollar topilmadi');
             var qs=result.questions.map(function(q){if(q.image){q.img=q.image;delete q.image;}if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1;return q;});
-            await saveImportedQs({qs:qs,topic:result.topic,questionsToAsk:result.questionsToAsk},msg);
+            var topicFromFilename=file.name.replace(/\.(exe|docx|pdf|txt|jpe?g|png)$/i,'');
+            await saveImportedQs({qs:qs,topic:topicFromFilename,questionsToAsk:result.questionsToAsk},msg);
             resolve(true);
           }catch(e){
             retryOrGiveUp('Server javobini o\'qib bo\'lmadi ('+e.message+').');
