@@ -3874,6 +3874,12 @@ async function distributeEmfConversion(emfTasks, onProgress){
 // server" modelidan farqli, EMF-darajasidagi tarqatish.
 async function distributedExeImport(files, folderName, msg){
   _pendingImportFolder=folderName;
+  // MUHIM (2026-08-30 tuzatish): oldin bu bayroq faqat SAQLASH bosqichida
+  // yoqilardi - lekin "internet yo'q" ogohlantirishi ko'proq ANIQ shu
+  // oldingi (fayl ochish + rasm/formula konvertatsiya) bosqichlarida
+  // chiqardi, chunki o'sha payt bayroq hali yoqilmagan edi. Endi butun
+  // import boshidan oxirigacha yoqilgan turadi.
+  window._batchImportMode=true;
   await acquireImportWakeLock();
   msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; Fayllar ochilmoqda (0/'+files.length+')...</div>';
 
