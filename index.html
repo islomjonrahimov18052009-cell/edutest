@@ -2020,7 +2020,7 @@ function renderTopics(){
   if(_curFolder){
     // Papka ichidasiz - shu papkadagi mavzularni korsatamiz
     var inFolder=topics.filter(function(t){return folderOf[t]===_curFolder;});
-    inFolder.sort(function(a,b){return a.localeCompare(b,'uz');});
+    inFolder.sort(function(a,b){return a.localeCompare(b,'uz',{numeric:true});});
     var html='<div class="tbtn" style="border-style:dashed" onclick="_curFolder=null;renderTopics()"><div style="font-weight:700">&#8592; Orqaga</div><div style="font-size:11px;color:var(--mut);margin-top:3px">Kitoblar royxatiga</div></div>';
     html+=inFolder.map(function(t){
       var cnt=qsCountByTopic[t]||0,meta=metaByTopic[t],ask=meta?meta.questionsToAsk:cnt;
@@ -2034,9 +2034,9 @@ function renderTopics(){
   // Ildiz korinish: papkalar + papkasiz mavzular
   var folderNames=[];
   topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0)folderNames.push(folderOf[t]); });
-  folderNames.sort(function(a,b){return a.localeCompare(b,'uz');});
+  folderNames.sort(function(a,b){return a.localeCompare(b,'uz',{numeric:true});});
   var unfoldered=topics.filter(function(t){return !folderOf[t];});
-  unfoldered.sort(function(a,b){return a.localeCompare(b,'uz');});
+  unfoldered.sort(function(a,b){return a.localeCompare(b,'uz',{numeric:true});});
 
   var html='';
   html+=folderNames.map(function(fn){
@@ -2392,7 +2392,7 @@ function renderQT(){
 
   if(_curQFolder){
     var inFolder=topics.filter(function(t){return folderOf[t]===_curQFolder;});
-    inFolder.sort(function(a,b){return a.localeCompare(b,'uz');});
+    inFolder.sort(function(a,b){return a.localeCompare(b,'uz',{numeric:true});});
     var fEsc=_curQFolder.replace(/'/g,"\\'");
     var html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'+
       '<button class="btn bg bsm" onclick="_curQFolder=null;renderQT()">&#8592; Fayllar</button>'+
@@ -2407,9 +2407,9 @@ function renderQT(){
 
   var folderNames=emptyFolders.slice();
   topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0)folderNames.push(folderOf[t]); });
-  folderNames.sort(function(a,b){return a.localeCompare(b,'uz');});
+  folderNames.sort(function(a,b){return a.localeCompare(b,'uz',{numeric:true});});
   var unfoldered=topics.filter(function(t){return !folderOf[t];});
-  unfoldered.sort(function(a,b){return a.localeCompare(b,'uz');});
+  unfoldered.sort(function(a,b){return a.localeCompare(b,'uz',{numeric:true});});
 
   var html='';
   html+=folderNames.map(function(fn){
@@ -5270,4 +5270,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-</html>
+          </html>
