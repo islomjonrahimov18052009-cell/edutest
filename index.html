@@ -985,6 +985,7 @@ function markConnLost(){
   if(_connLost) return;
   _connLost=true;
   if(S.mode) return; // test paytida hech narsa korsatilmaydi
+  if(window._batchImportMode) return; // import paytida ham korsatilmaydi
   ensureConnBanner().style.display='block';
 }
 function markConnOk(){
@@ -4835,9 +4836,28 @@ function aiCheckTopic(topic) {
 function updateOfflineOverlay(){
   var ov=document.getElementById('offline-overlay');
   if(!ov)return;
-  if(S.mode){ ov.style.display='none'; return; }
-  ov.style.display = navigator.onLine ? 'none' : 'flex';
+  if(S.mode || window._batchImportMode){ ov.style.display='none'; return; }
+  if(navigator.onLine){
+    if(_offlineOverlayTimer){clearTimeout(_offlineOverlayTimer);_offlineOverlayTimer=null;}
+    ov.style.display='none';
+    return;
+  }
+  // MUHIM (2026-08-30): navigator.onLine ba'zan bir necha soniyaga
+  // yolg'ondan "offline" deb korsatishi mumkin (Wi-Fi signalining
+  // qisqa tebranishi, tarmoq adapteri holatini almashtirishi va h.k.),
+  // garchi internet aslida ishlab tursa ham - bu FOYDALANUVCHIGA
+  // BEZOVTA QILUVCHI, kerak bolmagan to'la ekranli xabar korsatardi.
+  // Endi darhol korsatmaymiz - 4 soniya kutib, agar SHU VAQT ICHIDA ham
+  // hali "offline" bolib qolsa (haqiqiy uzilish), faqat SHUNDA korsatamiz.
+  if(_offlineOverlayTimer) return; // allaqachon kutilmoqda
+  _offlineOverlayTimer=setTimeout(function(){
+    _offlineOverlayTimer=null;
+    if(!navigator.onLine && !S.mode && !window._batchImportMode){
+      ov.style.display='flex';
+    }
+  }, 4000);
 }
+var _offlineOverlayTimer=null;
 window.addEventListener('online', updateOfflineOverlay);
 window.addEventListener('offline', updateOfflineOverlay);
 // MUHIM: bu skript "#offline-overlay" divdan OLDIN joylashgan (u </body>
@@ -5270,4 +5290,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-          </html>
+</html>
