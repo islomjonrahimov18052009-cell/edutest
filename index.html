@@ -583,7 +583,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     </div>
     <div class="card">
       <h3 style="margin-bottom:12px">Sinflar boshqaruvi</h3>
-      <div class="fg"><label>Sinflar (vergul bilan)</label><input type="text" id="cls-inp" placeholder="5A,5B,6A,..."></div>
+      <div class="fg"><label>Sinflar (vergul bilan)</label><input type="text" id="cls-inp" placeholder="5A,5B,6A,..."><p class="ts tm" style="margin-top:5px">Bu yerdan faqat YANGI sinf qo'sha olasiz - mavjud sinflarni o'chira olmaysiz (bu boshqa ustozlarga ta'sir qiladi, faqat admin o'chira oladi).</p></div>
       <button class="btn bpu bsm" onclick="saveClsList()">Saqlash</button>
       <div id="cls-msg"></div>
     </div>
@@ -1305,6 +1305,8 @@ var SUBJECTS=[
   {v:'rus',n:'Rus tili'},{v:'info',n:'Informatika'},{v:'other',n:'Boshqa fan'}
 ];
 function subjName(v){var s=SUBJECTS.find(function(x){return x.v===v;});return s?s.n:v;}
+var SUBJECT_EMOJI={math:'&#x1F4D0;',phys:'&#x269B;&#xFE0F;',chem:'&#x1F9EA;',bio:'&#x1F9EC;',hist:'&#x1F4DC;',geo:'&#x1F30D;',lit:'&#x1F4D6;',lang:'&#x270D;&#xFE0F;',eng:'&#x1F1EC;&#x1F1E7;',rus:'&#x1F1F7;&#x1F1FA;',info:'&#x1F4BB;',other:'&#x1F4DA;'};
+function subjEmoji(v){return SUBJECT_EMOJI[v]||'&#x1F4DA;';}
 
 // ── FANGA QARAB DIZAYN (RANG) O'ZGARISHI ───────────────────────────────────
 // Har bir fan uchun oz rang uslubi: sayt kirish sahifasi doim neytral/umumiy
@@ -1980,7 +1982,7 @@ function logout(){ME=null;if(S.iv)clearInterval(S.iv);_backWarned=false;
   var ndd=document.getElementById('notif-dropdown'); if(ndd) ndd.style.display='none';
   resetTheme();showPg('pg-home');}
 
-var _curSubjFilter='';
+var _curSubjFilter=null;
 var _curFolder=null;
 function renderTopics(){
   document.getElementById('tp-gr').textContent='Salom, '+ME.name+'!';
@@ -1990,18 +1992,37 @@ function renderTopics(){
   var subjSet=[];
   allQs.forEach(function(q){if(q.subject&&subjSet.indexOf(q.subject)<0)subjSet.push(q.subject);});
   var filterHost=document.getElementById('subj-filter');
+  var grid=document.getElementById('topic-grid');
+
   if(subjSet.length<=1){
+    // Faqat bitta fan bor - tanlash shart emas, avtomatik shu fan tanlangan
+    // hisoblanadi.
     filterHost.innerHTML='';
-    _curSubjFilter='';
+    _curSubjFilter=subjSet[0]||'';
+  } else if(!_curSubjFilter){
+    // MUHIM (2026-08-30): endi bir nechta fan bo'lsa, mavzular RO'YXATI
+    // birinchi navbatda umuman KO'RSATILMAYDI - avval FAN tanlash MAJBURIY.
+    // Sabab: ustozlar endi ro'yxatdan o'tishda o'z fanini tanlaydi, va
+    // turli fanlardan bir xil nomli yoki oxshash mavzular aralashib,
+    // o'quvchi uchun qaysi fan ekanini ajratish qiyin bo'lib qolgan edi.
+    // "Barchasi" (hammasini birga korish) variant ENDI YO'Q - aynan shu
+    // aralashib ketishning oldini olish uchun.
+    filterHost.innerHTML='';
+    document.getElementById('tp-sub').textContent="Avval fanni tanlang";
+    grid.innerHTML=subjSet.map(function(s){
+      return '<div class="tbtn" style="padding:22px 12px" onclick="filterBySubj(\''+s+'\')"><div style="font-size:28px;margin-bottom:6px">'+subjEmoji(s)+'</div><div style="font-weight:700">'+subjName(s)+'</div></div>';
+    }).join('');
+    return;
   } else {
-    var pills=['<button class="tab'+(_curSubjFilter===''?' on':'')+'" style="flex:none;padding:6px 14px" onclick="filterBySubj(\'\')">Barchasi</button>'];
-    subjSet.forEach(function(s){
-      pills.push('<button class="tab'+(_curSubjFilter===s?' on':'')+'" style="flex:none;padding:6px 14px" onclick="filterBySubj(\''+s+'\')">'+subjName(s)+'</button>');
+    // Fan allaqachon tanlangan - kichik "fanni almashtirish" tugmasi
+    // korsatiladi (pastda), "Barchasi" esa YO'Q.
+    var pills=subjSet.map(function(s){
+      return '<button class="tab'+(_curSubjFilter===s?' on':'')+'" style="flex:none;padding:6px 14px" onclick="filterBySubj(\''+s+'\')">'+subjName(s)+'</button>';
     });
+    pills.push('<button class="tab" style="flex:none;padding:6px 14px;background:#f1f5f9" onclick="filterBySubj(null)">&#x1F504; Fanni almashtirish</button>');
     filterHost.innerHTML=pills.join('');
   }
   var topics=getTopics().filter(function(t){
-    if(!_curSubjFilter)return true;
     return allQs.some(function(q){return q.topic===t&&q.subject===_curSubjFilter;});
   });
   // Mavzularni papka(kitob)larga guruhlash
@@ -3296,10 +3317,21 @@ function delUser(uid){
 }
 function saveClsList(){
   var val=document.getElementById('cls-inp').value;
-  var cls=val.split(',').map(function(c){return c.trim();}).filter(function(c){return c;});
-  if(!cls.length){alert("Kamida bitta sinf!");return;}
-  var db=getDB();db.classes=cls;saveDB(db);
-  document.getElementById('cls-msg').innerHTML='<div class="alt as mt8">Sinflar saqlandi!</div>';
+  var typed=val.split(',').map(function(c){return c.trim();}).filter(function(c){return c;});
+  if(!typed.length){alert("Kamida bitta sinf!");return;}
+  var db=getDB();
+  // TUZATISH (2026-08-30): avval bu yerda "db.classes=cls" - BUTUN royxatni
+  // ALMASHTIRARDI. Bu global (hamma ustozlar uchun umumiy) royxat bolgani
+  // uchun, bitta ustoz sinf ochirsa, boshqa ustozlarning ham (o'zi
+  // ishlatmasa ham ularga tegishli) sinflari yo'qolib ketardi. Endi FAQAT
+  // QO'SHISH mumkin - mavjud sinflar hech qachon shu yerdan ochirilmaydi
+  // (ochirish kerak bolsa, bu alohida, admin darajasidagi amal bolishi kerak).
+  db.classes=db.classes||[];
+  var addedCount=0;
+  typed.forEach(function(c){ if(db.classes.indexOf(c)<0){ db.classes.push(c); addedCount++; } });
+  saveDB(db);
+  document.getElementById('cls-inp').value=db.classes.join(',');
+  document.getElementById('cls-msg').innerHTML='<div class="alt as mt8">'+(addedCount?addedCount+' ta yangi sinf qo\'shildi!':'Yangi sinf yo\'q edi, mavjudlar saqlanib qoldi.')+'</div>';
   setTimeout(function(){document.getElementById('cls-msg').innerHTML='';},3000);
 }
 function clearResults(){
