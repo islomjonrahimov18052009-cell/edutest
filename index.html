@@ -297,59 +297,102 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
         <button class="btn bg bsm" onclick="logout();showPg('pg-home')">Chiqish</button>
       </div>
     </div>
-    <div class="fg" id="battle-join-box" style="background:#f5f3ff;border:1.5px dashed var(--purd);border-radius:11px;padding:14px;margin-bottom:14px">
-      <label style="margin-bottom:8px">&#x1F3AE; Sinf jangiga qo'shilish</label>
-      <div class="fx" style="gap:8px">
-        <input type="text" id="battle-pin-inp" placeholder="6 xonali PIN" maxlength="6" style="letter-spacing:3px;font-weight:700;text-align:center;font-size:18px">
-        <button class="btn bpu" onclick="joinBattle()">Qo'shilish</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="switchTab('st-test',this)">&#x1F4DD; Test yechish</button>
+    <button class="tab" onclick="switchTab('st-battle',this)">&#x1F3AE; O'yinlar</button>
+    <button class="tab" onclick="switchTab('st-results',this);loadMyHist()">&#x1F4CA; Natijalarim</button>
+  </div>
+
+  <div class="tc on" id="st-test">
+    <div class="card">
+      <div class="fg">
+        <label>Fan</label>
+        <div id="subj-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+        <label>Qaysi mavzuni ishlaysiz?</label>
+        <div class="tgrid" id="topic-grid"></div>
       </div>
-      <div id="battle-join-msg" class="mt8"></div>
     </div>
-    <div class="fg">
-      <label>Fan</label>
-      <div id="subj-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
-      <label>Qaysi mavzuni ishlaysiz?</label>
-      <div class="tgrid" id="topic-grid"></div>
+    <div class="card" id="mode-card" style="display:none">
+      <h3 style="margin-bottom:12px">Test rejimini tanlang</h3>
+      <div style="margin-bottom:12px">
+        <div id="timer-teacher-only" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <label style="font-size:14px;font-weight:500">⏱ Timer:</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="timer-toggle-preview" checked onchange="saveTimerPref(this.checked)" style="width:18px;height:18px">
+            <span id="timer-label-preview" style="font-size:13px">Yoqiq</span>
+          </label>
+        </div>
+        <div id="timer-time-row-preview" style="display:flex;align-items:center;gap:8px">
+          <label style="font-size:13px">Vaqt:</label>
+          <select id="timer-minutes-preview" onchange="saveTimerMinutes(this.value)" style="padding:4px 8px;border-radius:6px;border:1px solid var(--color-border);font-size:13px">
+            <option value="5">5 daqiqa</option>
+            <option value="10">10 daqiqa</option>
+            <option value="15" selected>15 daqiqa</option>
+            <option value="20">20 daqiqa</option>
+            <option value="30">30 daqiqa</option>
+            <option value="45">45 daqiqa</option>
+            <option value="60">60 daqiqa</option>
+            <option value="90">90 daqiqa</option>
+          </select>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="rcard" onclick="startTest('practice')">
+          <div class="ic">&#x1F9EA;</div>
+          <h3>Sinov</h3><p class="ts tm">Natija saqlanmaydi</p>
+        </div>
+        <div class="rcard" id="exam-mode-card" onclick="startTest('exam')">
+          <div class="ic">&#x1F3AF;</div>
+          <h3>Imtihon</h3><p class="ts tm" id="exam-mode-desc">Natija saqlanadi</p>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="card" id="mode-card" style="display:none">
-    <h3 style="margin-bottom:12px">Test rejimini tanlang</h3>
-    <div style="margin-bottom:12px">
-      <div id="timer-teacher-only" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <label style="font-size:14px;font-weight:500">⏱ Timer:</label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-          <input type="checkbox" id="timer-toggle-preview" checked onchange="saveTimerPref(this.checked)" style="width:18px;height:18px">
-          <span id="timer-label-preview" style="font-size:13px">Yoqiq</span>
-        </label>
-      </div>
-      <div id="timer-time-row-preview" style="display:flex;align-items:center;gap:8px">
-        <label style="font-size:13px">Vaqt:</label>
-        <select id="timer-minutes-preview" onchange="saveTimerMinutes(this.value)" style="padding:4px 8px;border-radius:6px;border:1px solid var(--color-border);font-size:13px">
-          <option value="5">5 daqiqa</option>
-          <option value="10">10 daqiqa</option>
-          <option value="15" selected>15 daqiqa</option>
-          <option value="20">20 daqiqa</option>
-          <option value="30">30 daqiqa</option>
-          <option value="45">45 daqiqa</option>
-          <option value="60">60 daqiqa</option>
-          <option value="90">90 daqiqa</option>
-        </select>
+
+  <div class="tc" id="st-battle">
+    <div class="card">
+      <h2 style="margin-bottom:14px">&#x1F3AE; O'yinlar</h2>
+      <div class="rc">
+        <div class="rcard" onclick="document.getElementById('games-sinfjangi').style.display='block';document.getElementById('games-hub').style.display='none'">
+          <div class="ic">&#x1F465;</div>
+          <h3>Sinf jangi</h3><p class="ts tm">Ustoz boshlaydi, PIN bilan qoshilasiz</p>
+        </div>
+        <div class="rcard" onclick="openDuelHub()">
+          <div class="ic">&#x2694;&#xFE0F;</div>
+          <h3>Duel</h3><p class="ts tm">Online yoki Bot bilan poyga</p>
+        </div>
       </div>
     </div>
-    <div class="g2">
-      <div class="rcard" onclick="startTest('practice')">
-        <div class="ic">&#x1F9EA;</div>
-        <h3>Sinov</h3><p class="ts tm">Natija saqlanmaydi</p>
-      </div>
-      <div class="rcard" id="exam-mode-card" onclick="startTest('exam')">
-        <div class="ic">&#x1F3AF;</div>
-        <h3>Imtihon</h3><p class="ts tm" id="exam-mode-desc">Natija saqlanadi</p>
+    <div class="card" id="games-hub" style="display:none"></div>
+    <div class="card" id="games-sinfjangi" style="display:none">
+      <button class="btn bg bsm mt8" onclick="document.getElementById('games-sinfjangi').style.display='none'" style="margin-bottom:12px">&#8592; Orqaga</button>
+      <div class="fg" id="battle-join-box" style="background:#f5f3ff;border:1.5px dashed var(--purd);border-radius:11px;padding:14px">
+        <label style="margin-bottom:8px">&#x1F3AE; Sinf jangiga qo'shilish</label>
+        <p class="ts tm" style="margin-bottom:10px">Ustozingiz sinfda "Sinf jangi"ni boshlagan bo'lsa, u bergan 6 xonali PIN'ni shu yerga kiriting.</p>
+        <div class="fx" style="gap:8px">
+          <input type="text" id="battle-pin-inp" placeholder="6 xonali PIN" maxlength="6" style="letter-spacing:3px;font-weight:700;text-align:center;font-size:18px">
+          <button class="btn bpu" onclick="joinBattle()">Qo'shilish</button>
+        </div>
+        <div id="battle-join-msg" class="mt8"></div>
       </div>
     </div>
   </div>
-  <div class="card" id="my-hist" style="display:none">
-    <h3 style="margin-bottom:11px">&#x1F4CA; Mening natijalarim</h3>
-    <div id="my-hist-body"></div>
+
+  <!-- DUEL MODAL -->
+  <div class="mbg" id="duel-modal" style="display:none;z-index:290">
+    <div class="modal" style="max-width:480px">
+      <div class="mh"><h3>&#x2694;&#xFE0F; Duel</h3><button class="xb" onclick="closeDuelModal()">&#x2715;</button></div>
+      <div id="duel-modal-body"></div>
+    </div>
+  </div>
+
+  <div class="tc" id="st-results">
+    <div class="card" id="my-hist">
+      <h3 style="margin-bottom:11px">&#x1F4CA; Mening natijalarim</h3>
+      <div id="my-hist-body"></div>
+    </div>
   </div>
 </div>
 
@@ -418,6 +461,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <p class="ts tm" id="r-sub"></p>
     <div id="r-synote" class="alt aw" style="margin:12px auto;max-width:380px;display:none">&#x1F9EA; Sinov rejimi - natija saqlanmadi</div>
     <div id="r-syncnote" class="alt" style="margin:12px auto;max-width:420px;display:none"></div>
+    <div id="r-flag-note" class="alt ai" style="margin:12px auto;max-width:420px;display:none"></div>
     <div class="fx center fxw" style="margin-top:14px;gap:8px">
       <button class="btn bp" onclick="showPg('pg-topic');loadMyHist()">&#x1F504; Yana test</button>
       <button class="btn bg bsm" onclick="toggleDetail()">&#x1F4CB; Batafsil</button>
@@ -436,6 +480,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <button class="tab on" onclick="switchTab('tc-q',this)">&#x1F4DD; Savollar</button>
     <button class="tab" onclick="switchTab('tc-r',this);loadResults()">&#x1F4CA; Natijalar</button>
     <button class="tab" onclick="switchTab('tc-c',this);loadClasses()">&#x1F3EB; Sinflar</button>
+    <button class="tab" id="tc-review-tab" onclick="switchTab('tc-v',this);loadReviewQueue()">&#x1F50D; Tekshirish<span id="review-count-badge" style="display:none;background:var(--err);color:#fff;border-radius:99px;padding:1px 6px;font-size:11px;margin-left:4px"></span></button>
     <button class="tab" onclick="switchTab('tc-i',this)">&#x1F4E5; Import</button>
     <button class="tab" onclick="switchTab('tc-s',this);initSettings()">&#x2699; Sozlamalar</button>
   </div>
@@ -510,6 +555,14 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="card" id="prog-panel" style="display:none">
       <div class="ch"><h2 id="prog-title">Progress</h2><button class="btn bg bsm" onclick="document.getElementById('prog-panel').style.display='none'">&#x2715;</button></div>
       <div id="prog-body"></div>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-v">
+    <div class="card">
+      <div class="ch"><h2>&#x1F50D; Tekshirish navbati</h2><span class="ts tm" id="review-summary"></span></div>
+      <p class="ts tm" style="margin-bottom:14px">O'quvchilar xato ishlagan savollar shu yerda ko'rinadi. Agar savol/javob to'g'ri bo'lsa "To'g'ri" tugmasini bosing (10 marta to'g'ri deb tasdiqlansa, savol keyin bu yerga tushmay qo'yadi). Agar savolda yoki to'g'ri javob belgisida xato bo'lsa "Noto'g'ri" tugmasini bosib, tuzating - shunda o'sha savolni xato ishlagan barcha o'quvchilarning balli avtomatik tuzatiladi.</p>
+      <div id="review-list"></div>
     </div>
   </div>
 
@@ -2114,8 +2167,11 @@ function selectTopicByName(t,el){
 function loadMyHist(){
   var db=getDB(),myR=db.results.filter(function(r){return r.student===ME.name&&r.cls===ME.cls&&r.mode==='exam';});
   var card=document.getElementById('my-hist');
-  if(!myR.length){card.style.display='none';return;}
   card.style.display='block';
+  if(!myR.length){
+    document.getElementById('my-hist-body').innerHTML='<p class="ts tm" style="text-align:center;padding:20px">Hali imtihon natijalaringiz yoq. "Test yechish" bolimidan birinchi testingizni boshlang!</p>';
+    return;
+  }
   document.getElementById('my-hist-body').innerHTML='<table><thead><tr><th>Mavzu</th><th>Natija</th><th>Ball</th><th>Sana</th></tr></thead><tbody>'+
     myR.slice(-10).reverse().map(function(r){var bc=r.pct>=70?'bgr':r.pct>=50?'byl':'brd';return '<tr><td><strong>'+r.topic+'</strong></td><td>'+r.correct+'/'+r.total+'</td><td><span class="bdg '+bc+'">'+r.pct+'%</span></td><td class="ts tm">'+r.date+'</td></tr>';}).join('')+'</tbody></table>';
 }
@@ -2250,6 +2306,46 @@ function closeFinishModal(){
 function confirmFinishTest(){
   submitTest(true);
 }
+// ═══════════════════════════════════════════════════════════════════════
+// JAVOBLARNI TEKSHIRISH TIZIMI (2026-08-31)
+// ═══════════════════════════════════════════════════════════════════════
+// Maqsad: agar o'quvchi biror savolni "xato" ishlagan bo'lsa, bu HAR DOIM
+// ham o'quvchining xatosi degani emas - ba'zan savolning o'zida (yoki
+// to'g'ri javob belgisida) xato bo'lishi mumkin. Shuning uchun har bir
+// xato javob avtomatik ustozga "Tekshirish" navbatiga yuboriladi. Ustoz
+// "To'g'ri" (savol durust, o'quvchi xato qilgan) yoki "Noto'g'ri" (savolda
+// xato bor, tuzatish kerak) deb belgilaydi. Bitta savol 10 marta "To'g'ri"
+// ovoz olsa, ISHONCHLI deb hisoblanadi va boshqa hech qachon navbatga
+// tushmaydi (server/ustoz vaqtini tejash uchun). Agar "Noto'g'ri" chiqsa,
+// savol tuzatiladi va O'SHA SAVOLNI XATO deb hisoblangan BARCHA o'quvchilar
+// balliga RETROAKTIV +1 qo'shiladi (agar ularning javobi yangi to'g'ri
+// javobga mos kelsa).
+async function flagWrongAnswersForReview(res){
+  if(!_sbReady || !_sb || !S.test) return 0;
+  var toFlag=[];
+  res.details.forEach(function(d,i){
+    if(d.ok) return;
+    var q=S.test[i];
+    if(!q || !q.id || !q.teacherId) return;
+    if((q.trustVotes||0) >= 10) return; // ishonchli - navbatga qoshilmaydi
+    toFlag.push({
+      teacher_id: q.teacherId,
+      topic: selTopic,
+      question_id: String(q.id),
+      question_snapshot: {text:q.text, options:q.options, correct:q.correct, image:q.img||q.image||''},
+      student_login: ME.login,
+      student_name: ME.name,
+      result_id: res.id,
+      detail_index: i,
+      student_selected: d.userAns
+    });
+  });
+  if(!toFlag.length) return 0;
+  try{
+    await _sb.from('answer_flags').insert(toFlag);
+  }catch(e){ console.warn('Tekshirish navbatiga yuborishda xato:', e); }
+  return toFlag.length;
+}
 async function doSubmitTest(){
   if(S.iv)clearInterval(S.iv);_backWarned=false;
   // To'liq ekrandan chiqish - faqat haqiqatan fullscreen bolsa
@@ -2270,6 +2366,14 @@ async function doSubmitTest(){
     db.results.push(res);
     db.v=(db.v||0)+1;
     try{ localStorage.setItem(SK, JSON.stringify(db)); }catch(e){}
+    flagWrongAnswersForReview(res).then(function(n){
+      res._flaggedCount=n;
+      var noteEl=document.getElementById('r-flag-note');
+      if(noteEl && n>0){
+        noteEl.style.display='block';
+        noteEl.innerHTML='&#x1F50D; '+n+' ta xato javobingiz tekshirish uchun ustozga yuborildi - agar savolda xato topilsa, ballingiz avtomatik tuzatiladi.';
+      }
+    });
   }
   S.mode='';S._blurWarnPending=false;
   if(typeof updateOfflineOverlay==='function') updateOfflineOverlay();
@@ -2300,6 +2404,7 @@ function updateSyncBanner(state){
   }
 }
 function showResult(r,syncState){
+  var _fn=document.getElementById('r-flag-note'); if(_fn) _fn.style.display='none';
   var passed=r.pct>=70,col=passed?'#16a34a':r.pct>=50?'#d97706':'#dc2626';
   var ring=document.getElementById('r-ring');
   ring.style.borderColor=col;
@@ -2761,6 +2866,131 @@ function saveQ(){
   saveDB(db);closeAQ();renderQT();
 }
 function delQ(idx){if(idx<BQ.length){alert("Bu savol o'zgarmas!");return;}if(!confirm("O'chirasizmi?"))return;var db=getDB();db.userQs.splice(idx-BQ.length,1);saveDB(db);renderQT();}
+
+// ═══════════════════════════════════════════════════════════════════════
+// USTOZ TOMONI: TEKSHIRISH NAVBATI
+// ═══════════════════════════════════════════════════════════════════════
+var _reviewGroups=[];
+async function loadReviewQueue(){
+  var list=document.getElementById('review-list');
+  if(!list) return;
+  if(!_sbReady || !_sb){ list.innerHTML='<p class="ts tm">Ulanish yoq.</p>'; return; }
+  list.innerHTML='<p class="ts tm" style="text-align:center;padding:20px">&#x23F3; Yuklanmoqda...</p>';
+  var res=await _sb.from('answer_flags').select('*').eq('teacher_id',ME.id).eq('status','pending').order('created_at');
+  var flags=res.data||[];
+  // Bir xil savolga tegishli flaglarni birlashtiramiz - ustoz bitta savolni
+  // bir marta korib, barcha talabalar uchun birdaniga hal qila oladi.
+  var byQ={};
+  flags.forEach(function(f){
+    if(!byQ[f.question_id]) byQ[f.question_id]={question_id:f.question_id, snapshot:f.question_snapshot, topic:f.topic, flags:[]};
+    byQ[f.question_id].flags.push(f);
+  });
+  _reviewGroups=Object.values(byQ);
+  renderReviewList();
+}
+function renderReviewList(){
+  var list=document.getElementById('review-list');
+  var summary=document.getElementById('review-summary');
+  var badge=document.getElementById('review-count-badge');
+  var totalFlags=_reviewGroups.reduce(function(s,g){return s+g.flags.length;},0);
+  if(summary) summary.textContent=_reviewGroups.length+' ta savol, jami '+totalFlags+' ta xato javob';
+  if(badge){
+    if(totalFlags>0){ badge.style.display='inline'; badge.textContent=totalFlags; }
+    else badge.style.display='none';
+  }
+  if(!_reviewGroups.length){
+    list.innerHTML='<p class="ts tm" style="text-align:center;padding:30px">&#x2705; Tekshirish uchun hech narsa yoq - barcha savollar ishonchli!</p>';
+    return;
+  }
+  list.innerHTML=_reviewGroups.map(function(g,gi){
+    var q=g.snapshot;
+    var optsHtml=(q.options||[]).map(function(o,oi){
+      var isCorrect=(q.correct||[]).indexOf(oi)>=0;
+      var pickedByN=g.flags.filter(function(f){return (f.student_selected||[]).indexOf(oi)>=0;}).length;
+      var isImg=isImgVal(o);
+      return '<div style="padding:6px 8px;margin-bottom:4px;border-radius:6px;'+(isCorrect?'background:#dcfce7;border:1px solid #86efac':'background:#fff;border:1px solid #e2e8f0')+'">'+
+        String.fromCharCode(65+oi)+'. '+(isImg?'<img src="'+imgSrcVal(o)+'" style="max-height:70px;vertical-align:middle;margin-left:4px">':o)+
+        (isCorrect?' <span style="color:#16a34a;font-size:11px;font-weight:700">(hozirgi to\'g\'ri javob)</span>':'')+
+        (pickedByN>0?' <span class="ts tm" style="margin-left:6px">- '+pickedByN+' ta talaba shuni tanlagan</span>':'')+
+      '</div>';
+    }).join('');
+    return '<div class="pd" style="margin-bottom:12px">'+
+      '<div class="ts tm" style="margin-bottom:4px">'+_aiEsc(g.topic)+' &middot; '+g.flags.length+' ta o\'quvchi xato ishlagan</div>'+
+      (q.image?'<img src="'+imgSrcVal(q.image)+'" style="max-width:100%;max-height:150px;border-radius:6px;margin-bottom:8px">':'')+
+      '<div style="font-weight:700;margin-bottom:8px">'+_aiEsc(q.text||'(rasm/formula)')+'</div>'+
+      optsHtml+
+      '<div class="fx" style="gap:8px;margin-top:10px">'+
+        '<button class="btn bs bsm" onclick="resolveReviewCorrect('+gi+')">&#x2705; To\'g\'ri (savol durust)</button>'+
+        '<button class="btn bd bsm" onclick="openReviewFix('+gi+')">&#x274C; Noto\'g\'ri - tuzatish</button>'+
+      '</div>'+
+      '<div id="review-fix-'+gi+'" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--bdr)"></div>'+
+    '</div>';
+  }).join('');
+  renderMathIn(list);
+}
+async function resolveReviewCorrect(gi){
+  var g=_reviewGroups[gi];
+  if(!g) return;
+  var db=getDB();
+  var q=(db.userQs||[]).find(function(x){return String(x.id)===String(g.question_id)&&x.teacherId===ME.id;});
+  if(q) q.trustVotes=(q.trustVotes||0)+g.flags.length;
+  saveDB(db);
+  try{
+    await _sb.from('answer_flags').delete().in('id', g.flags.map(function(f){return f.id;}));
+  }catch(e){}
+  _reviewGroups.splice(gi,1);
+  renderReviewList();
+}
+function openReviewFix(gi){
+  var g=_reviewGroups[gi];
+  var el=document.getElementById('review-fix-'+gi);
+  if(!g||!el) return;
+  el.style.display='block';
+  el.innerHTML='<label style="font-size:12px;font-weight:700;margin-bottom:6px;display:block">To\'g\'ri javob(lar)ni belgilang:</label>'+
+    (g.snapshot.options||[]).map(function(o,oi){
+      var checked=(g.snapshot.correct||[]).indexOf(oi)>=0?'checked':'';
+      var isImg=isImgVal(o);
+      return '<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer"><input type="checkbox" class="review-fix-chk-'+gi+'" value="'+oi+'" '+checked+'><span>'+String.fromCharCode(65+oi)+'. '+(isImg?'[rasm]':_aiEsc(o))+'</span></label>';
+    }).join('')+
+    '<button class="btn bpu bsm mt8" onclick="saveReviewFix('+gi+')">&#x1F4BE; Saqlash va o\'quvchilar ballini tuzatish</button>';
+}
+async function saveReviewFix(gi){
+  var g=_reviewGroups[gi];
+  if(!g) return;
+  var newCorrect=Array.prototype.slice.call(document.querySelectorAll('.review-fix-chk-'+gi+':checked')).map(function(c){return parseInt(c.value);});
+  if(!newCorrect.length){ alert("Kamida bitta to'g'ri javobni belgilang!"); return; }
+  var db=getDB();
+  var q=(db.userQs||[]).find(function(x){return String(x.id)===String(g.question_id)&&x.teacherId===ME.id;});
+  if(q){ q.correct=newCorrect; q.trustVotes=0; }
+
+  // RETROAKTIV TUZATISH: shu savolni xato deb hisoblangan (lekin yangi
+  // kalitga kora aslida TOGRI bolgan) barcha o'quvchilarning natijasini
+  // topib, ballini +1 qilib tuzatamiz.
+  var fixedStudents=[];
+  g.flags.forEach(function(f){
+    var sel=(f.student_selected||[]).slice().sort();
+    var nc=newCorrect.slice().sort();
+    var matches=sel.length===nc.length && sel.every(function(v,idx){return v===nc[idx];});
+    if(!matches) return;
+    var r=(db.results||[]).find(function(x){return x.id===f.result_id;});
+    if(!r || !r.details || !r.details[f.detail_index]) return;
+    if(r.details[f.detail_index].ok) return; // allaqachon togri hisoblangan
+    r.details[f.detail_index].ok=true;
+    r.correct=(r.correct||0)+1;
+    r.pct=Math.round(r.correct/r.total*100);
+    fixedStudents.push(f.student_name+' ('+g.topic+')');
+    // Talabaga bildirishnoma
+    var stu=(db.users||[]).find(function(u){return u.login===f.student_login;});
+    if(stu) addNotification(db, stu.id, '\u2705 Ballingiz tuzatildi!', '"'+g.topic+'" mavzusidagi bir savolda xato topildi va tuzatildi - sizning javobingiz aslida to\'g\'ri ekan, ballingiz +1 qilib yangilandi.');
+  });
+  saveDB(db);
+  try{
+    await _sb.from('answer_flags').delete().in('id', g.flags.map(function(f){return f.id;}));
+  }catch(e){}
+  _reviewGroups.splice(gi,1);
+  renderReviewList();
+  alert('Savol tuzatildi!'+(fixedStudents.length?' '+fixedStudents.length+' ta o\'quvchining balli tuzatildi.':''));
+}
 
 function loadResults(){
   var res=myVisibleResults(),exam=res.filter(function(r){return r.mode==='exam';});
@@ -4065,25 +4295,21 @@ async function saveImportedQs(parsed,msg){
   // 2026-08-18 TUZATISH: avval bu yerda confirm() BLOKLOVCHI dialog chiqarardi.
   // Ko'p faylli (masalan 16 ta) import paytida, agar 2+ fayldan bir xil
   // nomli mavzu chiqsa, har birida shu savol so'ralardi. Agar shu payt
-  // ekran o'chgan/fon rejimiga o'tgan bo'lsa (yoki foydalanuvchi darhol
-  // javob bermasa), ba'zi brauzerlar bunday "kutilmagan" dialoglarni
-  // AVTOMATIK "OK" (=Yangilash, eskisini o'chirib yuborish) deb javob
-  // beradi - natijada bir nechta mavzu jimgina BIR-BIRINI EZIB YUBORARDI
-  // (16 ta import qilingan deyilsa-yu, faqat 11 tasi qolgani shu sabab
-  // edi). Endi: KO'P FAYLLI (batch) import paytida hech qachon so'ralmaydi -
-  // duplikat nom avtomatik noyob qilinadi (hech narsa yo'qolmaydi). Faqat
-  // BITTA fayl qo'lda import qilinganda (odatiy holat) so'raladi.
+  // TUZATISH (2026-08-31): oldin BITTA fayl import qilinganda hali ham
+  // confirm() so'rovi chiqardi ("Yangilash yoki yangi saqlash?"). Agar
+  // foydalanuvchi shoshilib yoki odatiga ko'ra "OK" (=Yangilash, eskisini
+  // BUTUNLAY OCHIRIB, ustidan yozish) bossa - o'quvchining ismi o'zgargan
+  // bo'lsa-yu, tasodifan eski fayl bilan bir xil nomda saqlangan bo'lsa,
+  // ESKI MAVZU BUTUNLAY YO'QOLIB KETARDI. Bu juda xavfli va qaytarib
+  // bo'lmas edi. Endi HECH QACHON so'ralmaydi va HECH QACHON ustidan
+  // yozilmaydi - har doim avtomatik noyob nom beriladi (masalan "Mavzu (2)"),
+  // hech narsa yo'qolmaydi. Agar chindan eski mavzuni yangilamoqchi bo'lsa,
+  // buni FAQAT "Savollar" bo'limida o'sha mavzuni ochirib, keyin qayta
+  // import qilish orqali ataylab qilish mumkin.
   var _dbCheck=getDB();
   var topicExists=(_dbCheck.userQs||[]).some(function(q){return q.topic===parsed.topic&&q.teacherId===ME.id;});
   if(topicExists){
-    if(window._batchImportMode){
-      parsed.topic=uniqueTopicName(parsed.topic);
-    } else {
-      var doUpdate=confirm('"'+parsed.topic+'" nomli mavzu allaqachon mavjud.\n\nOK — Yangilash (eskisi o\'chib, yangi savollar bilan almashtiriladi)\nBekor qilish — Yangi, alohida mavzu sifatida saqlash');
-      if(!doUpdate){
-        parsed.topic=uniqueTopicName(parsed.topic);
-      }
-    }
+    parsed.topic=uniqueTopicName(parsed.topic);
   }
 
   // MUHIM: har bir savolga GLOBAL nodir ID beramiz (bir nechta mavzu
@@ -5107,6 +5333,255 @@ async function answerBattle(qIdx,optIdx,correctArr){
   try{
     await _sb.from('battle_answers').insert({session_id:BT.session.id,student_login:ME.login,student_name:ME.name,q_idx:qIdx,correct:isOk,answer_ms:ms});
   }catch(e){}
+}
+
+var DL={mode:'',subject:'',level:'',topic:'',questions:[],idx:0,answers:[],startTs:0,matchId:null,queueId:null,isP1:false,chan:null,timerIv:null,botScore:0,botDone:false,myDone:false};
+var DUEL_LEVEL_SEC={easy:72,normal:45,hard:30};
+var DUEL_BOT_ACCURACY={easy:0.55,normal:0.75,hard:0.9};
+
+function openDuelHub(){
+  document.getElementById('duel-modal').style.display='flex';
+  renderDuelSubjectPick();
+}
+function closeDuelModal(){
+  document.getElementById('duel-modal').style.display='none';
+  if(DL.timerIv){clearInterval(DL.timerIv);DL.timerIv=null;}
+  if(DL.chan){_sb.removeChannel(DL.chan);DL.chan=null;}
+  if(DL.queueId){ _sb.from('duel_queue').delete().eq('id',DL.queueId).then(function(){}); }
+  DL={mode:'',subject:'',level:'',topic:'',questions:[],idx:0,answers:[],startTs:0,matchId:null,queueId:null,isP1:false,chan:null,timerIv:null,botScore:0,botDone:false,myDone:false};
+}
+function renderDuelSubjectPick(){
+  var allQs=getAllQs();
+  var subjSet=[];
+  allQs.forEach(function(q){if(q.subject&&subjSet.indexOf(q.subject)<0)subjSet.push(q.subject);});
+  document.getElementById('duel-modal-body').innerHTML=
+    '<p class="ts tm" style="margin-bottom:10px">Qaysi fandan duel qilmoqchisiz?</p>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+    subjSet.map(function(s){return '<button class="tbtn" style="text-align:left;padding:12px 14px" onclick="DL.subject=\''+s+'\';renderDuelModePick()">'+subjName(s)+'</button>';}).join('')+
+    '</div>';
+}
+function renderDuelModePick(){
+  document.getElementById('duel-modal-body').innerHTML=
+    '<button class="btn bg bsm mt8" onclick="renderDuelSubjectPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
+    '<div class="rc">'+
+    '<div class="rcard" onclick="DL.mode=\'online\';renderDuelLevelPick()"><div class="ic">&#x1F310;</div><h3>Online</h3><p class="ts tm">Random raqib bilan</p></div>'+
+    '<div class="rcard" onclick="DL.mode=\'bot\';renderDuelTopicPick()"><div class="ic">&#x1F916;</div><h3>Bot</h3><p class="ts tm">Kompyuter bilan poyga</p></div>'+
+    '</div>';
+}
+function renderDuelTopicPick(){
+  var topics=getTopics().filter(function(t){return getAllQs().some(function(q){return q.topic===t&&q.subject===DL.subject;});});
+  if(!topics.length){
+    document.getElementById('duel-modal-body').innerHTML='<p class="ts tm" style="text-align:center;padding:20px">Kechirasiz, bu fandan hali savollar tuzilmagan.</p><button class="btn bg bsm" onclick="renderDuelModePick()">&#8592; Orqaga</button>';
+    return;
+  }
+  document.getElementById('duel-modal-body').innerHTML=
+    '<button class="btn bg bsm mt8" onclick="renderDuelModePick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
+    '<p class="ts tm" style="margin-bottom:10px">Mavzuni tanlang:</p>'+
+    '<div style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto">'+
+    topics.map(function(t){var tEsc=t.replace(/'/g,"\\'");return '<button class="tbtn" style="text-align:left;padding:10px 12px" onclick="DL.topic=\''+tEsc+'\';renderDuelLevelPick()">'+t+'</button>';}).join('')+
+    '</div>';
+}
+function renderDuelLevelPick(){
+  document.getElementById('duel-modal-body').innerHTML=
+    '<button class="btn bg bsm mt8" onclick="'+(DL.mode==='bot'?'renderDuelTopicPick()':'renderDuelModePick()')+'" style="margin-bottom:10px">&#8592; Orqaga</button>'+
+    '<p class="ts tm" style="margin-bottom:10px">Darajani tanlang:</p>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'easy\';startDuel()">&#x1F7E2; Oson <span class="ts tm">(72 sekund/savol)</span></button>'+
+    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'normal\';startDuel()">&#x1F7E1; O\'rtacha <span class="ts tm">(45 sekund/savol)</span></button>'+
+    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'hard\';startDuel()">&#x1F534; Qiyin <span class="ts tm">(30 sekund/savol)</span></button>'+
+    '</div>';
+}
+function startDuel(){
+  if(DL.mode==='bot') startBotDuel();
+  else startOnlineDuel();
+}
+function startBotDuel(){
+  var qs=shuf(getQsByTopic(DL.topic)).slice(0,10);
+  if(qs.length<3){ alert('Bu mavzuda yetarli savol yoq!'); closeDuelModal(); return; }
+  DL.questions=qs; DL.idx=0; DL.answers=[]; DL.botScore=0; DL.botDone=false; DL.myDone=false; DL.startTs=Date.now();
+  ME.duelRating=ME.duelRating||1000;
+  renderDuelRace();
+  simulateBotProgress();
+}
+function simulateBotProgress(){
+  var secPerQ=DUEL_LEVEL_SEC[DL.level];
+  var acc=DUEL_BOT_ACCURACY[DL.level];
+  var qi=0;
+  function nextBotQ(){
+    if(qi>=DL.questions.length || DL.myDone){ DL.botDone=true; checkDuelFinish(); return; }
+    var delay=(2+Math.random()*(secPerQ*0.7))*1000;
+    setTimeout(function(){
+      if(DL.myDone) return;
+      if(Math.random()<acc) DL.botScore++;
+      qi++;
+      updateDuelBotProgress(qi);
+      nextBotQ();
+    }, delay);
+  }
+  nextBotQ();
+}
+function updateDuelBotProgress(n){
+  var el=document.getElementById('duel-bot-progress');
+  if(el) el.textContent='Bot: '+n+'/'+DL.questions.length;
+}
+function renderDuelRace(){
+  var q=DL.questions[DL.idx];
+  if(!q){ finishMyDuelSide(); return; }
+  var body=document.getElementById('duel-modal-body');
+  var secPerQ=DUEL_LEVEL_SEC[DL.level];
+  body.innerHTML=
+    '<div class="fx between" style="margin-bottom:8px"><span class="ts tm">Savol '+(DL.idx+1)+'/'+DL.questions.length+'</span>'+
+    (DL.mode==='bot'?'<span class="ts tm" id="duel-bot-progress">Bot: 0/'+DL.questions.length+'</span>':'<span class="ts tm" id="duel-opp-progress">Raqib: 0/'+DL.questions.length+'</span>')+
+    '</div>'+
+    '<div class="tmr" id="duel-timer" style="margin-bottom:10px">'+secPerQ+'</div>'+
+    '<div style="font-weight:700;margin-bottom:12px">'+q.text+'</div>'+
+    (q.image||q.img?'<img src="'+imgSrcVal(q.image||q.img)+'" style="max-width:100%;max-height:130px;border-radius:6px;margin-bottom:10px">':'')+
+    q.options.map(function(o,i){return '<div class="opt" onclick="answerDuel('+i+')"><span>'+String.fromCharCode(65+i)+'. '+o+'</span></div>';}).join('');
+  var left=secPerQ;
+  if(DL.timerIv) clearInterval(DL.timerIv);
+  DL.timerIv=setInterval(function(){
+    left--;
+    var tel=document.getElementById('duel-timer');
+    if(tel) tel.textContent=left;
+    if(left<=0){ clearInterval(DL.timerIv); answerDuel(-1); }
+  },1000);
+}
+function answerDuel(optIdx){
+  if(DL.timerIv){clearInterval(DL.timerIv);DL.timerIv=null;}
+  var q=DL.questions[DL.idx];
+  var isOk=optIdx>=0 && (q.correct||[]).indexOf(optIdx)>=0;
+  DL.answers.push(isOk);
+  DL.idx++;
+  if(DL.mode==='online' && DL.matchId){
+    updateOnlineDuelProgress();
+  }
+  renderDuelRace();
+}
+function finishMyDuelSide(){
+  DL.myDone=true;
+  var myScore=DL.answers.filter(Boolean).length;
+  if(DL.mode==='bot'){
+    checkDuelFinish();
+    return;
+  }
+  finishOnlineDuel(myScore);
+}
+function checkDuelFinish(){
+  if(!DL.myDone) return;
+  var myScore=DL.answers.filter(Boolean).length;
+  if(DL.mode==='bot' && !DL.botDone){
+    document.getElementById('duel-modal-body').innerHTML='<div style="text-align:center;padding:20px 0"><div style="font-size:32px">&#x23F3;</div><p class="ts tm mt8">Siz tugatdingiz! Bot hali ishlamoqda...</p></div>';
+    var chk=setInterval(function(){
+      if(DL.botDone){ clearInterval(chk); showDuelResult(myScore, DL.botScore, 'Bot'); }
+    },500);
+    return;
+  }
+  showDuelResult(myScore, DL.botScore||0, 'Bot');
+}
+function showDuelResult(myScore, oppScore, oppName){
+  var won=myScore>oppScore, draw=myScore===oppScore;
+  var title=draw?'&#x1F91D; Durrang!':won?'&#x1F3C6; G\'alaba!':'&#x1F614; Mag\'lubiyat';
+  document.getElementById('duel-modal-body').innerHTML=
+    '<div style="text-align:center;padding:10px 0">'+
+    '<div style="font-size:40px;margin-bottom:10px">'+(draw?'&#x1F91D;':won?'&#x1F3C6;':'&#x1F614;')+'</div>'+
+    '<h2 style="margin-bottom:14px">'+title+'</h2>'+
+    '<div class="g2" style="max-width:280px;margin:0 auto 14px">'+
+    '<div class="sc"><div class="sn">'+myScore+'</div><div class="sl">Siz</div></div>'+
+    '<div class="sc"><div class="sn">'+oppScore+'</div><div class="sl">'+oppName+'</div></div>'+
+    '</div>'+
+    '<button class="btn bg" onclick="closeDuelModal()">Yopish</button>'+
+    '</div>';
+}
+async function startOnlineDuel(){
+  document.getElementById('duel-modal-body').innerHTML='<div style="text-align:center;padding:24px 0"><div style="font-size:32px">&#x1F50D;</div><p class="ts tm mt8">Raqib qidirilmoqda...</p><button class="btn bg bsm mt12" onclick="closeDuelModal()">Bekor qilish</button></div>';
+  var existing=await _sb.from('duel_queue').select('*').eq('subject',DL.subject).eq('level',DL.level).eq('status','waiting').neq('student_login',ME.login).order('created_at').limit(1);
+  if(existing.data && existing.data.length){
+    var opp=existing.data[0];
+    var allQs=getAllQs().filter(function(q){return q.subject===DL.subject;});
+    var qs=shuf(allQs).slice(0,10);
+    if(qs.length<3){ alert('Bu fandan yetarli savol yoq!'); closeDuelModal(); return; }
+    var mres=await _sb.from('duel_matches').insert({
+      player1_login:opp.student_login, player1_name:opp.student_name,
+      player2_login:ME.login, player2_name:ME.name,
+      subject:DL.subject, level:DL.level, questions:qs
+    }).select().single();
+    if(mres.error){ alert('Xato: '+mres.error.message); closeDuelModal(); return; }
+    await _sb.from('duel_queue').update({status:'matched',matched_duel_id:mres.data.id}).eq('id',opp.id);
+    DL.matchId=mres.data.id; DL.isP1=false; DL.questions=qs;
+    beginOnlineDuelRace();
+    return;
+  }
+  var ins=await _sb.from('duel_queue').insert({student_login:ME.login,student_name:ME.name,cls:ME.cls,subject:DL.subject,level:DL.level,teacher_id:(ME.teacherId||'')}).select().single();
+  if(ins.error){ alert('Xato: '+ins.error.message); closeDuelModal(); return; }
+  DL.queueId=ins.data.id;
+  DL.chan=_sb.channel('duelq_'+ins.data.id)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'duel_queue',filter:'id=eq.'+ins.data.id},function(payload){
+      if(payload.new.status==='matched' && payload.new.matched_duel_id){
+        DL.matchId=payload.new.matched_duel_id; DL.isP1=true;
+        _sb.from('duel_matches').select('*').eq('id',DL.matchId).single().then(function(r){
+          if(r.data){ DL.questions=r.data.questions; beginOnlineDuelRace(); }
+        });
+      }
+    }).subscribe();
+}
+function beginOnlineDuelRace(){
+  if(DL.chan){_sb.removeChannel(DL.chan);}
+  DL.idx=0; DL.answers=[]; DL.myDone=false; DL.startTs=Date.now();
+  ME.duelRating=ME.duelRating||1000;
+  DL.chan=_sb.channel('duelm_'+DL.matchId)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'duel_matches',filter:'id=eq.'+DL.matchId},function(payload){
+      var row=payload.new;
+      var oppProgField=DL.isP1?'player2_answers':'player1_answers';
+      var oppEl=document.getElementById('duel-opp-progress');
+      if(oppEl) oppEl.textContent='Raqib: '+((row[oppProgField]||[]).length)+'/'+DL.questions.length;
+      if(row.status==='done'){
+        var myScoreF=DL.isP1?row.player1_score:row.player2_score;
+        var oppScoreF=DL.isP1?row.player2_score:row.player1_score;
+        var oppName=DL.isP1?row.player2_name:row.player1_name;
+        applyDuelRating(row.winner_login===ME.login, row.winner_login===null);
+        showDuelResult(myScoreF, oppScoreF, oppName);
+      }
+    }).subscribe();
+  renderDuelRace();
+}
+async function updateOnlineDuelProgress(){
+  if(!DL.matchId) return;
+  var field=DL.isP1?'player1_answers':'player2_answers';
+  try{ var o={}; o[field]=DL.answers; await _sb.from('duel_matches').update(o).eq('id',DL.matchId); }catch(e){}
+}
+async function finishOnlineDuel(myScore){
+  if(!DL.matchId) return;
+  var finishMs=Date.now()-DL.startTs;
+  var doneField=DL.isP1?'player1_finished':'player2_finished';
+  var scoreField=DL.isP1?'player1_score':'player2_score';
+  var msField=DL.isP1?'player1_finish_ms':'player2_finish_ms';
+  var ansField=DL.isP1?'player1_answers':'player2_answers';
+  var upd={}; upd[doneField]=true; upd[scoreField]=myScore; upd[msField]=finishMs; upd[ansField]=DL.answers;
+  var r=await _sb.from('duel_matches').update(upd).eq('id',DL.matchId).select().single();
+  if(!r.data) return;
+  var row=r.data;
+  if(row.player1_finished && row.player2_finished){
+    var winner=null;
+    if(row.player1_score>row.player2_score) winner=row.player1_login;
+    else if(row.player2_score>row.player1_score) winner=row.player2_login;
+    else winner=(row.player1_finish_ms<row.player2_finish_ms)?row.player1_login:row.player2_login;
+    var isDraw=row.player1_score===row.player2_score;
+    await _sb.from('duel_matches').update({status:'done',winner_login:isDraw?null:winner}).eq('id',row.id);
+    applyDuelRating(winner===ME.login && !isDraw, isDraw);
+    var oppScore=DL.isP1?row.player2_score:row.player1_score;
+    var oppName=DL.isP1?row.player2_name:row.player1_name;
+    showDuelResult(myScore, oppScore, oppName);
+  } else {
+    document.getElementById('duel-modal-body').innerHTML='<div style="text-align:center;padding:24px 0"><div style="font-size:32px">&#x23F3;</div><p class="ts tm mt8">Siz tugatdingiz! Raqib hali ishlamoqda, natija tayyor bolganda darhol korasiz...</p></div>';
+  }
+}
+function applyDuelRating(won, isDraw){
+  var db=getDB();
+  var u=(db.users||[]).find(function(x){return x.id===ME.id;});
+  if(!u) return;
+  u.duelRating=(u.duelRating||1000)+(isDraw?0:(won?1:-1));
+  ME.duelRating=u.duelRating;
+  saveDB(db);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
