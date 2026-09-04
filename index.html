@@ -481,6 +481,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <button class="tab" onclick="switchTab('tc-r',this);loadResults()">&#x1F4CA; Natijalar</button>
     <button class="tab" onclick="switchTab('tc-c',this);loadClasses()">&#x1F3EB; Sinflar</button>
     <button class="tab" id="tc-review-tab" onclick="switchTab('tc-v',this);loadReviewQueue()">&#x1F50D; Tekshirish<span id="review-count-badge" style="display:none;background:var(--err);color:#fff;border-radius:99px;padding:1px 6px;font-size:11px;margin-left:4px"></span></button>
+    <button class="tab" onclick="switchTab('tc-h',this);loadCollaborations()">&#x1F91D; Hamkorlik</button>
     <button class="tab" onclick="switchTab('tc-i',this)">&#x1F4E5; Import</button>
     <button class="tab" onclick="switchTab('tc-s',this);initSettings()">&#x2699; Sozlamalar</button>
   </div>
@@ -563,6 +564,31 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div class="ch"><h2>&#x1F50D; Tekshirish navbati</h2><span class="ts tm" id="review-summary"></span></div>
       <p class="ts tm" style="margin-bottom:14px">O'quvchilar xato ishlagan savollar shu yerda ko'rinadi. Agar savol/javob to'g'ri bo'lsa "To'g'ri" tugmasini bosing (10 marta to'g'ri deb tasdiqlansa, savol keyin bu yerga tushmay qo'yadi). Agar savolda yoki to'g'ri javob belgisida xato bo'lsa "Noto'g'ri" tugmasini bosib, tuzating - shunda o'sha savolni xato ishlagan barcha o'quvchilarning balli avtomatik tuzatiladi.</p>
       <div id="review-list"></div>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-h">
+    <div class="card">
+      <h2 style="margin-bottom:10px">&#x1F91D; Hamkorlikka so'rov yuborish</h2>
+      <p class="ts tm" style="margin-bottom:12px">Boshqa ustozning savol bazasidan foydalanish uchun (masalan sizda hali savol yoq) - uning login'ini kiriting va so'rov yuboring. U rozilik bersa, uning savollari sizning sinflaringizga ham korinadigan boladi - lekin siz ularni ozgartira, ochira olmaysiz, imtihon rejimini ham boshqara olmaysiz, faqat foydalanasiz.</p>
+      <div class="fx" style="gap:8px">
+        <input type="text" id="collab-target-login" placeholder="Ustozning login'i">
+        <button class="btn bpu bsm" onclick="sendCollabRequest()">So'rov yuborish</button>
+      </div>
+      <div id="collab-send-msg" class="mt8"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:10px">&#x1F4E5; Sizga kelgan so'rovlar</h3>
+      <div id="collab-incoming"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:10px">&#x1F91D; Faol hamkorliklar</h3>
+      <div id="collab-active"></div>
+    </div>
+    <div class="card" id="collab-viewer-card" style="display:none">
+      <div class="ch"><h3 id="collab-viewer-title" style="margin:0"></h3><button class="btn bg bsm" onclick="document.getElementById('collab-viewer-card').style.display='none'">&#x2715; Yopish</button></div>
+      <p class="ts tm" style="margin-bottom:10px">&#x1F441;&#xFE0F; Faqat korish - o'zgartirish/ochirish mumkin emas.</p>
+      <div id="collab-viewer-body"></div>
     </div>
   </div>
 
@@ -1649,18 +1675,37 @@ function getAllQs() {
   var teacherMap={};
   (db.users||[]).forEach(function(u){ teacherMap[u.id]=u; });
   var mySchool=normSchool(ME.maktab);
+  // HAMKORLIK (2026-08-31): agar biror ustoz (requester) boshqa ustozning
+  // (owner) savollaridan foydalanish uchun so'rov yuborib, owner rozilik
+  // bergan bolsa - requesterning SINFLARIGA ham owner savollari korinishi
+  // kerak (requester o'z sinfiga owner savollaridan test bera oladi).
+  // Buning uchun har bir owner uchun "kimlar ruxsat olgan" royxatini
+  // oldindan tayyorlab qoyamiz.
+  var acceptedByOwner={}; // ownerId -> [requesterTeacher, ...]
+  (db.collaborations||[]).forEach(function(c){
+    if(c.status!=='accepted') return;
+    if(!acceptedByOwner[c.toId]) acceptedByOwner[c.toId]=[];
+    var reqT=teacherMap[c.fromId];
+    if(reqT) acceptedByOwner[c.toId].push(reqT);
+  });
   return all.filter(function(q){
     if(!q.teacherId) return true; // tizim/eski savollar - hammaga ochiq
     var t=teacherMap[q.teacherId];
     if(!t) return true; // ustoz topilmadi (ochirilgan hisob) - eski malumot sifatida korsatamiz
     // 1) Maktab mos kelishi kerak (agar ikkalasi ham korsatgan bolsa)
     var tSchool=normSchool(t.maktab);
-    if(mySchool && tSchool && mySchool!==tSchool) return false;
+    var schoolOk=!(mySchool && tSchool && mySchool!==tSchool);
     // 2) Ustoz aynan shu oquvchining sinfiga dars berishi kerak
-    if(t.teachClasses && t.teachClasses.length){
-      if(!ME.cls || t.teachClasses.indexOf(ME.cls)<0) return false;
-    }
-    return true;
+    var classOk=!(t.teachClasses && t.teachClasses.length) || (ME.cls && t.teachClasses.indexOf(ME.cls)>=0);
+    if(schoolOk && classOk) return true;
+    // 3) Yoki - shu savol egasi bilan hamkorlik qilgan (ruxsat olgan)
+    // ustozlardan biri ANIQ shu o'quvchining sinfiga dars berayotgan bolsa
+    var collabTeachers=acceptedByOwner[q.teacherId]||[];
+    return collabTeachers.some(function(rt){
+      var rtSchoolOk=!(mySchool && normSchool(rt.maktab) && mySchool!==normSchool(rt.maktab));
+      var rtClassOk=!(rt.teachClasses && rt.teachClasses.length) || (ME.cls && rt.teachClasses.indexOf(ME.cls)>=0);
+      return rtSchoolOk && rtClassOk;
+    });
   });
 }
 function getTopics() { var qs=getAllQs(),t=[]; qs.forEach(function(q){if(q.topic&&t.indexOf(q.topic)<0)t.push(q.topic);}); return t; }
@@ -2871,6 +2916,86 @@ function delQ(idx){if(idx<BQ.length){alert("Bu savol o'zgarmas!");return;}if(!co
 // USTOZ TOMONI: TEKSHIRISH NAVBATI
 // ═══════════════════════════════════════════════════════════════════════
 var _reviewGroups=[];
+// ═══════════════════════════════════════════════════════════════════════
+// HAMKORLIK (2026-08-31)
+// ═══════════════════════════════════════════════════════════════════════
+function sendCollabRequest(){
+  var login=(document.getElementById('collab-target-login').value||'').trim();
+  var msg=document.getElementById('collab-send-msg');
+  if(!login){ msg.innerHTML='<div class="alt ar">Login kiriting!</div>'; return; }
+  var db=getDB();
+  var target=(db.users||[]).find(function(u){return u.login===login && u.role==='teacher';});
+  if(!target){ msg.innerHTML='<div class="alt ar">Bunday login\'li ustoz topilmadi!</div>'; return; }
+  if(target.id===ME.id){ msg.innerHTML='<div class="alt ar">Ozingizga sorov yubora olmaysiz!</div>'; return; }
+  db.collaborations=db.collaborations||[];
+  var dup=db.collaborations.some(function(c){return c.fromId===ME.id && c.toId===target.id && (c.status==='pending'||c.status==='accepted');});
+  if(dup){ msg.innerHTML='<div class="alt aw">Bu ustozga allaqachon sorov yuborilgan yoki hamkorlik faol.</div>'; return; }
+  var c={id:'cb'+Date.now(), fromId:ME.id, toId:target.id, status:'pending', createdAt:Date.now()};
+  db.collaborations.push(c);
+  addNotification(db, target.id, '\u1F91D Hamkorlik sorovi', ME.name+' sizga hamkorlik taklif qilmoqda - "Hamkorlik" bolimida korib, qabul yoki rad etishingiz mumkin.');
+  saveDB(db);
+  msg.innerHTML='<div class="alt as">So\'rov yuborildi!</div>';
+  document.getElementById('collab-target-login').value='';
+}
+function loadCollaborations(){
+  var db=getDB();
+  db.collaborations=db.collaborations||[];
+  var teacherMap={}; (db.users||[]).forEach(function(u){teacherMap[u.id]=u;});
+
+  var incoming=db.collaborations.filter(function(c){return c.toId===ME.id && c.status==='pending';});
+  document.getElementById('collab-incoming').innerHTML=incoming.length?incoming.map(function(c){
+    var reqT=teacherMap[c.fromId];
+    return '<div class="pd fx between" style="align-items:center"><div><strong>'+(reqT?reqT.name:'?')+'</strong><div class="ts tm">'+(reqT?reqT.login:'')+'</div></div>'+
+      '<div class="fx" style="gap:6px"><button class="btn bs bsm" onclick="respondCollab(\''+c.id+'\',true)">&#x2705; Qabul</button><button class="btn bd bsm" onclick="respondCollab(\''+c.id+'\',false)">&#x274C; Rad</button></div></div>';
+  }).join(''):'<p class="ts tm">Hozircha kelgan sorov yoq.</p>';
+
+  var mine=db.collaborations.filter(function(c){return (c.fromId===ME.id||c.toId===ME.id) && c.status==='accepted';});
+  document.getElementById('collab-active').innerHTML=mine.length?mine.map(function(c){
+    var isOwner=c.toId===ME.id;
+    var other=teacherMap[isOwner?c.fromId:c.toId];
+    var qCount=(db.userQs||[]).filter(function(q){return q.teacherId===(isOwner?ME.id:c.toId);}).length;
+    return '<div class="pd fx between" style="align-items:center"><div>'+
+      (isOwner?'<strong>'+(other?other.name:'?')+'</strong> sizning savollaringizdan foydalanmoqda':'Siz <strong>'+(other?other.name:'?')+'</strong>ning savollaridan foydalanyapsiz')+
+      '</div><div class="fx" style="gap:6px">'+
+      (isOwner?'<button class="btn bd bsm" onclick="revokeCollab(\''+c.id+'\')">Bekor qilish</button>':'<button class="btn bpu bsm" onclick="viewCollabQuestions(\''+c.toId+'\')">&#x1F441;&#xFE0F; Korish</button>')+
+      '</div></div>';
+  }).join(''):'<p class="ts tm">Hozircha faol hamkorlik yoq.</p>';
+}
+function respondCollab(cid, accept){
+  var db=getDB();
+  var c=(db.collaborations||[]).find(function(x){return x.id===cid;});
+  if(!c) return;
+  c.status=accept?'accepted':'declined';
+  var teacherMap={}; (db.users||[]).forEach(function(u){teacherMap[u.id]=u;});
+  var reqT=teacherMap[c.fromId];
+  addNotification(db, c.fromId, accept?'\u2705 Hamkorlik qabul qilindi':'\u274C Hamkorlik rad etildi', ME.name+' sizning hamkorlik sorovingizni '+(accept?'qabul qildi':'rad etdi')+'.');
+  saveDB(db);
+  loadCollaborations();
+}
+function revokeCollab(cid){
+  if(!confirm('Bu hamkorlikni bekor qilasizmi? Boshqa ustoz endi sizning savollaringizni ishlata olmaydi.'))return;
+  var db=getDB();
+  var c=(db.collaborations||[]).find(function(x){return x.id===cid;});
+  if(!c) return;
+  c.status='revoked';
+  addNotification(db, c.fromId, '\u26A0\uFE0F Hamkorlik bekor qilindi', ME.name+' hamkorlikni bekor qildi - uning savollaridan endi foydalana olmaysiz.');
+  saveDB(db);
+  loadCollaborations();
+}
+function viewCollabQuestions(ownerId){
+  var db=getDB();
+  var owner=(db.users||[]).find(function(u){return u.id===ownerId;});
+  var qs=(db.userQs||[]).filter(function(q){return q.teacherId===ownerId;});
+  var topics=[]; qs.forEach(function(q){if(q.topic&&topics.indexOf(q.topic)<0)topics.push(q.topic);});
+  document.getElementById('collab-viewer-title').textContent=(owner?owner.name:'')+'ning savollari';
+  document.getElementById('collab-viewer-card').style.display='block';
+  document.getElementById('collab-viewer-body').innerHTML=topics.length?topics.map(function(t){
+    var cnt=qs.filter(function(q){return q.topic===t;}).length;
+    return '<div class="pd">'+t+' <span class="ts tm">('+cnt+' ta savol)</span></div>';
+  }).join(''):'<p class="ts tm">Hali savol yoq.</p>';
+  document.getElementById('collab-viewer-card').scrollIntoView({behavior:'smooth'});
+}
+
 async function loadReviewQueue(){
   var list=document.getElementById('review-list');
   if(!list) return;
@@ -5364,7 +5489,7 @@ function renderDuelModePick(){
   document.getElementById('duel-modal-body').innerHTML=
     '<button class="btn bg bsm mt8" onclick="renderDuelSubjectPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
     '<div class="rc">'+
-    '<div class="rcard" onclick="DL.mode=\'online\';renderDuelLevelPick()"><div class="ic">&#x1F310;</div><h3>Online</h3><p class="ts tm">Random raqib bilan</p></div>'+
+    '<div class="rcard" onclick="DL.mode=\'online\';renderDuelTopicPick()"><div class="ic">&#x1F310;</div><h3>Online</h3><p class="ts tm">Random raqib bilan</p></div>'+
     '<div class="rcard" onclick="DL.mode=\'bot\';renderDuelTopicPick()"><div class="ic">&#x1F916;</div><h3>Bot</h3><p class="ts tm">Kompyuter bilan poyga</p></div>'+
     '</div>';
 }
@@ -5383,7 +5508,7 @@ function renderDuelTopicPick(){
 }
 function renderDuelLevelPick(){
   document.getElementById('duel-modal-body').innerHTML=
-    '<button class="btn bg bsm mt8" onclick="'+(DL.mode==='bot'?'renderDuelTopicPick()':'renderDuelModePick()')+'" style="margin-bottom:10px">&#8592; Orqaga</button>'+
+    '<button class="btn bg bsm mt8" onclick="renderDuelTopicPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
     '<p class="ts tm" style="margin-bottom:10px">Darajani tanlang:</p>'+
     '<div style="display:flex;flex-direction:column;gap:8px">'+
     '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'easy\';startDuel()">&#x1F7E2; Oson <span class="ts tm">(72 sekund/savol)</span></button>'+
@@ -5494,12 +5619,11 @@ function showDuelResult(myScore, oppScore, oppName){
 }
 async function startOnlineDuel(){
   document.getElementById('duel-modal-body').innerHTML='<div style="text-align:center;padding:24px 0"><div style="font-size:32px">&#x1F50D;</div><p class="ts tm mt8">Raqib qidirilmoqda...</p><button class="btn bg bsm mt12" onclick="closeDuelModal()">Bekor qilish</button></div>';
-  var existing=await _sb.from('duel_queue').select('*').eq('subject',DL.subject).eq('level',DL.level).eq('status','waiting').neq('student_login',ME.login).order('created_at').limit(1);
+  var existing=await _sb.from('duel_queue').select('*').eq('subject',DL.subject).eq('topic',DL.topic).eq('level',DL.level).eq('status','waiting').neq('student_login',ME.login).order('created_at').limit(1);
   if(existing.data && existing.data.length){
     var opp=existing.data[0];
-    var allQs=getAllQs().filter(function(q){return q.subject===DL.subject;});
-    var qs=shuf(allQs).slice(0,10);
-    if(qs.length<3){ alert('Bu fandan yetarli savol yoq!'); closeDuelModal(); return; }
+    var qs=shuf(getQsByTopic(DL.topic)).slice(0,10);
+    if(qs.length<3){ alert('Bu mavzuda yetarli savol yoq!'); closeDuelModal(); return; }
     var mres=await _sb.from('duel_matches').insert({
       player1_login:opp.student_login, player1_name:opp.student_name,
       player2_login:ME.login, player2_name:ME.name,
@@ -5511,7 +5635,7 @@ async function startOnlineDuel(){
     beginOnlineDuelRace();
     return;
   }
-  var ins=await _sb.from('duel_queue').insert({student_login:ME.login,student_name:ME.name,cls:ME.cls,subject:DL.subject,level:DL.level,teacher_id:(ME.teacherId||'')}).select().single();
+  var ins=await _sb.from('duel_queue').insert({student_login:ME.login,student_name:ME.name,cls:ME.cls,subject:DL.subject,topic:DL.topic,level:DL.level,teacher_id:(ME.teacherId||'')}).select().single();
   if(ins.error){ alert('Xato: '+ins.error.message); closeDuelModal(); return; }
   DL.queueId=ins.data.id;
   DL.chan=_sb.channel('duelq_'+ins.data.id)
@@ -5803,4 +5927,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-</html>
+      </html>
