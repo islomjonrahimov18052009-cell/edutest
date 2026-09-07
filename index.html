@@ -76,8 +76,9 @@ h1{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;letter-
 .bbl{background:#dbeafe;color:#1d4ed8}.bgr{background:#dcfce7;color:#15803d}
 .brd{background:#fee2e2;color:#b91c1c}.byl{background:#fef3c7;color:#92400e}
 .bgy{background:#f1f5f9;color:#475569}.bpu2{background:#ede9fe;color:#5b3ea6}
-.tabs{display:flex;gap:3px;background:#e6e9f2;padding:4px;border-radius:12px;margin-bottom:16px}
-.tab{flex:1;padding:8px 4px;text-align:center;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--mut);transition:all .2s}
+.tabs{display:flex;gap:3px;background:#e6e9f2;padding:4px;border-radius:12px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;padding:8px 14px;text-align:center;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--mut);transition:all .2s;white-space:nowrap}
 .tab.on{background:#fff;color:var(--pri);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{background:#f8fafc;padding:9px 10px;text-align:left;font-weight:700;font-size:11px;color:var(--mut);border-bottom:2px solid var(--bdr);text-transform:uppercase;letter-spacing:.4px}
@@ -921,16 +922,36 @@ var _sb = null;
 var _sbReady = false;
 var _realtimeCh = null;
 
-// ── RASMLARNI SUPABASE STORAGE'GA YUKLASH ──────────────────────────────────
+// ── RASMLARNI YUKLASH (R2 birinchi, Supabase zaxira) ───────────────────────
 // Rasmlarni asosiy ma'lumotlar bazasi (JSON) ichida Base64 sifatida saqlash
-// o'rniga, alohida fayl saqlash xizmatiga (Storage) yuklaymiz va faqat
-// QISQA HAVOLANI saqlaymiz. Bu asosiy JSON hajmini yuzlab marta kichraytiradi
-// va Supabase'ning kichik serverini haddan tashqari band qilib qoymaydi.
+// o'rniga, alohida fayl saqlash xizmatiga yuklaymiz va faqat QISQA HAVOLANI
+// saqlaymiz. Bu asosiy JSON hajmini yuzlab marta kichraytiradi.
+// 2026-09-06 TUZATISH: avval bu funksiya FAQAT Supabase Storage'ga yozardi -
+// R2 backend'da (import/EMF-konvertatsiya yolida) qancha toliq sozlangan
+// bolmasin, BU yerdan (masalan "Savol qo'shish" formasiga qolda rasm
+// yuklanganda, yoki import paytida uploadAllImages() orqali) chiqadigan
+// rasmlar doim Supabase'da qolib ketardi - "R2'ni toliq ulagandan keyin
+// ham hammasi Supabase'ga tushyapti" shikoyatining aynan shu funksiyadagi
+// sababi edi. Endi: AVVAL /upload_image (server orqali R2'ga, kalitlar
+// brauzerga chiqmaydi) sinaladi; faqat u ishlamasa (R2 sozlanmagan yoki
+// server javob bermasa) ESKI Supabase yoliga qaytiladi - import hech qachon
+// buzilmaydi, faqat R2 to'liq sozlanmagan holatda avvalgidek ishlayveradi.
 async function uploadImageToStorage(dataUrl, keyHint){
-  if(!_sbReady || !_sb) return dataUrl; // Supabase ulanmagan - eski usulda qoladi
+  var match = dataUrl && dataUrl.match ? dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/) : null;
+  if(!match) return dataUrl; // notanish format yoki allaqachon URL (R2/Supabase)
   try{
-    var match = dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
-    if(!match) return dataUrl; // notanish format yoki allaqachon URL
+    var r2res = await fetch(RENDER_SERVER+'/upload_image', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({dataUrl: dataUrl})
+    });
+    if(r2res.ok){
+      var r2data = await r2res.json();
+      if(r2data && r2data.url) return r2data.url;
+    }
+  }catch(e){ console.warn('R2 (/upload_image) xato, Supabase zaxira yoliga o\'tilmoqda:', e); }
+  // R2 sozlanmagan/xato bergan - ESKI (Supabase Storage) yolga qaytamiz
+  if(!_sbReady || !_sb) return dataUrl; // Supabase ham ulanmagan - o'zgarishsiz qoladi (base64)
+  try{
     var mime = match[1], b64 = match[2];
     var ext = (mime.split('/')[1] || 'png').replace('jpeg','jpg');
     var bin = atob(b64);
@@ -946,8 +967,10 @@ async function uploadImageToStorage(dataUrl, keyHint){
 }
 // Kop rasmni bir vaqtda (lekin cheklangan miqdorda parallel) yuklash -
 // minglab rasm bolganda ham brauzerni "qotirmaydi" va tezroq ishlaydi.
+// MUHIM: endi Supabase ulanmagan bolsa ham ishlaydi (avval shart edi) -
+// R2 yoli Supabase'dan mutlaqo mustaqil ishlashi kerak.
 async function uploadAllImages(items){
-  if(!_sbReady || !_sb || !items.length) return;
+  if(!items.length) return;
   var CONCURRENCY = 8;
   var idx = 0;
   async function worker(){
@@ -1224,22 +1247,32 @@ function renderNotifDropdown(){
   var list=myNotifications();
   if(!list.length){
     dd.innerHTML='<div style="padding:20px;text-align:center;color:var(--mut);font-size:13px">Bildirishnomalar yoq</div>';
-  } else {
-    dd.innerHTML=list.slice(0,30).map(function(n){
-      var d=new Date(n.date);
-      var timeStr=d.toLocaleDateString('uz-UZ')+' '+d.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});
-      return '<div style="padding:10px 12px;border-radius:9px;margin-bottom:4px;background:'+(n.read?'#fff':'#eef2ff')+';border:1px solid '+(n.read?'#e5e7eb':'#c7d2fe')+'">'+
-        '<div style="font-weight:700;font-size:13px;margin-bottom:3px">'+_aiEsc(n.title)+'</div>'+
-        '<div style="font-size:12.5px;color:var(--mut);line-height:1.4">'+_aiEsc(n.body)+'</div>'+
-        '<div style="font-size:11px;color:#9ca3af;margin-top:4px">'+timeStr+'</div>'+
-      '</div>';
-    }).join('');
+    return;
   }
-  // Ochilganda hammasi "oqilgan" deb belgilanadi
+  // 2026-09-06: avval dropdown ochilganda HAMMASI darhol "oqilgan" deb
+  // belgilanardi-yu, lekin royxatda qolaverardi (faqat rang ozgarardi).
+  // Foydalanuvchi so'roviga kora endi: bildirishnoma ustiga BOSILGANDA
+  // (ya'ni "oqilganda") o'sha bitta xabar royxatdan BUTUNLAY ochiriladi -
+  // dropdown ochilishining ozi endi hech narsani avtomatik "oqigan"
+  // qilib belgilamaydi/ochirmaydi.
+  dd.innerHTML=list.slice(0,30).map(function(n){
+    var d=new Date(n.date);
+    var timeStr=d.toLocaleDateString('uz-UZ')+' '+d.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});
+    return '<div onclick="dismissNotification(\''+n.id+'\')" style="cursor:pointer;padding:10px 12px;border-radius:9px;margin-bottom:4px;background:'+(n.read?'#fff':'#eef2ff')+';border:1px solid '+(n.read?'#e5e7eb':'#c7d2fe')+'">'+
+      '<div style="font-weight:700;font-size:13px;margin-bottom:3px">'+_aiEsc(n.title)+'</div>'+
+      '<div style="font-size:12.5px;color:var(--mut);line-height:1.4">'+_aiEsc(n.body)+'</div>'+
+      '<div style="font-size:11px;color:#9ca3af;margin-top:4px">'+timeStr+' &middot; <span style="color:#9ca3af">bosib o\'qilgan deb belgilash</span></div>'+
+    '</div>';
+  }).join('');
+}
+// Bitta bildirishnomani "oqilgan" deb hisoblab, royxatdan butunlay ochiradi
+// (foydalanuvchi ustiga bosgani = oqigani). Boshqalar tegilmaydi.
+function dismissNotification(nid){
   var db=getDB();
-  var changed=false;
-  (db.notifications||[]).forEach(function(n){ if(n.userId===ME.id && !n.read){ n.read=true; changed=true; } });
-  if(changed){ saveDB(db); renderNotifBell(); }
+  db.notifications=(db.notifications||[]).filter(function(n){return n.id!==nid;});
+  saveDB(db);
+  renderNotifBell();
+  renderNotifDropdown();
 }
 document.addEventListener('click', function(e){
   var wrap=document.getElementById('notif-bell-wrap');
@@ -2359,9 +2392,10 @@ function confirmFinishTest(){
 // to'g'ri javob belgisida) xato bo'lishi mumkin. Shuning uchun har bir
 // xato javob avtomatik ustozga "Tekshirish" navbatiga yuboriladi. Ustoz
 // "To'g'ri" (savol durust, o'quvchi xato qilgan) yoki "Noto'g'ri" (savolda
-// xato bor, tuzatish kerak) deb belgilaydi. Bitta savol 10 marta "To'g'ri"
-// ovoz olsa, ISHONCHLI deb hisoblanadi va boshqa hech qachon navbatga
-// tushmaydi (server/ustoz vaqtini tejash uchun). Agar "Noto'g'ri" chiqsa,
+// xato bor, tuzatish kerak) deb belgilaydi. Bitta savol 5 marta "To'g'ri"
+// ovoz olsa (2026-09-06'da 10'dan 5'ga tushirildi - foydalanuvchi so'roviga
+// ko'ra, 10 juda ko'p edi), ISHONCHLI deb hisoblanadi va boshqa hech qachon
+// navbatga tushmaydi (server/ustoz vaqtini tejash uchun). Agar "Noto'g'ri" chiqsa,
 // savol tuzatiladi va O'SHA SAVOLNI XATO deb hisoblangan BARCHA o'quvchilar
 // balliga RETROAKTIV +1 qo'shiladi (agar ularning javobi yangi to'g'ri
 // javobga mos kelsa).
@@ -2372,7 +2406,7 @@ async function flagWrongAnswersForReview(res){
     if(d.ok) return;
     var q=S.test[i];
     if(!q || !q.id || !q.teacherId) return;
-    if((q.trustVotes||0) >= 10) return; // ishonchli - navbatga qoshilmaydi
+    if((q.trustVotes||0) >= 5) return; // ishonchli - navbatga qoshilmaydi (2026-09-06: 10->5)
     toFlag.push({
       teacher_id: q.teacherId,
       topic: selTopic,
@@ -3509,6 +3543,29 @@ function renderPendingTeachers(){
       '</div></div></div>';
   }).join('');
 }
+// 2026-09-06: avval bu yerda fetch(...).catch(function(){}) bor edi -
+// xatoni butunlay yutib yuborardi va pastdagi alert() HAR DOIM "Emailga
+// ham xabar yuborildi" derdi, hatto server email yubora olmagan (masalan
+// EMAIL_SMTP_USER/PASS sozlanmagan) yoki tarmoq xatosi bolgan taqdirda ham -
+// admin hech qachon haqiqiy holatni bilmasdi. Endi javob albatta
+// tekshiriladi va MUVAFFAQIYATSIZ bolsa alohida ANIQ ogohlantirish beriladi.
+function notifyTeacherEmailHonestly(u, status){
+  if(!u.email) return;
+  fetch(RENDER_SERVER+'/notify_teacher_status',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:u.email,name:u.name,login:u.login,status:status})
+  }).then(function(r){ return r.json().catch(function(){return {};}); })
+    .then(function(res){
+      if(!res || !res.sent){
+        console.warn('notify_teacher_status: email yuborilmadi', res);
+        alert('\u26A0\uFE0F Diqqat: '+u.name+'ga '+u.email+' manziliga email YUBORILMADI (server: '+((res&&res.error)||'nomalum sabab')+').\n\nTekshiring: Render Dashboard > edutest-server-7 > Environment > EMAIL_SMTP_USER va EMAIL_SMTP_PASS to\'g\'ri kiritilganmi (Gmail App Password, oddiy parol EMAS).');
+      }
+    })
+    .catch(function(e){
+      console.warn('notify_teacher_status xato:', e);
+      alert('\u26A0\uFE0F Diqqat: '+u.name+'ga email haqida server bilan bog\'lanib bo\'lmadi ('+e.message+'). Internet aloqasi yoki edutest-server-7 holatini tekshiring.');
+    });
+}
 function approveTeacher(uid){
   var db=getDB();
   var u=db.users.find(function(x){return x.id===uid;});
@@ -3516,27 +3573,17 @@ function approveTeacher(uid){
   u.approved=true;
   addNotification(db, u.id, '\u2705 Ro\'yxatdan muvaffaqiyatli o\'tdingiz!', 'Login: '+u.login+' - Admin hisobingizni tasdiqladi, endi tizimga kirishingiz mumkin.');
   saveDB(db);
-  if(u.email){
-    fetch(RENDER_SERVER+'/notify_teacher_status',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:u.email,name:u.name,login:u.login,status:'approved'})
-    }).catch(function(){});
-  }
   renderPendingTeachers();
   renderAdminAllUsers();
-  alert(u.name+' tasdiqlandi - endi tizimga kira oladi.'+(u.email?' Emailga ham xabar yuborildi.':''));
+  alert(u.name+' tasdiqlandi - endi tizimga kira oladi.'+(u.email?' Emailga xabar yuborilmoqda (muammo bolsa, alohida ogohlantirish chiqadi).':''));
+  notifyTeacherEmailHonestly(u,'approved');
 }
 function rejectTeacher(uid){
   var db=getDB();
   var u=db.users.find(function(x){return x.id===uid;});
   if(!u)return;
   if(!confirm(u.name+' ("'+u.login+'") hisobini butunlay ochirasizmi?'))return;
-  if(u.email){
-    fetch(RENDER_SERVER+'/notify_teacher_status',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:u.email,name:u.name,login:u.login,status:'blocked'})
-    }).catch(function(){});
-  }
+  notifyTeacherEmailHonestly(u,'blocked');
   db.users=db.users.filter(function(x){return x.id!==uid;});
   saveDB(db);
   renderPendingTeachers();
@@ -4013,7 +4060,17 @@ var RENDER_SERVER='https://edutest-server-7.onrender.com';
 // uchun edutest-pro skill faylining Changelog bolimiga qarang.
 var IMPORT_SERVER='https://edutest-oracle.duckdns.org';      // VM1 (Oracle)
 var IMPORT_SERVER_2='https://edutest-oracle-2.duckdns.org';  // VM2 (Oracle)
-var IMPORT_SERVER_3='https://edutest-vm5.duckdns.org';       // VM5 (Google Cloud e2-micro)
+// 2026-09-06: VM5 (Google Cloud e2-micro) HAVZADAN OLIB TASHLANDI - foydalanuvchi
+// tasdig'i bilan. Sabab: (1) e2-micro atigi 1GB RAM beradi, LibreOffice asosidagi
+// EMF/rasm konvertatsiyasi uchun bu doim ham yetarli emas - shu VM import
+// paytida boshqalarga qaraganda SEZILARLI kop xato berardi (aynan shu Render
+// 512MB tajribasida ilgari kuzatilgan OOM muammosining boshqa provayderdagi
+// oynasi); (2) GCP hisobida "kichik, hal qilinmagan tolovlar" bor edi (eng
+// ehtimoliy sabab: statik tashqi IP VM to'xtatilgan holatda ham HAQ olinadi -
+// GCP faqat IP RUNNING instance'ga biriktirilgan bolsa bepul qiladi).
+// Qayta yoqish kerak bolsa: pastdagi 3 ta qatorni ('var IMPORT_SERVER_3',
+// VM_FALLBACK yozuvi, SERVER_POOL yozuvi) izohdan chiqarish yetarli.
+// var IMPORT_SERVER_3='https://edutest-vm5.duckdns.org';    // VM5 (Google Cloud e2-micro) - 2026-09-06 OCHIRILDI
 var IMPORT_SERVER_4='https://edutest-vm4.duckdns.org';       // VM4 (Oracle Ampere, 2026-08-28 qoshildi)
 var IMPORT_SERVER_5='https://edutest-vm7.duckdns.org';       // VM7 (Oracle Ampere, oldinroq sozlangan, 2026-08-28 kodga ulandi)
 var IMPORT_SERVER_6='https://130-61-168-154.nip.io';         // VM8 (Oracle Ampere, DuckDNS limiti tugagani uchun nip.io ishlatilgan, 2026-08-28)
@@ -4037,7 +4094,7 @@ function pickServer(){
 var VM_FALLBACK={};
 VM_FALLBACK[IMPORT_SERVER]='https://92-5-41-212.nip.io';
 VM_FALLBACK[IMPORT_SERVER_2]='https://92-5-126-0.nip.io';
-VM_FALLBACK[IMPORT_SERVER_3]='https://34-58-106-227.nip.io';
+// VM_FALLBACK[IMPORT_SERVER_3]='https://34-58-106-227.nip.io'; // VM5 (Google) - 2026-09-06 ochirildi, yuqoridagi izohga qarang
 VM_FALLBACK[IMPORT_SERVER_4]='https://130-61-74-112.nip.io';
 VM_FALLBACK[IMPORT_SERVER_5]='https://130-61-172-212.nip.io';
 async function fetchVM(server, path, opts){
@@ -4086,7 +4143,7 @@ function uniqueTopicName(base){
 var SERVER_POOL=[
   {url:IMPORT_SERVER,   name:'VM1 (Oracle AMD)',  weight:15, dailyBudgetSec:null},
   {url:IMPORT_SERVER_2, name:'VM2 (Oracle AMD)',  weight:15, dailyBudgetSec:null},
-  {url:IMPORT_SERVER_3, name:'VM5 (Google e2-micro)', weight:8, dailyBudgetSec:null},
+  // {url:IMPORT_SERVER_3, name:'VM5 (Google e2-micro)', weight:8, dailyBudgetSec:null}, // 2026-09-06 ochirildi: kop xato + hal qilinmagan GCP tolovlari
   {url:IMPORT_SERVER_4, name:'VM4 (Oracle Ampere)', weight:15, dailyBudgetSec:null},
   {url:IMPORT_SERVER_5, name:'VM7 (Oracle Ampere)', weight:15, dailyBudgetSec:null},
   {url:IMPORT_SERVER_6, name:'VM8 (Oracle Ampere)', weight:15, dailyBudgetSec:null},
@@ -4167,11 +4224,31 @@ async function distributeEmfConversion(emfTasks, onProgress){
   // qayta uriniladi (Docker avtomatik qayta ishga tushishi uchun vaqt
   // berish maqsadida).
   var MAX_CHUNK=6;
-  var MAX_RETRIES_PER_SERVER=2;
-  var RETRY_WAIT_MS=8000;
+  // 2026-09-06 TUZATISH: avvalgi kod 2 marta ketma-ket xatodan keyin
+  // serverni SHU IMPORT uchun BUTUNLAY (doimiy) chetlatib qoyardi. Muammo:
+  // ekran ochirilganda (screen-off) yoki fon rejimiga otganda, TELEFONNING
+  // OZI barcha ochiq tarmoq sorovlarini bir vaqtda uzadi - demak ayni shu
+  // vaqtda deyarli HAMMA server bir xil sababdan (foydalanuvchi tomonidan,
+  // server ozi emas) 2 marta ketma-ket xato berib, birma-bir doimiy
+  // chetlanib qolardi. Natijada import oxiriga kelib atigi 1-2 ta server
+  // qolib, qolganlari "ochib qolgan" korinardi (aslida ular ISHLAYDI,
+  // shunchaki SHU IMPORT navbatidan chetlatilgan edi). Fallback-bosqichlar
+  // esa faqat HAMMA worker tugagandan keyin ishga tushadi - shuning uchun
+  // foydalanuvchi jonli progressda buni sezmasdi.
+  // Yechim: bitta xatodan keyin ENDI DOIMIY chetlatilmaydi - server
+  // JAMI necha soniya "yiqilgan" holatda bolganini hisoblab boradi va
+  // faqat shu jami vaqt MAX_TOTAL_DOWN_MS (5 daqiqa)dan oshsagina haqiqatan
+  // "bu import uchun ishlamayapti" deb hisoblanadi. Har xatodan keyingi
+  // kutish vaqti ham progressiv oshadi (8s, 16s, 24s... 30s bilan
+  // cheklangan) - qisqa vaqtinchalik uzilishlarda tezroq qaytadi, uzoq
+  // muammoda esa serverni ortiqcha "kaltaklamaydi".
+  var RETRY_WAIT_BASE_MS=8000;
+  var RETRY_WAIT_MAX_MS=30000;
+  var MAX_TOTAL_DOWN_MS=5*60*1000; // 5 daqiqa jami "yiqilgan" vaqt - shundan keyingina chindan chetlatiladi
 
   async function worker(srv){
     var consecutiveFails=0;
+    var totalDownMs=0;
     while(true){
       if(!isServerBudgetAvailable(srv)){ delete activeServers[srv.name]; return; }
       var chunk=queue.claim(Math.min(srv.weight, MAX_CHUNK));
@@ -4188,22 +4265,22 @@ async function distributeEmfConversion(emfTasks, onProgress){
           Object.keys(res.results).forEach(function(id){ results[id]=res.results[id]; });
         }
         addServerBudgetUsed(srv.url, Math.round((Date.now()-t0)/1000));
-        consecutiveFails=0; // muvaffaqiyatli - hisoblagichni tozalaymiz
+        consecutiveFails=0; totalDownMs=0; // muvaffaqiyatli - hisoblagichlarni tozalaymiz
       }catch(e){
         consecutiveFails++;
-        if(consecutiveFails<=MAX_RETRIES_PER_SERVER){
-          // Darhol tashlab yubormaymiz - Docker avtomatik qayta ishga
-          // tushishi uchun qisqa vaqt kutamiz, keyin SHU serverga yana
-          // urinamiz (vazifa hali navbatda, chunki hali requeue qilmadik).
-          console.warn('Server '+srv.name+' xato berdi ('+consecutiveFails+'/'+MAX_RETRIES_PER_SERVER+'), '+(RETRY_WAIT_MS/1000)+'s kutib qayta urinadi:', e);
-          queue.requeueFront(chunk);
-          await sleepMs(RETRY_WAIT_MS);
-          continue;
-        }
-        console.warn('Server '+srv.name+' '+MAX_RETRIES_PER_SERVER+' marta ketma-ket xato berdi, bu import uchun chetlatildi:', e);
+        var waitMs=Math.min(RETRY_WAIT_BASE_MS*consecutiveFails, RETRY_WAIT_MAX_MS);
+        totalDownMs+=waitMs;
         queue.requeueFront(chunk);
-        delete activeServers[srv.name];
-        return;
+        if(totalDownMs>MAX_TOTAL_DOWN_MS){
+          console.warn('Server '+srv.name+' jami '+Math.round(totalDownMs/60000)+' daqiqadan beri javob bermayapti, bu import uchun chetlatildi:', e);
+          delete activeServers[srv.name];
+          return;
+        }
+        console.warn('Server '+srv.name+' xato berdi (jami '+Math.round(totalDownMs/1000)+'s/'+Math.round(MAX_TOTAL_DOWN_MS/1000)+'s), '+(waitMs/1000)+'s kutib qayta urinadi:', e);
+        delete activeServers[srv.name]; // vaqtincha "band emas" - progress korsatkichida darhol korinadi
+        if(onProgress) onProgress(done,total,Object.keys(activeServers));
+        await sleepMs(waitMs);
+        continue;
       }
       done+=chunk.length;
       if(onProgress) onProgress(done,total,Object.keys(activeServers));
@@ -5463,6 +5540,11 @@ async function answerBattle(qIdx,optIdx,correctArr){
 var DL={mode:'',subject:'',level:'',topic:'',questions:[],idx:0,answers:[],startTs:0,matchId:null,queueId:null,isP1:false,chan:null,timerIv:null,botScore:0,botDone:false,myDone:false};
 var DUEL_LEVEL_SEC={easy:72,normal:45,hard:30};
 var DUEL_BOT_ACCURACY={easy:0.55,normal:0.75,hard:0.9};
+// 2026-09-06: haqiqiy Elo reyting tizimi uchun - botning "virtual reyting"i,
+// qiyinlik darajasiga qarab. Botni "Qiyin"da yutish endi "Oson"da yutishdan
+// KOP reyting bersin (haqiqiy Elo mantigi), shuning uchun har xil qiyinlikka
+// har xil son beriladi.
+var DUEL_BOT_RATING={easy:800,normal:1000,hard:1300};
 
 function openDuelHub(){
   document.getElementById('duel-modal').style.display='flex';
@@ -5591,21 +5673,42 @@ function finishMyDuelSide(){
   }
   finishOnlineDuel(myScore);
 }
+// Bot bilan duel yakunlanganda ham ENDI reyting qollaniladi (avval bot
+// rejimida applyDuelRating() umuman chaqirilmasdi - Duel reytingi faqat
+// online rejimda "korinmas" holda ozgarardi). Bot qiyinligiga qarab
+// DUEL_BOT_RATING'dan mos virtual reyting olinadi.
+function finishBotDuelWithRating(myScore){
+  var won=myScore>DL.botScore, draw=myScore===DL.botScore;
+  var oppRating=DUEL_BOT_RATING[DL.level]||1000;
+  var delta=applyDuelRating(won, draw, oppRating);
+  showDuelResult(myScore, DL.botScore||0, 'Bot', delta);
+}
 function checkDuelFinish(){
   if(!DL.myDone) return;
   var myScore=DL.answers.filter(Boolean).length;
   if(DL.mode==='bot' && !DL.botDone){
     document.getElementById('duel-modal-body').innerHTML='<div style="text-align:center;padding:20px 0"><div style="font-size:32px">&#x23F3;</div><p class="ts tm mt8">Siz tugatdingiz! Bot hali ishlamoqda...</p></div>';
     var chk=setInterval(function(){
-      if(DL.botDone){ clearInterval(chk); showDuelResult(myScore, DL.botScore, 'Bot'); }
+      if(DL.botDone){ clearInterval(chk); finishBotDuelWithRating(myScore); }
     },500);
     return;
   }
-  showDuelResult(myScore, DL.botScore||0, 'Bot');
+  finishBotDuelWithRating(myScore);
 }
-function showDuelResult(myScore, oppScore, oppName){
+function showDuelResult(myScore, oppScore, oppName, ratingDelta){
   var won=myScore>oppScore, draw=myScore===oppScore;
   var title=draw?'&#x1F91D; Durrang!':won?'&#x1F3C6; G\'alaba!':'&#x1F614; Mag\'lubiyat';
+  // 2026-09-06: Elo reytingi ozgarishini KORINADIGAN qilib chiqaramiz -
+  // avval bu ozgarish sodir bolar edi-yu, ekranda hech qayerda korinmas
+  // edi ("Duel'da ELO qani?" degan shikoyatning asosiy sababi shu edi).
+  var ratingHtml='';
+  if(typeof ratingDelta==='number'){
+    var newRating=ME.duelRating||1000;
+    var oldRating=newRating-ratingDelta;
+    var sign=ratingDelta>0?'+':'';
+    var col=ratingDelta>0?'var(--ok)':(ratingDelta<0?'var(--err)':'var(--mut)');
+    ratingHtml='<div class="ts" style="margin-bottom:10px">&#x1F3C5; Reyting: '+oldRating+' &#8594; <b>'+newRating+'</b> <span style="color:'+col+';font-weight:700">('+sign+ratingDelta+')</span></div>';
+  }
   document.getElementById('duel-modal-body').innerHTML=
     '<div style="text-align:center;padding:10px 0">'+
     '<div style="font-size:40px;margin-bottom:10px">'+(draw?'&#x1F91D;':won?'&#x1F3C6;':'&#x1F614;')+'</div>'+
@@ -5614,6 +5717,7 @@ function showDuelResult(myScore, oppScore, oppName){
     '<div class="sc"><div class="sn">'+myScore+'</div><div class="sl">Siz</div></div>'+
     '<div class="sc"><div class="sn">'+oppScore+'</div><div class="sl">'+oppName+'</div></div>'+
     '</div>'+
+    ratingHtml+
     '<button class="btn bg" onclick="closeDuelModal()">Yopish</button>'+
     '</div>';
 }
@@ -5624,11 +5728,33 @@ async function startOnlineDuel(){
     var opp=existing.data[0];
     var qs=shuf(getQsByTopic(DL.topic)).slice(0,10);
     if(qs.length<3){ alert('Bu mavzuda yetarli savol yoq!'); closeDuelModal(); return; }
+    // 2026-09-06: har ikkala tomonning duel BOSHLANISHIDAGI reytingini
+    // qator ichiga "suratga olib" saqlaymiz - shunda duel tugaganda HAR
+    // IKKI klient ham bir xil (o'zgarmagan) pre-match qiymatlar asosida
+    // Elo formulasini mustaqil hisoblaydi va natija ikkalasida ham mos
+    // tushadi. Raqibning joriy reytingi mahalliy db.users'dan olinadi
+    // (butun blob allaqachon localda bor, alohida sorov shart emas).
+    var _duelDb=getDB();
+    var _oppUser=(_duelDb.users||[]).find(function(u){return u.login===opp.student_login;});
+    var _oppRatingSnap=(_oppUser&&_oppUser.duelRating)||1000;
+    var _myRatingSnap=ME.duelRating||1000;
     var mres=await _sb.from('duel_matches').insert({
       player1_login:opp.student_login, player1_name:opp.student_name,
       player2_login:ME.login, player2_name:ME.name,
-      subject:DL.subject, level:DL.level, questions:qs
+      subject:DL.subject, level:DL.level, questions:qs,
+      player1_rating:_oppRatingSnap, player2_rating:_myRatingSnap
     }).select().single();
+    if(mres.error){
+      // Agar sabab reyting ustunlari hali bazaga qoshilmagani bolsa (SQL
+      // migratsiya hali bajarilmagan) - ustunlarsiz qayta urinamiz, shunda
+      // duel funksiyasi baribir ishlayveradi (Elo vaqtincha neytral 1000
+      // zaxiraga tushadi, migratsiya bajarilgach avtomatik toliq ishlaydi).
+      mres=await _sb.from('duel_matches').insert({
+        player1_login:opp.student_login, player1_name:opp.student_name,
+        player2_login:ME.login, player2_name:ME.name,
+        subject:DL.subject, level:DL.level, questions:qs
+      }).select().single();
+    }
     if(mres.error){ alert('Xato: '+mres.error.message); closeDuelModal(); return; }
     await _sb.from('duel_queue').update({status:'matched',matched_duel_id:mres.data.id}).eq('id',opp.id);
     DL.matchId=mres.data.id; DL.isP1=false; DL.questions=qs;
@@ -5662,8 +5788,9 @@ function beginOnlineDuelRace(){
         var myScoreF=DL.isP1?row.player1_score:row.player2_score;
         var oppScoreF=DL.isP1?row.player2_score:row.player1_score;
         var oppName=DL.isP1?row.player2_name:row.player1_name;
-        applyDuelRating(row.winner_login===ME.login, row.winner_login===null);
-        showDuelResult(myScoreF, oppScoreF, oppName);
+        var oppRatingSnap=DL.isP1?row.player2_rating:row.player1_rating;
+        var deltaF=applyDuelRating(row.winner_login===ME.login, row.winner_login===null, oppRatingSnap);
+        showDuelResult(myScoreF, oppScoreF, oppName, deltaF);
       }
     }).subscribe();
   renderDuelRace();
@@ -5691,21 +5818,44 @@ async function finishOnlineDuel(myScore){
     else winner=(row.player1_finish_ms<row.player2_finish_ms)?row.player1_login:row.player2_login;
     var isDraw=row.player1_score===row.player2_score;
     await _sb.from('duel_matches').update({status:'done',winner_login:isDraw?null:winner}).eq('id',row.id);
-    applyDuelRating(winner===ME.login && !isDraw, isDraw);
+    var oppRatingSnap2=DL.isP1?row.player2_rating:row.player1_rating;
+    var delta2=applyDuelRating(winner===ME.login && !isDraw, isDraw, oppRatingSnap2);
     var oppScore=DL.isP1?row.player2_score:row.player1_score;
     var oppName=DL.isP1?row.player2_name:row.player1_name;
-    showDuelResult(myScore, oppScore, oppName);
+    showDuelResult(myScore, oppScore, oppName, delta2);
   } else {
     document.getElementById('duel-modal-body').innerHTML='<div style="text-align:center;padding:24px 0"><div style="font-size:32px">&#x23F3;</div><p class="ts tm mt8">Siz tugatdingiz! Raqib hali ishlamoqda, natija tayyor bolganda darhol korasiz...</p></div>';
   }
 }
-function applyDuelRating(won, isDraw){
+// 2026-09-06: HAQIQIY Elo reyting formulasi (avval shunchaki +1/-1 edi,
+// bu "reyting" emas, oddiy hisoblagich edi - foydalanuvchi tomonidan
+// "Duel'da Elo tizimi qani?" deb aniq soralgan). Standart Elo: kutilgan
+// natija raqib bilan reyting farqidan hisoblanadi, keyin haqiqiy natija
+// (g'alaba/durrang/mag'lubiyat) bilan solishtirilib, K koeffitsiyentiga
+// (32 - odatiy standart qiymat) ko'paytirib qo'shiladi. Shunda kuchli
+// o'yinchini yutish KOPROQ, zaif o'yinchini (yoki "Oson" botni) yutish
+// esa KAMROQ reyting beradi - haqiqiy Elo mantig'i.
+function computeEloDelta(myRating, oppRating, score){
+  var K=32;
+  var expected=1/(1+Math.pow(10,(oppRating-myRating)/400));
+  return Math.round(K*(score-expected));
+}
+// oppRating - raqibning duel BOSHLANISHIDAGI reytingi (online duel'da
+// duel_matches jadvalidan, bot duel'da DUEL_BOT_RATING dan). Agar
+// berilmasa (masalan migratsiyadan OLDIN yaratilgan eski duel qatori,
+// unda player1_rating/player2_rating hali yoq) - neytral 1000 deb olinadi,
+// import qilinmagan/eski holatlar uchun zaxira.
+function applyDuelRating(won, isDraw, oppRating){
   var db=getDB();
   var u=(db.users||[]).find(function(x){return x.id===ME.id;});
-  if(!u) return;
-  u.duelRating=(u.duelRating||1000)+(isDraw?0:(won?1:-1));
+  if(!u) return 0;
+  var myRating=u.duelRating||1000;
+  var score=isDraw?0.5:(won?1:0);
+  var delta=computeEloDelta(myRating, (oppRating==null?1000:oppRating), score);
+  u.duelRating=myRating+delta;
   ME.duelRating=u.duelRating;
   saveDB(db);
+  return delta;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
