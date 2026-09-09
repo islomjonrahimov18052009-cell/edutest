@@ -884,7 +884,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <label>Savol matni</label>
       <textarea id="aq-text" placeholder="Savolni yozing..." oninput="updateMathPreview()"></textarea>
       <div class="sarea" id="aq-syms"></div>
-      <div class="ts tm" style="margin-top:4px">&#x1F4A1; Kasr, ildiz, daraja tugmalari <b>haqiqiy chizilgan</b> ko'rinishda qo'shiladi (chizig'i ichidagi matnga qarab cho'ziladi). Ichma-ich yozish uchun: ichki qismini yozib, <b>belgilab (select qilib)</b> oling, so'ng kerakli tugmani (Kasr, √, xⁿ) bosing — natija tagidagi ko'rinishda darhol chiqadi.</div>
+      <div class="ts tm" style="margin-top:4px">💡 <b>Kasr</b> (a/b), <b>ildiz</b> (√, ∛, ⁿ√) va <b>daraja</b> (xⁿ) tugmalarini bosganda ekranda kiritish paneli ochiladi — surat, mahraj yoki ko'rsatkichni kiriting, "Qo'shish"ni bosing. Belgilab (select) olingan matn avtomatik suratga/asosga aylanadi. Daraja ustiga daraja: birinchi natijani belgilab, yana xⁿ bosing.</div>
       <div id="aq-preview" style="display:none;margin-top:8px;padding:12px 14px;background:#f8f9fc;border:1px dashed var(--color-border);border-radius:8px;font-size:16px;line-height:1.8;overflow-x:auto"></div>
     </div>
     <div class="fg">
@@ -1514,9 +1514,72 @@ var SYMBOLS_BY_SUBJECT={
   other:['±','→','↔','°','%','‰','...','«','»','№','–','×','÷','²','³','≈','≠','≤','≥']
 };
 
-// Endi kasr, ildiz va daraja belgilari HAQIQIY chizilgan matematik shakl
-// (KaTeX) sifatida qo'shiladi - shuning uchun kasr chizig'i va ildiz ustidagi
-// chiziq ichidagi matn qancha uzun bo'lsa, shuncha cho'ziladi (rasmdagidek).
+// ─── MATEMATIK KIRITISH YORDAMCHISI (inline mini-modal) ──────────────────
+// prompt() o'rniga - mobil qurilmada prompt() qo'shimcha klaviatura ochib
+// yopadi va kursor pozitsiyasini yo'qotadi. Endi barcha kiritish shu
+// yordamchi orqali: kichik panel textarea'ning pastida paydo bo'ladi,
+// foydalanuvchi qiymatlarni kiriting, "Qo'shish" bosadi - formula
+// avtomatik qo'shiladi va panel yo'qoladi.
+var _mhPending=null; // {type:'frac'|'root'|'exp', base:'', ...}
+
+function _mhShow(cfg){
+  _mhPending=cfg;
+  var panel=document.getElementById('math-helper-panel');
+  if(!panel){
+    panel=document.createElement('div');
+    panel.id='math-helper-panel';
+    panel.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid var(--pri);padding:14px 16px 20px;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)';
+    document.body.appendChild(panel);
+  }
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><b style="font-size:15px">'+cfg.title+'</b><button onclick="_mhClose()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#888">✕</button></div>';
+  cfg.fields.forEach(function(f){
+    html+='<div style="margin-bottom:8px"><label style="font-size:12px;font-weight:700;color:#666;text-transform:uppercase">'+f.label+'</label>';
+    html+='<input id="mh-'+f.id+'" type="text" value="'+(f.val||'')+'" placeholder="'+f.ph+'" style="width:100%;padding:8px 10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:15px;margin-top:3px;font-family:\'JetBrains Mono\',monospace"></div>';
+  });
+  html+='<div style="display:flex;gap:8px;margin-top:4px">';
+  html+='<button onclick="_mhApply()" style="flex:1;padding:10px;background:var(--pri);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer">✓ Qo\'shish</button>';
+  html+='<button onclick="_mhClose()" style="padding:10px 16px;background:#f1f5f9;border:none;border-radius:9px;font-size:14px;cursor:pointer">Bekor</button>';
+  html+='</div>';
+  panel.innerHTML=html;
+  // Birinchi inputga fokus
+  setTimeout(function(){ var el=document.getElementById('mh-'+cfg.fields[0].id); if(el)el.focus(); },80);
+}
+function _mhClose(){
+  var panel=document.getElementById('math-helper-panel');
+  if(panel)panel.remove();
+  _mhPending=null;
+}
+function _mhVal(id){ var el=document.getElementById('mh-'+id); return el?el.value.trim():''; }
+function _mhApply(){
+  if(!_mhPending)return;
+  var c=_mhPending;
+  var latex='';
+  if(c.type==='frac'){
+    var num=_mhVal('num'),den=_mhVal('den');
+    if(!num&&!den){_mhClose();return;}
+    latex='\\frac{'+(num||' ')+'}{'+den+'}';
+  } else if(c.type==='root'){
+    var content=_mhVal('content'),deg=_mhVal('deg');
+    latex=deg?('\\sqrt['+deg+']{'+content+'}'):('\\sqrt{'+(content||' ')+'}');
+  } else if(c.type==='exp'){
+    var base2=_mhVal('base'),exp2=_mhVal('exp');
+    if(!base2&&!exp2){_mhClose();return;}
+    latex=(base2||'x')+'^{'+(exp2||'2')+'}';
+  }
+  _mhClose();
+  insLatex(latex);
+}
+// Enter tugmasi bosqanda ham qo'shilsin
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&_mhPending){
+    var panel=document.getElementById('math-helper-panel');
+    if(panel&&document.activeElement&&panel.contains(document.activeElement)){
+      e.preventDefault();_mhApply();
+    }
+  }
+  if(e.key==='Escape'&&_mhPending){ _mhClose(); }
+});
+
 function stripMathDelim(s){
   s=s.trim();
   if(s.length>=2&&s.charAt(0)==='$'&&s.charAt(s.length-1)==='$')return s.slice(1,-1);
@@ -1531,62 +1594,61 @@ function insLatex(latex){
   ta.focus();
   updateMathPreview();
 }
-// KASR: surat ustiga, mahraj ostiga yoziladi, orasida cho'ziluvchan chiziq -
-// ICHMA-ICH kasr uchun: avval kichik kasrni yozib, uni belgilab (select qilib)
-// oling, so'ng yana "Kasr" tugmasini bosing - belgilangan qism suratga aylanadi.
+// KASR - inline panel orqali (prompt() yo'q)
 function insFraction(){
   var ta=document.getElementById('aq-text');
-  var st=ta.selectionStart,en=ta.selectionEnd;
-  var sel=ta.value.slice(st,en);
-  var num;
-  if(sel){ num=stripMathDelim(sel); }
-  else {
-    num=prompt("Kasr suratini (yuqori qismini) kiriting:\nMasalan: 2x+1","");
-    if(num===null)return;
-  }
-  var den=prompt("Kasr mahrajini (pastki qismini) kiriting:\nMasalan: x-3\n\n(Ichma-ich kasr uchun: kichik kasrni alohida yozib, belgilab oling, so'ng yana \"Kasr\" tugmasini bosing)","");
-  if(den===null)return;
-  insLatex('\\frac{'+num+'}{'+den+'}');
+  var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
+  var preNum=sel?stripMathDelim(sel):'';
+  _mhShow({
+    type:'frac', title:'➗ Kasr',
+    fields:[
+      {id:'num',label:'Surat (ustki qism)',ph:'Masalan: 2x+1',val:preNum},
+      {id:'den',label:'Mahraj (pastki qism)',ph:'Masalan: x-3',val:''}
+    ]
+  });
 }
-// ILDIZ: ostidagi ifoda qancha uzun bo'lsa, ustidagi chiziq ham shuncha cho'ziladi.
+// ILDIZ - inline panel orqali
 function insNthRoot(){
   var ta=document.getElementById('aq-text');
-  var st=ta.selectionStart,en=ta.selectionEnd;
-  var sel=ta.value.slice(st,en);
-  var content;
-  if(sel){ content=stripMathDelim(sel); }
-  else {
-    content=prompt("Ildiz ostidagi ifodani kiriting:\nMasalan: 25, x+7","");
-    if(content===null)return;
-  }
-  var n=prompt("Ildiz darajasini kiriting (oddiy kvadrat ildiz uchun bo'sh qoldiring):\nMasalan: 3, 5, 7, n","");
-  if(n===null)return;
-  n=n.trim();
-  insLatex(n?('\\sqrt['+n+']{'+content+'}'):('\\sqrt{'+content+'}'));
+  var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
+  var preContent=sel?stripMathDelim(sel):'';
+  _mhShow({
+    type:'root', title:'√ Ildiz',
+    fields:[
+      {id:'content',label:'Ildiz ostidagi ifoda',ph:'Masalan: 25 yoki x+7',val:preContent},
+      {id:'deg',label:'Daraja (kvadrat ildiz uchun bo\'sh qoldiring)',ph:'Masalan: 3, n (bo\'sh = √)',val:''}
+    ]
+  });
 }
 function insRootQuick(n){
   var ta=document.getElementById('aq-text');
-  var st=ta.selectionStart,en=ta.selectionEnd;
-  var sel=ta.value.slice(st,en);
+  var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
   var content=sel?stripMathDelim(sel):'';
-  insLatex(n?('\\sqrt['+n+']{'+content+'}'):('\\sqrt{'+content+'}'));
+  if(content){
+    insLatex(n?('\\sqrt['+n+']{'+content+'}'):('\\sqrt{'+content+'}'));
+  } else {
+    _mhShow({
+      type:'root', title:(n?('∛ '+n+'-daraja ildiz'):'√ Kvadrat ildiz'),
+      fields:[{id:'content',label:'Ildiz ostidagi ifoda',ph:'Masalan: 25, x+7',val:''}].concat(
+        n?[]:[{id:'deg',label:'Daraja (bo\'sh qolsa √)',ph:'Masalan: 3, n',val:''}]
+      ),
+      _fixedDeg: n||''
+    });
+  }
 }
-// DARAJA: asosni belgilab (select) qilib tanlang, so'ng bu tugmani bosing -
-// daraja ustiga daraja (ichma-ich) yozish uchun ham xuddi shunday: chiqqan
-// natijani belgilab, yana bosing.
+// DARAJA - inline panel orqali, daraja ustiga daraja ham yoziladi:
+// avvalgi natijani belgilab (select qilib), yana xⁿ tugmasini bosish yetarli
 function insCustomExp(){
   var ta=document.getElementById('aq-text');
-  var st=ta.selectionStart,en=ta.selectionEnd;
-  var sel=ta.value.slice(st,en);
-  var base;
-  if(sel){ base=stripMathDelim(sel); }
-  else {
-    base=prompt("Daraja qo'yiladigan sonni/harfni kiriting:\nMasalan: x, 5","x");
-    if(base===null)return;
-  }
-  var exp=prompt("Daraja qiymatini kiriting:\nMasalan: 2, 3, -1, n, yoki murakkab: 2n+1","2");
-  if(exp===null)return;
-  insLatex(base+'^{'+exp+'}');
+  var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
+  var preBase=sel?stripMathDelim(sel):'';
+  _mhShow({
+    type:'exp', title:'xⁿ Daraja',
+    fields:[
+      {id:'base',label:'Asos (daraja qo\'yiladigan son/harf)',ph:'Masalan: x, 5, (a+b)',val:preBase},
+      {id:'exp',label:'Daraja ko\'rsatkichi',ph:'Masalan: 2, n, 2n+1',val:''}
+    ]
+  });
 }
 function updateMathPreview(){
   var ta=document.getElementById('aq-text');
@@ -1595,7 +1657,10 @@ function updateMathPreview(){
   var txt=ta.value;
   if(!txt.trim()){prev.style.display='none';return;}
   prev.style.display='block';
-  prev.textContent=txt;
+  // MUHIM: textContent emas innerHTML orqali o'rnatiladi - aks holda KaTeX
+  // belgilari render bo'lmay, oddiy matn sifatida ko'rinib qoladi.
+  // Xavfsizlik: foydalanuvchi o'z savoliga o'zi yozayapti, XSS xavfi yo'q.
+  prev.innerHTML=txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   renderMathIn(prev);
 }
 function renderMathIn(el){
@@ -3549,21 +3614,52 @@ function renderPendingTeachers(){
 // EMAIL_SMTP_USER/PASS sozlanmagan) yoki tarmoq xatosi bolgan taqdirda ham -
 // admin hech qachon haqiqiy holatni bilmasdi. Endi javob albatta
 // tekshiriladi va MUVAFFAQIYATSIZ bolsa alohida ANIQ ogohlantirish beriladi.
-function notifyTeacherEmailHonestly(u, status){
-  if(!u.email) return;
+// Admin uchun bildirishnoma yubor (barcha adminlarga)
+function notifyAdmins(db, title, body){
+  (db.users||[]).forEach(function(u){
+    if(u.role==='admin') addNotification(db, u.id, title, body);
+  });
+}
+
+function notifyTeacherEmailHonestly(u, status, db){
+  // Email natijasini (muvaffaqiyat yoki xato) admin bildirishnomalariga yozamiz
+  // - alert() o'rniga yoki undan QOSHIMCHA (email bo'lmasa ham admin ko'rsin)
+  var statusText=status==='approved'?'tasdiqlandi':'rad etildi';
+  if(!u.email){
+    if(db){
+      notifyAdmins(db, '📧 Email yuborilmadi (manzil yo\'q)',
+        u.name+' ('+u.login+') '+statusText+', lekin ro\'yxatdan o\'tishda email manzil kiritilmagan.');
+      saveDB(db);
+    }
+    return;
+  }
   fetch(RENDER_SERVER+'/notify_teacher_status',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({email:u.email,name:u.name,login:u.login,status:status})
   }).then(function(r){ return r.json().catch(function(){return {};}); })
     .then(function(res){
-      if(!res || !res.sent){
+      var db2=getDB();
+      if(res && res.sent){
+        notifyAdmins(db2, '✅ Email muvaffaqiyatli yuborildi',
+          u.name+' ('+u.login+') '+statusText+'. Email manzil: '+u.email);
+      } else {
+        var err=(res&&res.error)||'nomalum sabab';
+        notifyAdmins(db2, '⚠️ Email YUBORILMADI — '+u.name,
+          'Manzil: '+u.email+' | Holat: '+statusText+' | Server javobi: '+err+
+          '\nTekshiring: Render → edutest-server-7 → Environment → EMAIL_SMTP_USER / EMAIL_SMTP_PASS');
         console.warn('notify_teacher_status: email yuborilmadi', res);
-        alert('\u26A0\uFE0F Diqqat: '+u.name+'ga '+u.email+' manziliga email YUBORILMADI (server: '+((res&&res.error)||'nomalum sabab')+').\n\nTekshiring: Render Dashboard > edutest-server-7 > Environment > EMAIL_SMTP_USER va EMAIL_SMTP_PASS to\'g\'ri kiritilganmi (Gmail App Password, oddiy parol EMAS).');
       }
+      saveDB(db2);
+      renderNotifBell();
     })
     .catch(function(e){
+      var db2=getDB();
+      notifyAdmins(db2, '⚠️ Email serverga yetib bormadi — '+u.name,
+        'Manzil: '+u.email+' | Holat: '+statusText+' | Tarmoq xatosi: '+e.message+
+        '\neduler-server-7 holati yoki internet aloqasini tekshiring.');
+      saveDB(db2);
+      renderNotifBell();
       console.warn('notify_teacher_status xato:', e);
-      alert('\u26A0\uFE0F Diqqat: '+u.name+'ga email haqida server bilan bog\'lanib bo\'lmadi ('+e.message+'). Internet aloqasi yoki edutest-server-7 holatini tekshiring.');
     });
 }
 function approveTeacher(uid){
@@ -3571,23 +3667,28 @@ function approveTeacher(uid){
   var u=db.users.find(function(x){return x.id===uid;});
   if(!u)return;
   u.approved=true;
-  addNotification(db, u.id, '\u2705 Ro\'yxatdan muvaffaqiyatli o\'tdingiz!', 'Login: '+u.login+' - Admin hisobingizni tasdiqladi, endi tizimga kirishingiz mumkin.');
+  addNotification(db, u.id, '✅ Ro\'yxatdan muvaffaqiyatli o\'tdingiz!', 'Login: '+u.login+' - Admin hisobingizni tasdiqladi, endi tizimga kirishingiz mumkin.');
+  notifyAdmins(db, '👤 Ustoz tasdiqlandi', u.name+' ('+u.login+') tasdiqlandi.'+(u.email?' Email yuborilmoqda: '+u.email:' Email manzil yo\'q.'));
   saveDB(db);
   renderPendingTeachers();
   renderAdminAllUsers();
-  alert(u.name+' tasdiqlandi - endi tizimga kira oladi.'+(u.email?' Emailga xabar yuborilmoqda (muammo bolsa, alohida ogohlantirish chiqadi).':''));
-  notifyTeacherEmailHonestly(u,'approved');
+  renderNotifBell();
+  notifyTeacherEmailHonestly(u,'approved',db);
 }
 function rejectTeacher(uid){
   var db=getDB();
   var u=db.users.find(function(x){return x.id===uid;});
   if(!u)return;
   if(!confirm(u.name+' ("'+u.login+'") hisobini butunlay ochirasizmi?'))return;
-  notifyTeacherEmailHonestly(u,'blocked');
+  notifyAdmins(db, '🚫 Ustoz rad etildi', u.name+' ('+u.login+') hisobi rad etildi va o\'chirildi.'+(u.email?' Email yuborilmoqda: '+u.email:' Email manzil yo\'q.'));
+  saveDB(db);
+  notifyTeacherEmailHonestly(u,'blocked',db);
+  db=getDB(); // reload after possible notif save
   db.users=db.users.filter(function(x){return x.id!==uid;});
   saveDB(db);
   renderPendingTeachers();
   renderAdminAllUsers();
+  renderNotifBell();
 }
 function toggleExamMode(on){
   var db=getDB();
