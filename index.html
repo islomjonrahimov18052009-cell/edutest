@@ -790,11 +790,11 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     </div>
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-        <h3 style="margin:0">&#x1F4BE; Xotira holati (Supabase Storage)</h3>
+        <h3 style="margin:0">&#x1F4BE; Xotira holati</h3>
         <button class="btn bg bsm" onclick="loadStorageStats()" id="storage-refresh-btn">&#x1F504; Yangilash</button>
       </div>
       <div class="fg" style="max-width:260px">
-        <label>Reja (Supabase avtomatik bermaydi, qo'lda tanlang)</label>
+        <label>Supabase reja (avtomatik aniqlanmaydi, qo'lda tanlang)</label>
         <select id="storage-plan-select" onchange="onStoragePlanChange()">
           <option value="free">Bepul &#8212; 1 GB</option>
           <option value="pro">Pullik (Pro) &#8212; 100 GB</option>
@@ -2138,6 +2138,16 @@ function doRegister(){
   ME=nu;afterLogin();
 }
 function afterLogin(){
+  // Agar oldingi sessiyada test yarim qolgan bo'lsa (masalan brauzer yopilgan,
+  // blur eventi ishlamagan) - kirish paytida holat to'liq tozalansin.
+  if(S.iv) clearInterval(S.iv);
+  S={test:[],idx:0,answers:{},timeLeft:0,iv:null,mode:'',lastRes:null};
+  _backWarned=false; _logoutWarned=false; _ignoreBlur=false;
+  // Agar fullscreen qolgan bo'lsa - chiqamiz
+  if(document.fullscreenElement||document.webkitFullscreenElement){
+    if(document.exitFullscreen) document.exitFullscreen().catch(function(){});
+    else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
   document.getElementById('nav-user').textContent=ME.name+(ME.cls?' - '+ME.cls:'')+(ME.role==='teacher'?' (Ustoz)':ME.role==='admin'?' (Admin)':'');
   document.getElementById('btn-out').style.display='inline-flex';
   document.getElementById('auth-err').innerHTML='';
@@ -3386,83 +3396,148 @@ function initAdminSettings(){
 }
 var _adminShowPass=false;
 var STORAGE_PLAN_MB={free:1024,pro:1024*100};
+// R2 bepul: 10 GB storage, 10 million read ops/oy, 1 million write ops/oy
+var R2_FREE_LIMITS={storage_gb:10,reads_per_month:10000000,writes_per_month:1000000};
 var _storageCache=null;
+var _r2StatsCache=null;
+
 async function loadStorageStats(){
-  // Endi bu funksiya "Umumiy" (avtomatik) va "Sozlamalar" (qolda "Yangilash")
-  // bolimlaridan ham chaqirilishi mumkin - ikkalasi ham bolmasligi mumkin,
-  // shuning uchun har birini alohida topamiz va bor bolganiga yozamiz.
   var bodyOverview=document.getElementById('storage-overview-body');
   var bodySettings=document.getElementById('storage-stats-body');
   var btn=document.getElementById('storage-refresh-btn');
   if(!bodyOverview&&!bodySettings)return;
   var loadingHtml='<p class="ts tm" style="text-align:center;padding:14px">&#x23F3; Yuklanmoqda...</p>';
-  if(!_sbReady||!_sb){
-    var noConnHtml='<p class="ts tm" style="text-align:center;padding:14px">Supabase ulanmagan.</p>';
-    if(bodyOverview)bodyOverview.innerHTML=noConnHtml;
-    if(bodySettings)bodySettings.innerHTML=noConnHtml;
-    return;
-  }
-  if(btn){btn.disabled=true;btn.textContent='\u23F3 Yuklanmoqda...';}
-  var busyHtml='<p class="ts tm" style="text-align:center;padding:14px">\u23F3 Supabase\'dan malumot olinmoqda (real vaqtda)...</p>';
-  if(bodyOverview)bodyOverview.innerHTML=busyHtml;
-  if(bodySettings)bodySettings.innerHTML=busyHtml;
-  try{
-    var all=[];
-    var offset=0, pageSize=1000, guard=0;
-    while(true){
-      guard++;
-      var res=await _sb.storage.from(SB_STORAGE_BUCKET).list('',{limit:pageSize,offset:offset,sortBy:{column:'name',order:'asc'}});
-      if(res.error) throw new Error(res.error.message);
-      var page=res.data||[];
-      all=all.concat(page);
-      if(page.length<pageSize || guard>200) break;
-      offset+=pageSize;
-    }
-    var files=all.filter(function(f){return f.name && f.metadata;}).map(function(f){return {name:f.name, size:(f.metadata&&f.metadata.size)||0};});
-    var totalBytes=files.reduce(function(s,f){return s+f.size;},0);
-    var largest=files.reduce(function(m,f){return f.size>m?f.size:m;},0);
-    _storageCache={files:files,totalBytes:totalBytes,largest:largest};
-    renderStorageBars();
-    var upd=document.getElementById('storage-overview-updated');
-    if(upd)upd.textContent='Yangilandi: '+new Date().toLocaleTimeString('uz-UZ');
-  }catch(e){
-    var errHtml='<p class="ts" style="color:#b91c1c;text-align:center;padding:14px">Xato: '+e.message+'</p>';
-    if(bodyOverview)bodyOverview.innerHTML=errHtml;
-    if(bodySettings)bodySettings.innerHTML=errHtml;
-  }
-  if(btn){btn.disabled=false;btn.textContent='\uD83D\uDD04 Yangilash';}
+  if(bodyOverview)bodyOverview.innerHTML=loadingHtml;
+  if(bodySettings)bodySettings.innerHTML=loadingHtml;
+  if(btn){btn.disabled=true;btn.textContent='⏳ Yuklanmoqda...';}
+
+  // R2 va Supabase Storage'ni PARALLEL yuklaymiz - ikkalasi bir-biriga bog'liq emas
+  var r2Promise = fetch(RENDER_SERVER+'/r2_stats',{method:'GET'})
+    .then(function(r){return r.json();})
+    .catch(function(e){return {configured:false,error:'Server bilan bog\'lanib bo\'lmadi: '+e.message};});
+
+  var sbPromise = (async function(){
+    if(!_sbReady||!_sb) return null;
+    try{
+      var all=[];
+      var offset=0,pageSize=1000,guard=0;
+      while(true){
+        guard++;
+        var res=await _sb.storage.from(SB_STORAGE_BUCKET).list('',{limit:pageSize,offset:offset,sortBy:{column:'name',order:'asc'}});
+        if(res.error) throw new Error(res.error.message);
+        var page=res.data||[];
+        all=all.concat(page);
+        if(page.length<pageSize||guard>200)break;
+        offset+=pageSize;
+      }
+      var files=all.filter(function(f){return f.name&&f.metadata;}).map(function(f){return{name:f.name,size:(f.metadata&&f.metadata.size)||0};});
+      var totalBytes=files.reduce(function(s,f){return s+f.size;},0);
+      var largest=files.reduce(function(m,f){return f.size>m?f.size:m;},0);
+      return {files:files,totalBytes:totalBytes,largest:largest};
+    }catch(e){return {error:e.message};}
+  })();
+
+  var results=await Promise.all([r2Promise,sbPromise]);
+  _r2StatsCache=results[0];
+  if(results[1]&&!results[1].error) _storageCache=results[1];
+
+  renderStorageBars();
+  var upd=document.getElementById('storage-overview-updated');
+  if(upd)upd.textContent='Yangilandi: '+new Date().toLocaleTimeString('uz-UZ');
+  if(btn){btn.disabled=false;btn.textContent='🔄 Yangilash';}
 }
+
 function onStoragePlanChange(){
   var db=getDB();
   db.storagePlan=document.getElementById('storage-plan-select').value;
   saveDB(db);
   renderStorageBars();
 }
+
+function _storageBar(label,usedMB,limitMB,color,unit){
+  var pct=Math.min(100,limitMB>0?(usedMB/limitMB*100):0);
+  var usedStr=usedMB>=1024?(usedMB/1024).toFixed(2)+' GB':usedMB.toFixed(1)+' MB';
+  var limStr=limitMB>=1024?(limitMB/1024).toFixed(0)+' GB':limitMB+' MB';
+  return '<div style="margin-bottom:12px">'+
+    '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px">'+
+    '<span>'+label+'</span><span style="font-family:monospace">'+usedStr+' / '+limStr+' <span style="color:'+color+';font-weight:700">('+pct.toFixed(1)+'%)</span></span></div>'+
+    '<div style="height:10px;background:#eef0f5;border-radius:8px;overflow:hidden">'+
+    '<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:8px;transition:width .4s"></div></div></div>';
+}
+
 function renderStorageBars(){
-  if(!_storageCache)return;
+  var html='';
+
+  // ── R2 (Cloudflare) ──────────────────────────────────────
+  var r2=_r2StatsCache;
+  if(r2&&r2.configured){
+    var imgMB=(r2.images&&r2.images.size_bytes||0)/1024/1024;
+    var datMB=(r2.data&&r2.data.size_bytes||0)/1024/1024;
+    var totalR2MB=imgMB+datMB;
+    var limitR2MB=R2_FREE_LIMITS.storage_gb*1024;
+    var colR2=totalR2MB/limitR2MB>0.9?'#dc2626':totalR2MB/limitR2MB>0.7?'#f59e0b':'#16a34a';
+    html+='<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;margin-bottom:14px">';
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+      '<span style="font-size:18px">☁️</span>'+
+      '<b style="font-size:14px">Cloudflare R2</b>'+
+      '<span class="bdg bgr" style="font-size:11px">Bepul • 10 GB / 10M reads / oy</span>';
+    if(r2.public_url) html+='<a href="https://dash.cloudflare.com" target="_blank" style="font-size:11px;color:var(--pri);margin-left:auto">Dashboard →</a>';
+    html+='</div>';
+    html+=_storageBar('Rasmlar ('+r2.images_bucket+')'+(r2.images&&r2.images.error?' ⚠️ '+r2.images.error:''), imgMB, limitR2MB, '#16a34a');
+    if(r2.data_bucket!==r2.images_bucket){
+      html+=_storageBar('Ma\'lumotlar ('+r2.data_bucket+')'+(r2.data&&r2.data.error?' ⚠️ '+r2.data.error:''), datMB, limitR2MB, '#6366f1');
+    }
+    html+=_storageBar('Jami R2', totalR2MB, limitR2MB, colR2);
+    html+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:6px">';
+    html+='<span>🖼️ Rasmlar: <b>'+(r2.images&&r2.images.count||0)+'</b> ta</span>';
+    if(r2.data_bucket!==r2.images_bucket) html+='<span>📦 Data: <b>'+(r2.data&&r2.data.count||0)+'</b> ta</span>';
+    var lrgR2=(r2.images&&r2.images.largest_bytes||0);
+    if(lrgR2>0) html+='<span>📏 Eng katta: <b>'+(lrgR2/1024/1024).toFixed(2)+' MB</b></span>';
+    html+='</div></div>';
+  } else if(r2&&!r2.configured){
+    html+='<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;margin-bottom:14px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:18px">☁️</span><b>Cloudflare R2</b></div>'+
+      '<p class="ts tm">R2 sozlanmagan yoki server bilan bog\'lanib bo\'lmadi'+(r2.error?' ('+r2.error+')':'')+'.</p>'+
+    '</div>';
+  } else {
+    html+='<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;margin-bottom:14px">'+
+      '<span style="font-size:18px">☁️</span> <b>Cloudflare R2:</b> <span class="ts tm">⏳ Yuklanmoqda...</span></div>';
+  }
+
+  // ── Supabase Storage ─────────────────────────────────────
   var db=getDB();
   var plan=db.storagePlan||'free';
-  var limitMB=STORAGE_PLAN_MB[plan];
-  var usedMB=_storageCache.totalBytes/1024/1024;
-  var pct=Math.min(100,(usedMB/limitMB*100));
-  var pctStr=pct<0.1?pct.toFixed(3):pct.toFixed(1);
-  var largestMB=_storageCache.largest/1024/1024;
-  var largestPct=Math.min(100,(largestMB/50*100));
-  var color=pct>90?'#dc2626':pct>70?'#f59e0b':'#16a34a';
-  var html='';
-  html+='<div style="margin-bottom:16px">';
-  html+='<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><b>Umumiy joy</b><span>'+usedMB.toFixed(1)+' MB / '+(limitMB>=1024?(limitMB/1024)+' GB':limitMB+' MB')+' ('+pctStr+'%)</span></div>';
-  html+='<div style="height:16px;background:#eef0f5;border-radius:8px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:8px;transition:width .4s"></div></div>';
+  var limitSbMB=STORAGE_PLAN_MB[plan];
+  html+='<div style="background:#eef1ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px 14px;margin-bottom:14px">';
+  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+    '<span style="font-size:18px">🟢</span>'+
+    '<b style="font-size:14px">Supabase Storage</b>'+
+    '<span class="bdg bpu2" style="font-size:11px">Eski rasmlar (18,456+)</span>'+
+    '<select id="storage-plan-select" onchange="onStoragePlanChange()" style="margin-left:auto;font-size:12px;padding:2px 6px;border-radius:6px;border:1px solid var(--bdr)">'+
+    '<option value="free"'+(plan==='free'?' selected':'')+'>Bepul — 1 GB</option>'+
+    '<option value="pro"'+(plan==='pro'?' selected':'')+'>Pullik — 100 GB</option>'+
+    '</select>'+
+  '</div>';
+  if(_storageCache&&!_storageCache.error){
+    var usedSbMB=_storageCache.totalBytes/1024/1024;
+    var colSb=usedSbMB/limitSbMB>0.9?'#dc2626':usedSbMB/limitSbMB>0.7?'#f59e0b':'#16a34a';
+    html+=_storageBar('Supabase Storage', usedSbMB, limitSbMB, colSb);
+    var largestSbMB=_storageCache.largest/1024/1024;
+    html+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:4px">'+
+      '<span>🖼️ Fayllar: <b>'+_storageCache.files.length+'</b> ta</span>'+
+      '<span>📈 O\'rtacha: <b>'+(_storageCache.files.length?(_storageCache.totalBytes/_storageCache.files.length/1024).toFixed(1):'0')+' KB</b></span>'+
+      '<span>📏 Eng katta: <b>'+largestSbMB.toFixed(2)+' MB</b></span>'+
+    '</div>';
+    html+='<button class="btn bpu bsm" style="margin-top:10px" onclick="openImgPicker()">🖼️ Suratlarni ko\'rish / o\'chirish</button>';
+  } else if(_storageCache&&_storageCache.error){
+    html+='<p class="ts" style="color:#b91c1c">Xato: '+_storageCache.error+'</p>';
+  } else if(!_sbReady){
+    html+='<p class="ts tm">Supabase ulanmagan.</p>';
+  } else {
+    html+='<p class="ts tm">⏳ Yuklanmoqda...</p>';
+  }
   html+='</div>';
-  html+='<div style="margin-bottom:16px">';
-  html+='<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><b>Eng katta fayl (bitta fayl limiti: 50 MB)</b><span>'+largestMB.toFixed(2)+' MB / 50 MB ('+largestPct.toFixed(2)+'%)</span></div>';
-  html+='<div style="height:16px;background:#eef0f5;border-radius:8px;overflow:hidden"><div style="height:100%;width:'+largestPct+'%;background:#6366f1;border-radius:8px;transition:width .4s"></div></div>';
-  html+='</div>';
-  html+='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-bottom:12px">';
-  html+='<div>\uD83D\uDDBC\uFE0F Jami fayllar: <b>'+_storageCache.files.length+'</b></div>';
-  html+='<div>\uD83D\uDCC8 O\'rtacha hajm: <b>'+(_storageCache.files.length?(_storageCache.totalBytes/_storageCache.files.length/1024).toFixed(1):'0')+' KB</b></div>';
-  html+='</div>';
-  html+='<button class="btn bpu bsm" onclick="openImgPicker()">\uD83D\uDDBC\uFE0F Suratlarni ko\'rish / o\'chirish</button>';
+
   var _bodyOv=document.getElementById('storage-overview-body');
   var _bodySet=document.getElementById('storage-stats-body');
   if(_bodyOv)_bodyOv.innerHTML=html;
