@@ -662,9 +662,10 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       </div>
     </div>
     <div class="card">
-      <h3 style="margin-bottom:12px">Sinflar boshqaruvi</h3>
-      <div class="fg"><label>Sinflar (vergul bilan)</label><input type="text" id="cls-inp" placeholder="5A,5B,6A,..."><p class="ts tm" style="margin-top:5px">Bu yerdan faqat YANGI sinf qo'sha olasiz - mavjud sinflarni o'chira olmaysiz (bu boshqa ustozlarga ta'sir qiladi, faqat admin o'chira oladi).</p></div>
-      <button class="btn bpu bsm" onclick="saveClsList()">Saqlash</button>
+      <h3 style="margin-bottom:8px">Sinf qo'shish</h3>
+      <p class="ts tm" style="margin-bottom:8px">Faqat O'ZINGIZGA kerakli sinflarni qo'shing — boshqa ustozlar ko'rmaydi. Bir nechta bo'lsa vergul bilan ajrating.</p>
+      <div class="fg"><input type="text" id="cls-inp" placeholder="Masalan: 10A,10B,11A"></div>
+      <button class="btn bpu bsm" onclick="saveClsList()">+ Qo'shish</button>
       <div id="cls-msg"></div>
     </div>
     <div class="card">
@@ -805,6 +806,20 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
   </div>
 </div>
 
+<!-- XABARLAR SAHIFASI (ustoz va admin uchun) -->
+<div class="pg" id="pg-notif">
+  <div class="card" style="padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn bg bsm" id="pg-notif-back" onclick="showPg(ME&&ME.role==='admin'?'pg-admin':'pg-teacher')">← Orqaga</button>
+        <h2 style="margin:0">🔔 Xabarlar</h2>
+      </div>
+      <button class="btn bd bsm" onclick="clearAllNotifs()">🗑️ Hammasini o'chir</button>
+    </div>
+  </div>
+  <div id="pg-notif-body"></div>
+</div>
+
 <!-- IMAGE PICKER MODAL (admin uchun - rasmlarni korish/ochirish) -->
 <div class="mbg" id="img-picker-modal" style="display:none">
   <div class="modal" style="max-width:640px">
@@ -886,6 +901,18 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <div class="sarea" id="aq-syms"></div>
       <div class="ts tm" style="margin-top:4px">💡 <b>Kasr</b> (a/b), <b>ildiz</b> (√, ∛, ⁿ√) va <b>daraja</b> (xⁿ) tugmalarini bosganda ekranda kiritish paneli ochiladi — surat, mahraj yoki ko'rsatkichni kiriting, "Qo'shish"ni bosing. Belgilab (select) olingan matn avtomatik suratga/asosga aylanadi. Daraja ustiga daraja: birinchi natijani belgilab, yana xⁿ bosing.</div>
       <div id="aq-preview" style="display:none;margin-top:8px;padding:12px 14px;background:#f8f9fc;border:1px dashed var(--color-border);border-radius:8px;font-size:16px;line-height:1.8;overflow-x:auto"></div>
+    </div>
+    <div class="fg">
+      <label>Savol rasmi (ixtiyoriy)</label>
+      <div id="aq-img-preview" style="display:none;margin-bottom:8px;position:relative">
+        <img id="aq-img-preview-el" style="max-width:100%;max-height:180px;border-radius:8px;display:block;background:#f1f5f9;padding:4px">
+        <button onclick="clearAQImg()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">✕</button>
+      </div>
+      <label style="display:inline-flex;align-items:center;gap:7px;padding:8px 14px;background:#f1f5f9;border:1.5px dashed var(--bdr);border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;text-transform:none;letter-spacing:0">
+        📷 Rasm yuklash
+        <input type="file" id="aq-img-inp" accept="image/*" style="display:none" onchange="onAQImgChange(this)">
+      </label>
+      <span class="ts tm" style="margin-left:8px">Shakllar, formulalar uchun</span>
     </div>
     <div class="fg">
       <label>Test turi</label>
@@ -1245,34 +1272,101 @@ function renderNotifDropdown(){
   var dd=document.getElementById('notif-dropdown');
   if(!dd) return;
   var list=myNotifications();
+  var unread=list.filter(function(n){return !n.read;});
+  var html='';
+  // Sarlavha
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px 8px;border-bottom:1px solid var(--bdr);margin-bottom:6px">'+
+    '<b style="font-size:13px">🔔 Xabarlar</b>'+
+    '<div style="display:flex;gap:6px">'+
+      (list.length?'<button onclick="openNotifPage()" style="font-size:11px;background:var(--pri);color:#fff;border:none;border-radius:6px;padding:3px 8px;cursor:pointer">Barchasi ('+list.length+')</button>':'')+''+
+      (list.length?'<button onclick="clearAllNotifs()" style="font-size:11px;background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:3px 8px;cursor:pointer">Hammasini o\'chir</button>':'')+''+
+    '</div>'+
+  '</div>';
   if(!list.length){
-    dd.innerHTML='<div style="padding:20px;text-align:center;color:var(--mut);font-size:13px">Bildirishnomalar yoq</div>';
-    return;
+    html+='<div style="padding:16px;text-align:center;color:var(--mut);font-size:13px">Xabarlar yo\'q</div>';
+  } else {
+    html+=list.slice(0,5).map(function(n){
+      var d=new Date(n.date);
+      var timeStr=d.toLocaleDateString('uz-UZ')+' '+d.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});
+      return '<div style="display:flex;align-items:flex-start;gap:6px;padding:8px 10px;border-radius:9px;margin-bottom:4px;background:'+(n.read?'#fff':'#eef2ff')+';border:1px solid '+(n.read?'#e5e7eb':'#c7d2fe')+'">'+
+        '<div style="flex:1;cursor:pointer;min-width:0" onclick="openNotifPage(\''+n.id+'\')" >'+
+          '<div style="font-weight:700;font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_aiEsc(n.title)+'</div>'+
+          '<div style="font-size:12px;color:var(--mut);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+_aiEsc(n.body)+'</div>'+
+          '<div style="font-size:11px;color:#9ca3af;margin-top:3px">'+timeStr+'</div>'+
+        '</div>'+
+        '<button onclick="dismissNotification(\''+n.id+'\')" title="O\'chirish" style="flex-shrink:0;background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0 2px">✕</button>'+
+      '</div>';
+    }).join('');
+    if(list.length>5){
+      html+='<div style="text-align:center;padding:6px"><button onclick="openNotifPage()" style="font-size:12px;background:none;border:none;cursor:pointer;color:var(--pri);font-weight:600">Yana '+(list.length-5)+' ta xabar →</button></div>';
+    }
   }
-  // 2026-09-06: avval dropdown ochilganda HAMMASI darhol "oqilgan" deb
-  // belgilanardi-yu, lekin royxatda qolaverardi (faqat rang ozgarardi).
-  // Foydalanuvchi so'roviga kora endi: bildirishnoma ustiga BOSILGANDA
-  // (ya'ni "oqilganda") o'sha bitta xabar royxatdan BUTUNLAY ochiriladi -
-  // dropdown ochilishining ozi endi hech narsani avtomatik "oqigan"
-  // qilib belgilamaydi/ochirmaydi.
-  dd.innerHTML=list.slice(0,30).map(function(n){
-    var d=new Date(n.date);
-    var timeStr=d.toLocaleDateString('uz-UZ')+' '+d.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});
-    return '<div onclick="dismissNotification(\''+n.id+'\')" style="cursor:pointer;padding:10px 12px;border-radius:9px;margin-bottom:4px;background:'+(n.read?'#fff':'#eef2ff')+';border:1px solid '+(n.read?'#e5e7eb':'#c7d2fe')+'">'+
-      '<div style="font-weight:700;font-size:13px;margin-bottom:3px">'+_aiEsc(n.title)+'</div>'+
-      '<div style="font-size:12.5px;color:var(--mut);line-height:1.4">'+_aiEsc(n.body)+'</div>'+
-      '<div style="font-size:11px;color:#9ca3af;margin-top:4px">'+timeStr+' &middot; <span style="color:#9ca3af">bosib o\'qilgan deb belgilash</span></div>'+
-    '</div>';
-  }).join('');
+  dd.innerHTML=html;
 }
-// Bitta bildirishnomani "oqilgan" deb hisoblab, royxatdan butunlay ochiradi
-// (foydalanuvchi ustiga bosgani = oqigani). Boshqalar tegilmaydi.
 function dismissNotification(nid){
   var db=getDB();
   db.notifications=(db.notifications||[]).filter(function(n){return n.id!==nid;});
   saveDB(db);
   renderNotifBell();
   renderNotifDropdown();
+  // Xabarlar sahifasi ochiq bo'lsa uni ham yangilaymiz
+  var pgN=document.getElementById('pg-notif');
+  if(pgN&&pgN.classList.contains('on')) renderNotifPage();
+}
+function clearAllNotifs(){
+  if(!confirm('Barcha xabarlarni o\'chirasizmi?')) return;
+  var db=getDB();
+  db.notifications=(db.notifications||[]).filter(function(n){return n.userId!==ME.id;});
+  saveDB(db);
+  renderNotifBell();
+  renderNotifDropdown();
+  var pgN=document.getElementById('pg-notif');
+  if(pgN&&pgN.classList.contains('on')) renderNotifPage();
+}
+// "Xabarlar" sahifasi — to'liq ro'yxat, filter, o'chirish
+function openNotifPage(scrollToId){
+  // Dropdown yopamiz
+  var dd=document.getElementById('notif-dropdown');
+  if(dd) dd.style.display='none';
+  // Xabarlarni o'qilgan deb belgilaymiz
+  var db=getDB();
+  var changed=false;
+  (db.notifications||[]).forEach(function(n){ if(n.userId===ME.id&&!n.read){n.read=true;changed=true;} });
+  if(changed){saveDB(db);renderNotifBell();}
+  // Sahifaga o'tamiz
+  showPg('pg-notif');
+  renderNotifPage(scrollToId);
+}
+function renderNotifPage(scrollToId){
+  var list=myNotifications();
+  var body=document.getElementById('pg-notif-body');
+  if(!body) return;
+  if(!list.length){
+    body.innerHTML='<div class="card" style="text-align:center;padding:32px"><div style="font-size:40px;margin-bottom:10px">🔔</div><p class="ts tm">Hali hech qanday xabar yo\'q</p></div>';
+    return;
+  }
+  body.innerHTML=list.map(function(n){
+    var d=new Date(n.date);
+    var timeStr=d.toLocaleDateString('uz-UZ')+' '+d.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});
+    var isNew=!n.read;
+    return '<div id="notif-item-'+n.id+'" class="card" style="border-left:3px solid '+(isNew?'var(--pri)':'var(--bdr)')+';margin-bottom:10px;padding:14px 16px">'+
+      '<div style="display:flex;align-items:flex-start;gap:10px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-weight:700;font-size:14px;margin-bottom:5px">'+(isNew?'<span class="bdg bbl" style="font-size:10px;margin-right:6px;vertical-align:middle">YANGI</span>':'')+_aiEsc(n.title)+'</div>'+
+          '<div style="font-size:13px;color:var(--mut);line-height:1.6;white-space:pre-wrap">'+_aiEsc(n.body)+'</div>'+
+          '<div style="font-size:11px;color:#9ca3af;margin-top:6px">🕐 '+timeStr+'</div>'+
+        '</div>'+
+        '<button onclick="dismissNotification(\''+n.id+'\')" title="O\'chirish" style="flex-shrink:0;background:#fee2e2;border:none;border-radius:6px;cursor:pointer;color:#b91c1c;font-size:13px;padding:5px 8px;font-weight:700">✕ O\'chir</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  // Kerakli xabarga scroll qilamiz
+  if(scrollToId){
+    setTimeout(function(){
+      var el=document.getElementById('notif-item-'+scrollToId);
+      if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.outline='2px solid var(--pri)';setTimeout(function(){el.style.outline='';},2000);}
+    },100);
+  }
 }
 document.addEventListener('click', function(e){
   var wrap=document.getElementById('notif-bell-wrap');
@@ -1520,7 +1614,27 @@ var SYMBOLS_BY_SUBJECT={
 // yordamchi orqali: kichik panel textarea'ning pastida paydo bo'ladi,
 // foydalanuvchi qiymatlarni kiriting, "Qo'shish" bosadi - formula
 // avtomatik qo'shiladi va panel yo'qoladi.
-var _mhPending=null; // {type:'frac'|'root'|'exp', base:'', ...}
+var _aqImgData=null; // joriy savol qo'shish modalidagi rasm (base64 data URL)
+function onAQImgChange(inp){
+  if(!inp.files||!inp.files[0])return;
+  var file=inp.files[0];
+  if(file.size>5*1024*1024){alert('Rasm 5 MB dan kichik bo\'lsin!');inp.value='';return;}
+  var r=new FileReader();
+  r.onload=function(e){
+    _aqImgData=e.target.result;
+    var prev=document.getElementById('aq-img-preview');
+    var el=document.getElementById('aq-img-preview-el');
+    if(prev&&el){el.src=_aqImgData;prev.style.display='block';}
+  };
+  r.readAsDataURL(file);
+}
+function clearAQImg(){
+  _aqImgData=null;
+  var prev=document.getElementById('aq-img-preview');
+  var inp=document.getElementById('aq-img-inp');
+  if(prev)prev.style.display='none';
+  if(inp)inp.value='';
+}
 
 function _mhShow(cfg){
   _mhPending=cfg;
@@ -2965,10 +3079,14 @@ function closeEditQ(){
 
 
 function openAddQ(){
-  aqOpts=['','','',''];aqCorr=[];aqIsM=false;
-  document.getElementById('aq-topic').value='';
+  aqOpts=['','','',''];aqCorr=[];aqIsM=false;_aqImgData=null;
+  document.getElementById('aq-topic').value=_curQFolder?'':'';
   document.getElementById('aq-text').value='';
   document.getElementById('aq-qcount').value='';
+  var imgPrev=document.getElementById('aq-img-preview');
+  var imgInp=document.getElementById('aq-img-inp');
+  if(imgPrev)imgPrev.style.display='none';
+  if(imgInp)imgInp.value='';
   document.querySelector('input[name="aqtype"][value="single"]').checked=true;
   var subjSel=document.getElementById('aq-subj');
   if(!subjSel.options.length){subjSel.innerHTML=SUBJECTS.map(function(s){return '<option value="'+s.v+'">'+s.n+'</option>';}).join('');}
@@ -3015,6 +3133,7 @@ function saveQ(){
   if(!topic){alert("Mavzu kiriting!");return;}if(!text){alert("Savol matnini kiriting!");return;}
   var opts=aqOpts.filter(function(o){return o.trim();});if(opts.length<2){alert("Kamida 2 ta variant!");return;}if(!aqCorr.length){alert("To'g'ri javobni belgilang!");return;}
   var q={id:Date.now(),subject:subj,topic:topic,text:text,options:opts,correct:aqCorr.filter(function(c){return c<opts.length;}),isMulti:aqIsM,teacherId:ME.id};
+  if(_aqImgData) q.img=_aqImgData;
   var db=getDB();db.userQs=db.userQs||[];db.userQs.push(q);
   if(qcount||_curQFolder){db.topicsMeta=db.topicsMeta||[];var f=false;db.topicsMeta.forEach(function(m){if(m.topic===topic&&m.teacherId===ME.id){if(qcount)m.questionsToAsk=qcount;if(_curQFolder)m.folder=_curQFolder;f=true;}});if(!f)db.topicsMeta.push({topic:topic,questionsToAsk:qcount||1,teacherId:ME.id,subject:subj,folder:_curQFolder||undefined});}
   saveDB(db);closeAQ();renderQT();
@@ -3865,7 +3984,7 @@ function testSbConnection(){
 
 function renderUsersT(){
   var sts=myVisibleStudents();
-  document.getElementById('users-tbody').innerHTML=sts.map(function(u){return '<tr><td><strong>'+u.name+'</strong></td><td>'+u.login+'</td><td>'+(u.cls||'')+'</td><td style="display:flex;gap:4px"><button class="btn bp bsm" onclick="editUser(\''+u.id+'\')">✏️</button><button class="btn bd bsm" onclick="delUser(\''+u.id+'\')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--mut)">O\'quvchilar yo\'q</td></tr>';
+  document.getElementById('users-tbody').innerHTML=sts.map(function(u){return '<tr><td><strong>'+u.name+'</strong></td><td>'+u.login+'</td><td>'+(u.cls||'')+'</td><td><button class="btn bp bsm" onclick="editUser(\''+u.id+'\')">✏️</button></td></tr>';}).join('')||'<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--mut)">O\'quvchilar yo\'q</td></tr>';
 }
 function editUser(uid){
   var db=getDB();
@@ -3896,21 +4015,23 @@ function delUser(uid){
 function saveClsList(){
   var val=document.getElementById('cls-inp').value;
   var typed=val.split(',').map(function(c){return c.trim();}).filter(function(c){return c;});
-  if(!typed.length){alert("Kamida bitta sinf!");return;}
+  if(!typed.length){alert("Kamida bitta sinf kiriting!");return;}
   var db=getDB();
-  // TUZATISH (2026-08-30): avval bu yerda "db.classes=cls" - BUTUN royxatni
-  // ALMASHTIRARDI. Bu global (hamma ustozlar uchun umumiy) royxat bolgani
-  // uchun, bitta ustoz sinf ochirsa, boshqa ustozlarning ham (o'zi
-  // ishlatmasa ham ularga tegishli) sinflari yo'qolib ketardi. Endi FAQAT
-  // QO'SHISH mumkin - mavjud sinflar hech qachon shu yerdan ochirilmaydi
-  // (ochirish kerak bolsa, bu alohida, admin darajasidagi amal bolishi kerak).
   db.classes=db.classes||[];
   var addedCount=0;
   typed.forEach(function(c){ if(db.classes.indexOf(c)<0){ db.classes.push(c); addedCount++; } });
+  // Avtomatik saralash: avval raqam, keyin harf (5A < 5B < 6A < 11A < 11B)
+  db.classes.sort(function(a,b){
+    var na=parseInt(a),nb=parseInt(b);
+    if(!isNaN(na)&&!isNaN(nb)&&na!==nb) return na-nb;
+    return a.localeCompare(b,'uz');
+  });
   saveDB(db);
-  document.getElementById('cls-inp').value=db.classes.join(',');
-  document.getElementById('cls-msg').innerHTML='<div class="alt as mt8">'+(addedCount?addedCount+' ta yangi sinf qo\'shildi!':'Yangi sinf yo\'q edi, mavjudlar saqlanib qoldi.')+'</div>';
-  setTimeout(function(){document.getElementById('cls-msg').innerHTML='';},3000);
+  document.getElementById('cls-inp').value='';
+  document.getElementById('cls-msg').innerHTML='<div class="alt as mt8">'+(addedCount?addedCount+' ta sinf qo\'shildi! Jami: '+db.classes.join(', '):'Bu sinflar allaqachon mavjud.')+'</div>';
+  setTimeout(function(){document.getElementById('cls-msg').innerHTML='';},4000);
+  // Sozlamalar bo'limidagi sinf ro'yxatini ham yangilaymiz
+  initSettings();
 }
 function clearResults(){
   var visible=myVisibleResults();
@@ -5737,41 +5858,83 @@ function renderDuelSubjectPick(){
   var allQs=getAllQs();
   var subjSet=[];
   allQs.forEach(function(q){if(q.subject&&subjSet.indexOf(q.subject)<0)subjSet.push(q.subject);});
+  if(subjSet.length===1){
+    // Bitta fan bo'lsa - bevosita mavzu tanlashga o'tamiz
+    DL.subject=subjSet[0];
+    renderDuelTopicPick();
+    return;
+  }
   document.getElementById('duel-modal-body').innerHTML=
     '<p class="ts tm" style="margin-bottom:10px">Qaysi fandan duel qilmoqchisiz?</p>'+
     '<div style="display:flex;flex-direction:column;gap:8px">'+
-    subjSet.map(function(s){return '<button class="tbtn" style="text-align:left;padding:12px 14px" onclick="DL.subject=\''+s+'\';renderDuelModePick()">'+subjName(s)+'</button>';}).join('')+
+    subjSet.map(function(s){return '<button class="tbtn" style="text-align:left;padding:12px 14px" onclick="DL.subject=\''+s+'\';renderDuelTopicPick()">'+subjName(s)+'</button>';}).join('')+
+    '</div>';
+}
+function renderDuelTopicPick(){
+  // Mavzularni papka(fayl)lar bo'yicha guruhlangan holda ko'rsatamiz
+  var db=getDB();
+  var folderOf={};
+  (db.topicsMeta||[]).forEach(function(m){ if(m.folder&&m.topic) folderOf[m.topic]=m.folder; });
+  var allQs=getAllQs();
+  var topics=getTopics().filter(function(t){
+    return allQs.some(function(q){return q.topic===t&&q.subject===DL.subject;});
+  });
+  if(!topics.length){
+    document.getElementById('duel-modal-body').innerHTML=
+      '<p class="ts tm" style="text-align:center;padding:20px">Bu fandan hali savollar tuzilmagan.</p>'+
+      '<button class="btn bg bsm" onclick="renderDuelSubjectPick()">&#8592; Orqaga</button>';
+    return;
+  }
+  // Papkalar va papkasiz mavzularni ajratamiz
+  var folderNames=[];
+  topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0) folderNames.push(folderOf[t]); });
+  var unfoldered=topics.filter(function(t){return !folderOf[t];});
+  var html='<button class="btn bg bsm" onclick="renderDuelSubjectPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
+    '<p class="ts tm" style="margin-bottom:10px">Mavzuni tanlang:</p>'+
+    '<div style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto">';
+  // Papka ichidagi mavzular - papka nomi ostida guruhlangan
+  folderNames.forEach(function(fn){
+    var inFolder=topics.filter(function(t){return folderOf[t]===fn;});
+    html+='<div style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:6px 4px 2px">&#x1F4D8; '+fn+'</div>';
+    inFolder.forEach(function(t){
+      var cnt=allQs.filter(function(q){return q.topic===t;}).length;
+      var tEsc=t.replace(/'/g,"\\'");
+      html+='<button class="tbtn" style="text-align:left;padding:10px 12px;margin-left:8px" onclick="DL.topic=\''+tEsc+'\';renderDuelLevelPick()">'+
+        '<span style="font-weight:600">'+t+'</span> <span class="ts tm">('+cnt+' savol)</span></button>';
+    });
+  });
+  // Papkasiz mavzular
+  if(unfoldered.length&&folderNames.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:6px 4px 2px">Boshqa mavzular</div>';
+  }
+  unfoldered.forEach(function(t){
+    var cnt=allQs.filter(function(q){return q.topic===t;}).length;
+    var tEsc=t.replace(/'/g,"\\'");
+    html+='<button class="tbtn" style="text-align:left;padding:10px 12px" onclick="DL.topic=\''+tEsc+'\';renderDuelLevelPick()">'+
+      '<span style="font-weight:600">'+t+'</span> <span class="ts tm">('+cnt+' savol)</span></button>';
+  });
+  html+='</div>';
+  document.getElementById('duel-modal-body').innerHTML=html;
+}
+function renderDuelLevelPick(){
+  var cnt=getAllQs().filter(function(q){return q.topic===DL.topic;}).length;
+  document.getElementById('duel-modal-body').innerHTML=
+    '<button class="btn bg bsm" onclick="renderDuelTopicPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
+    '<p class="ts tm" style="margin-bottom:4px">Mavzu: <b>'+DL.topic+'</b> ('+cnt+' savol)</p>'+
+    '<p class="ts tm" style="margin-bottom:10px">Darajani tanlang:</p>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'easy\';renderDuelModePick()">&#x1F7E2; Oson <span class="ts tm">(72 sekund/savol)</span></button>'+
+    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'normal\';renderDuelModePick()">&#x1F7E1; O\'rtacha <span class="ts tm">(45 sekund/savol)</span></button>'+
+    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'hard\';renderDuelModePick()">&#x1F534; Qiyin <span class="ts tm">(30 sekund/savol)</span></button>'+
     '</div>';
 }
 function renderDuelModePick(){
   document.getElementById('duel-modal-body').innerHTML=
-    '<button class="btn bg bsm mt8" onclick="renderDuelSubjectPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
+    '<button class="btn bg bsm" onclick="renderDuelLevelPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
+    '<p class="ts tm" style="margin-bottom:10px">Raqibni tanlang:</p>'+
     '<div class="rc">'+
-    '<div class="rcard" onclick="DL.mode=\'online\';renderDuelTopicPick()"><div class="ic">&#x1F310;</div><h3>Online</h3><p class="ts tm">Random raqib bilan</p></div>'+
-    '<div class="rcard" onclick="DL.mode=\'bot\';renderDuelTopicPick()"><div class="ic">&#x1F916;</div><h3>Bot</h3><p class="ts tm">Kompyuter bilan poyga</p></div>'+
-    '</div>';
-}
-function renderDuelTopicPick(){
-  var topics=getTopics().filter(function(t){return getAllQs().some(function(q){return q.topic===t&&q.subject===DL.subject;});});
-  if(!topics.length){
-    document.getElementById('duel-modal-body').innerHTML='<p class="ts tm" style="text-align:center;padding:20px">Kechirasiz, bu fandan hali savollar tuzilmagan.</p><button class="btn bg bsm" onclick="renderDuelModePick()">&#8592; Orqaga</button>';
-    return;
-  }
-  document.getElementById('duel-modal-body').innerHTML=
-    '<button class="btn bg bsm mt8" onclick="renderDuelModePick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
-    '<p class="ts tm" style="margin-bottom:10px">Mavzuni tanlang:</p>'+
-    '<div style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto">'+
-    topics.map(function(t){var tEsc=t.replace(/'/g,"\\'");return '<button class="tbtn" style="text-align:left;padding:10px 12px" onclick="DL.topic=\''+tEsc+'\';renderDuelLevelPick()">'+t+'</button>';}).join('')+
-    '</div>';
-}
-function renderDuelLevelPick(){
-  document.getElementById('duel-modal-body').innerHTML=
-    '<button class="btn bg bsm mt8" onclick="renderDuelTopicPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
-    '<p class="ts tm" style="margin-bottom:10px">Darajani tanlang:</p>'+
-    '<div style="display:flex;flex-direction:column;gap:8px">'+
-    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'easy\';startDuel()">&#x1F7E2; Oson <span class="ts tm">(72 sekund/savol)</span></button>'+
-    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'normal\';startDuel()">&#x1F7E1; O\'rtacha <span class="ts tm">(45 sekund/savol)</span></button>'+
-    '<button class="tbtn" style="text-align:left;padding:12px" onclick="DL.level=\'hard\';startDuel()">&#x1F534; Qiyin <span class="ts tm">(30 sekund/savol)</span></button>'+
+    '<div class="rcard" onclick="DL.mode=\'bot\';startDuel()"><div class="ic">&#x1F916;</div><h3>Bot</h3><p class="ts tm">Kompyuter bilan</p></div>'+
+    '<div class="rcard" onclick="DL.mode=\'online\';startDuel()"><div class="ic">&#x1F310;</div><h3>Online</h3><p class="ts tm">Real raqib bilan</p></div>'+
     '</div>';
 }
 function startDuel(){
