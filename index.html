@@ -30,7 +30,7 @@ body{font-family:'Inter',system-ui,sans-serif;color:var(--txt);min-height:100vh;
 body{background:linear-gradient(125deg,#151b3d,var(--purd) 30%,var(--pri) 55%,var(--accent) 70%,var(--purd) 100%);background-size:280% 280%;animation:bgShift 24s ease-in-out infinite}
 @keyframes bgShift{0%,100%{background-position:0% 30%}50%{background-position:100% 70%}}
 #mathBg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
-#heroArt{position:fixed;left:0;right:0;bottom:0;height:38vh;min-height:280px;z-index:-2;pointer-events:none}
+#heroArt{position:fixed;left:0;right:0;bottom:0;height:clamp(220px,35vh,380px);z-index:-2;pointer-events:none;overflow:hidden}
 #heroArt svg{width:100%;height:100%;display:block}
 #mathBg span{position:absolute;color:rgba(255,255,255,.16);font-family:'Space Grotesk',sans-serif;font-weight:600;user-select:none;animation:floatSym linear infinite}
 @keyframes floatSym{
@@ -148,9 +148,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <circle cx="720" cy="95" r="2.5"/><circle cx="950" cy="45" r="2"/><circle cx="1080" cy="120" r="2"/>
     <circle cx="1480" cy="70" r="2.5"/><circle cx="1560" cy="140" r="2"/>
   </g>
-  <!-- quyosh - markazga yaqinroq, tepaliklar ostida qolmasin -->
-  <circle cx="1280" cy="80" r="130" fill="url(#sunGlow)"/>
-  <circle cx="1280" cy="80" r="48" fill="#ffd873" opacity=".85"/>
+  <!-- quyosh - tepalik chizig'idan past, doim to'liq ko'rinsin -->
+  <circle cx="1280" cy="160" r="130" fill="url(#sunGlow)"/>
+  <circle cx="1280" cy="160" r="48" fill="#ffd873" opacity=".85"/>
   <!-- orqa tepalik -->
   <path d="M0,270 C220,210 380,255 600,225 C830,195 1000,245 1220,210 C1380,185 1500,215 1600,205 L1600,420 L0,420 Z" fill="#5b3ea6" opacity=".38"/>
   <!-- old tepalik -->
@@ -1867,11 +1867,20 @@ function saveDB(db) {
 
 // Sync from cloud on page load (if online)
 async function syncFromCloud() {
-  var remote = await sbPull();
-  if (!remote) return;
-  var local = localGetDB();
-  if ((remote.v||0) > (local.v||0)) {
-    localStorage.setItem(SK, JSON.stringify(remote));
+  try {
+    var remote = await sbPull();
+    if (!remote) return;
+    var local = localGetDB();
+    // TUZATISH: avval faqat v > local.v bo'lgandagina yangilardi.
+    // iPhone/yangi qurilmada localStorage bo'sh bo'lsa local.v=0, lekin
+    // remote.v ham 0 bo'lishi mumkin — natijada hech narsa yuklanmasdi.
+    // Endi: remote ma'lumot bor va local bo'sh bo'lsa HAR DOIM yuklaymiz.
+    var localEmpty = !(local.users && local.users.length > 1);
+    if ((remote.v||0) > (local.v||0) || localEmpty) {
+      try { localStorage.setItem(SK, JSON.stringify(remote)); } catch(e) {}
+    }
+  } catch(e) {
+    console.warn('syncFromCloud xato:', e);
   }
 }
 
@@ -2193,20 +2202,26 @@ function showErr(m){document.getElementById('auth-err').innerHTML='<div class="a
 async function doLogin(){
   var u=document.getElementById('li-u').value.trim(),p=document.getElementById('li-p').value;
   if(!u||!p){showErr("Login va parol kiriting!");return;}
-  // MUHIM: login qilishdan oldin bulutdagi ENG SO'NGGI holatni tortib olamiz -
-  // aks holda boshqa qurilmada parol/malumot ozgargan bolsa, bu yerda hali
-  // eski (keshlangan) nusxa bilan tekshirilib qolishi mumkin edi.
   document.getElementById('auth-err').innerHTML='<div class="alt ai">&#x23F3; Tekshirilmoqda...</div>';
+  // Har doim serverdan eng so'nggi ma'lumotni yuklaymiz — iPhone/yangi
+  // qurilmada localStorage bo'sh bo'lsa ham kirish ishlashi uchun.
   try{ await syncFromCloud(); }catch(e){}
   var db=getDB(),found=null;
   db.users.forEach(function(x){if(x.login===u&&x.pass===p&&x.role===authRole)found=x;});
-  if(!found){showErr("Login yoki parol noto'g'ri!");return;}
-  if(found.role==='teacher' && found.approved===false){showErr("Hisobingiz hali admin tomonidan tasdiqlanmagan. Iltimos, kuting yoki admin bilan boglaning.");return;}
-  // Xavfsizlik: kirish muvaffaqiyatli bo'lishi bilanoq maydonlarni darhol
-  // tozalaymiz - qiymat DOM'da qancha kam tursa, brauzerning "parolni
-  // saqlashni xohlaysizmi?" so'rovi (agar chiqsa) ham kamroq ma'lumotga ega
-  // bo'ladi. Bu Chrome'ning saqlash-taklifini kafolatlangan holda
-  // to'xtatmaydi (brauzer bunga o'zi qaror qiladi), lekin xavfni kamaytiradi.
+  if(!found){
+    // Agar topilmasa — internet muammosi bo'lishi mumkin, aniq xabar beramiz
+    var hasUsers=(db.users||[]).filter(function(x){return x.role===authRole;}).length;
+    if(!hasUsers){
+      showErr("&#x26A0;&#xFE0F; Ma'lumotlar serverdan yuklanmadi. Internet aloqasini tekshiring va qaytadan urinib ko'ring.");
+    } else {
+      showErr("Login yoki parol noto'g'ri!");
+    }
+    return;
+  }
+  if(found.role==='teacher' && found.approved===false){
+    showErr("Hisobingiz hali admin tomonidan tasdiqlanmagan. Iltimos, kuting yoki admin bilan boglaning.");
+    return;
+  }
   document.getElementById('li-u').value='';
   document.getElementById('li-p').value='';
   ME=found;afterLogin();
@@ -5395,17 +5410,9 @@ if('serviceWorker' in navigator){
     };
   }
   navigator.serviceWorker.register('sw.js').then(function(reg){
-    // MUHIM: agar yangilanish siz ilovani ochishdan OLDIN (masalan avvalgi
-    // tashrifda) allaqachon yuklab olingan bolsa - reg.waiting shu yerda
-    // darhol mavjud boladi. Bu holatda hech qanday banner korsatmasdan,
-    // JIMgina faollashtiramiz - chunki hali hech qanday ish/test boshlangani
-    // yoq, qayta yuklash xavfsiz.
     if(reg.waiting){
       reg.waiting.postMessage({type:'SKIP_WAITING'});
     }
-    // Endi shu sessiyaning ozi boshlandi deb belgilaymiz - shundan keyin
-    // topiladigan yangilanishlar esa banner bilan korsatiladi (chunki
-    // foydalanuvchi ilovani ochib, ishlatib turgan bolishi mumkin).
     _swSessionStarted = true;
     reg.addEventListener('updatefound', function(){
       var newSW = reg.installing;
@@ -5414,12 +5421,28 @@ if('serviceWorker' in navigator){
         if(newSW.state === 'installed' && navigator.serviceWorker.controller && _swSessionStarted){
           _showUpdateBanner(newSW);
         }
+        // Yangi SW o'rnatildi va hech qanday eski SW yo'q (birinchi marta)
+        // — darhol faollashtir
+        if(newSW.state === 'installed' && !navigator.serviceWorker.controller){
+          newSW.postMessage({type:'SKIP_WAITING'});
+        }
       });
     });
+    // Har sahifa ochilganda yangilanishni MAJBURAN tekshiramiz
+    // Maktab kompyuterlarida brauzer avtomatik tekshirmaydi shuning uchun
+    reg.update().catch(function(){});
   }).catch(function(){});
+
   // Yangi SW faollashgach sahifani qayta yuklaymiz
   navigator.serviceWorker.addEventListener('controllerchange', function(){
     window.location.reload();
+  });
+
+  // SW'dan yangilanish xabari kelsa — sahifani reload qilamiz
+  navigator.serviceWorker.addEventListener('message', function(e){
+    if(e.data && e.data.type === 'SW_UPDATED'){
+      window.location.reload();
+    }
   });
 }
 
