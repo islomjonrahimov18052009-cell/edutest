@@ -134,7 +134,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 <body>
 <div id="mathBg"></div>
 <div id="heroArt" aria-hidden="true">
-<svg viewBox="0 0 1600 420" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 1600 420" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;object-fit:cover">
   <defs>
     <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffd873" stop-opacity=".9"/>
@@ -148,9 +148,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <circle cx="720" cy="95" r="2.5"/><circle cx="950" cy="45" r="2"/><circle cx="1080" cy="120" r="2"/>
     <circle cx="1480" cy="70" r="2.5"/><circle cx="1560" cy="140" r="2"/>
   </g>
-  <!-- quyosh -->
-  <circle cx="1320" cy="95" r="120" fill="url(#sunGlow)"/>
-  <circle cx="1320" cy="95" r="46" fill="#ffd873" opacity=".85"/>
+  <!-- quyosh - markazga yaqinroq, tepaliklar ostida qolmasin -->
+  <circle cx="1280" cy="80" r="130" fill="url(#sunGlow)"/>
+  <circle cx="1280" cy="80" r="48" fill="#ffd873" opacity=".85"/>
   <!-- orqa tepalik -->
   <path d="M0,270 C220,210 380,255 600,225 C830,195 1000,245 1220,210 C1380,185 1500,215 1600,205 L1600,420 L0,420 Z" fill="#5b3ea6" opacity=".38"/>
   <!-- old tepalik -->
@@ -2545,6 +2545,26 @@ document.addEventListener('keydown',function(e){
   if(idx>=0&&idx<(q.options||[]).length){selAns(idx);e.preventDefault();return;}
   if(key==='ArrowRight'){if(S.idx<S.test.length-1){S.idx++;renderQ();}e.preventDefault();}
   else if(key==='ArrowLeft'){if(S.idx>0){S.idx--;renderQ();}e.preventDefault();}
+  else if(key==='ArrowDown'||key==='ArrowUp'){
+    // Yuqori/pastga strelka — variantlar orasida aylanadi
+    var q2=S.test[S.idx];
+    if(!q2||!q2.options||!q2.options.length){return;}
+    var cur=S.answers[S.idx]||[];
+    var lastSel=cur.length?cur[cur.length-1]:-1;
+    var nOpts=q2.options.length;
+    var next;
+    if(key==='ArrowDown'){next=lastSel<nOpts-1?lastSel+1:0;}
+    else{next=lastSel>0?lastSel-1:nOpts-1;}
+    // Bir javobli testda to'g'ri almashtiradi, ko'p javoblida qo'shadi
+    if(!q2.isMulti){S.answers[S.idx]=[next];}
+    else{
+      var idx2=cur.indexOf(next);
+      if(idx2>=0){var nc=cur.slice();nc.splice(idx2,1);S.answers[S.idx]=nc;}
+      else{S.answers[S.idx]=cur.concat([next]);}
+    }
+    renderQ();
+    e.preventDefault();
+  }
 });
 function submitTest(forced){
   if(!forced){
@@ -3515,7 +3535,8 @@ function initAdminSettings(){
 }
 var _adminShowPass=false;
 var STORAGE_PLAN_MB={free:1024,pro:1024*100};
-// R2 bepul: 10 GB storage, 10 million read ops/oy, 1 million write ops/oy
+// R2 bepul: 10 GB storage, 10 million Class B read ops/oy, 1 million Class A write ops/oy
+// Cloudflare rasmiy: https://developers.cloudflare.com/r2/pricing/
 var R2_FREE_LIMITS={storage_gb:10,reads_per_month:10000000,writes_per_month:1000000};
 var _storageCache=null;
 var _r2StatsCache=null;
@@ -3599,15 +3620,25 @@ function renderStorageBars(){
     html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
       '<span style="font-size:18px">☁️</span>'+
       '<b style="font-size:14px">Cloudflare R2</b>'+
-      '<span class="bdg bgr" style="font-size:11px">Bepul • 10 GB / 10M reads / oy</span>';
+      '<span class="bdg bgr" style="font-size:11px">Bepul: 10 GB • 10M o\'qish • 1M yozish / oy</span>';
     if(r2.public_url) html+='<a href="https://dash.cloudflare.com" target="_blank" style="font-size:11px;color:var(--pri);margin-left:auto">Dashboard →</a>';
     html+='</div>';
-    html+=_storageBar('Rasmlar ('+r2.images_bucket+')'+(r2.images&&r2.images.error?' ⚠️ '+r2.images.error:''), imgMB, limitR2MB, '#16a34a');
+    html+=_storageBar('🖼️ Rasmlar ('+r2.images_bucket+')'+(r2.images&&r2.images.error?' ⚠️ '+r2.images.error:''), imgMB, limitR2MB, colR2);
     if(r2.data_bucket!==r2.images_bucket){
-      html+=_storageBar('Ma\'lumotlar ('+r2.data_bucket+')'+(r2.data&&r2.data.error?' ⚠️ '+r2.data.error:''), datMB, limitR2MB, '#6366f1');
+      html+=_storageBar('📦 Ma\'lumotlar ('+r2.data_bucket+')'+(r2.data&&r2.data.error?' ⚠️ '+r2.data.error:''), datMB, limitR2MB, '#6366f1');
     }
-    html+=_storageBar('Jami R2', totalR2MB, limitR2MB, colR2);
-    html+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:6px">';
+    html+=_storageBar('💾 Jami saqlash joyi', totalR2MB, limitR2MB, colR2);
+    // O'qish/yozish operatsiyalari haqida ma'lumot (statistika real vaqtda
+    // S3 API'dan kelmaydi — Cloudflare faqat Dashboard'da ko'rsatadi)
+    html+='<div style="background:#fff;border:1px solid #d1fae5;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;color:var(--mut)">'+
+      '<div style="font-weight:700;color:#374151;margin-bottom:6px">📊 Oylik operatsiyalar limiti (S3 API real vaqtda bera olmaydi — Cloudflare Dashboard\'dan ko\'ring)</div>'+
+      '<div style="display:flex;gap:16px;flex-wrap:wrap">'+
+        '<span>📖 <b>Class B</b> (o\'qish): <b style="color:#16a34a">10,000,000</b> / oy bepul</span>'+
+        '<span>✏️ <b>Class A</b> (yozish/o\'chirish): <b style="color:#16a34a">1,000,000</b> / oy bepul</span>'+
+      '</div>'+
+      '<div style="margin-top:5px">📡 Egress (tarmoq): <b style="color:#16a34a">Cheksiz bepul</b> (R2\'ning asosiy afzalligi!)</div>'+
+    '</div>';
+    html+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px">';
     html+='<span>🖼️ Rasmlar: <b>'+(r2.images&&r2.images.count||0)+'</b> ta</span>';
     if(r2.data_bucket!==r2.images_bucket) html+='<span>📦 Data: <b>'+(r2.data&&r2.data.count||0)+'</b> ta</span>';
     var lrgR2=(r2.images&&r2.images.largest_bytes||0);
@@ -5858,8 +5889,11 @@ function renderDuelSubjectPick(){
   var allQs=getAllQs();
   var subjSet=[];
   allQs.forEach(function(q){if(q.subject&&subjSet.indexOf(q.subject)<0)subjSet.push(q.subject);});
+  if(!subjSet.length){
+    document.getElementById('duel-modal-body').innerHTML='<p class="ts tm" style="text-align:center;padding:20px">Hali savollar yo\'q.</p>';
+    return;
+  }
   if(subjSet.length===1){
-    // Bitta fan bo'lsa - bevosita mavzu tanlashga o'tamiz
     DL.subject=subjSet[0];
     renderDuelTopicPick();
     return;
@@ -5871,47 +5905,49 @@ function renderDuelSubjectPick(){
     '</div>';
 }
 function renderDuelTopicPick(){
-  // Mavzularni papka(fayl)lar bo'yicha guruhlangan holda ko'rsatamiz
   var db=getDB();
   var folderOf={};
   (db.topicsMeta||[]).forEach(function(m){ if(m.folder&&m.topic) folderOf[m.topic]=m.folder; });
   var allQs=getAllQs();
-  var topics=getTopics().filter(function(t){
-    return allQs.some(function(q){return q.topic===t&&q.subject===DL.subject;});
+  // Faqat tanlangan fandagi mavzular + alifbo bo'yicha saralash
+  var topics=[];
+  allQs.forEach(function(q){
+    if(q.topic && q.subject===DL.subject && topics.indexOf(q.topic)<0) topics.push(q.topic);
   });
+  topics.sort(function(a,b){return a.localeCompare(b,'uz');});
+
   if(!topics.length){
     document.getElementById('duel-modal-body').innerHTML=
       '<p class="ts tm" style="text-align:center;padding:20px">Bu fandan hali savollar tuzilmagan.</p>'+
       '<button class="btn bg bsm" onclick="renderDuelSubjectPick()">&#8592; Orqaga</button>';
     return;
   }
-  // Papkalar va papkasiz mavzularni ajratamiz
   var folderNames=[];
   topics.forEach(function(t){ if(folderOf[t]&&folderNames.indexOf(folderOf[t])<0) folderNames.push(folderOf[t]); });
+  folderNames.sort(function(a,b){return a.localeCompare(b,'uz');});
   var unfoldered=topics.filter(function(t){return !folderOf[t];});
+
   var html='<button class="btn bg bsm" onclick="renderDuelSubjectPick()" style="margin-bottom:10px">&#8592; Orqaga</button>'+
-    '<p class="ts tm" style="margin-bottom:10px">Mavzuni tanlang:</p>'+
-    '<div style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto">';
-  // Papka ichidagi mavzular - papka nomi ostida guruhlangan
+    '<p class="ts tm" style="margin-bottom:8px">Mavzuni tanlang:</p>'+
+    '<div style="display:flex;flex-direction:column;gap:5px;max-height:360px;overflow-y:auto">';
   folderNames.forEach(function(fn){
     var inFolder=topics.filter(function(t){return folderOf[t]===fn;});
-    html+='<div style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:6px 4px 2px">&#x1F4D8; '+fn+'</div>';
+    html+='<div style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:8px 4px 3px">&#x1F4D8; '+fn+'</div>';
     inFolder.forEach(function(t){
-      var cnt=allQs.filter(function(q){return q.topic===t;}).length;
+      var cnt=allQs.filter(function(q){return q.topic===t&&q.subject===DL.subject;}).length;
       var tEsc=t.replace(/'/g,"\\'");
-      html+='<button class="tbtn" style="text-align:left;padding:10px 12px;margin-left:8px" onclick="DL.topic=\''+tEsc+'\';renderDuelLevelPick()">'+
-        '<span style="font-weight:600">'+t+'</span> <span class="ts tm">('+cnt+' savol)</span></button>';
+      html+='<button class="tbtn" style="text-align:left;padding:9px 12px;margin-left:8px" onclick="DL.topic=\''+tEsc+'\';renderDuelLevelPick()">'+
+        t+' <span class="ts tm">('+cnt+')</span></button>';
     });
   });
-  // Papkasiz mavzular
   if(unfoldered.length&&folderNames.length){
-    html+='<div style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:6px 4px 2px">Boshqa mavzular</div>';
+    html+='<div style="font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:8px 4px 3px">Boshqa mavzular</div>';
   }
   unfoldered.forEach(function(t){
-    var cnt=allQs.filter(function(q){return q.topic===t;}).length;
+    var cnt=allQs.filter(function(q){return q.topic===t&&q.subject===DL.subject;}).length;
     var tEsc=t.replace(/'/g,"\\'");
-    html+='<button class="tbtn" style="text-align:left;padding:10px 12px" onclick="DL.topic=\''+tEsc+'\';renderDuelLevelPick()">'+
-      '<span style="font-weight:600">'+t+'</span> <span class="ts tm">('+cnt+' savol)</span></button>';
+    html+='<button class="tbtn" style="text-align:left;padding:9px 12px" onclick="DL.topic=\''+tEsc+'\';renderDuelLevelPick()">'+
+      t+' <span class="ts tm">('+cnt+')</span></button>';
   });
   html+='</div>';
   document.getElementById('duel-modal-body').innerHTML=html;
