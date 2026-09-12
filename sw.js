@@ -1,4 +1,4 @@
-const CACHE = 'edutest-v61';
+const CACHE = 'edutest-v63';
 const IMG_CACHE = 'edutest-img-v1';
 const FILES = ['./', './index.html'];
 
@@ -8,22 +8,45 @@ self.addEventListener('install', function(e) {
       return cache.addAll(FILES).catch(function(){});
     })
   );
+  // MUHIM: skipWaiting() - yangi SW darhol eski SW ni almashtiradi.
+  // Bu olmasa, maktab kompyuterida sahifa yopilgunga qadar eski kesh
+  // ishlashda davom etadi (foydalanuvchi ma'lumotlarni ko'ra olmaydi).
   self.skipWaiting();
 });
 
 self.addEventListener('activate', function(e) {
   e.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(keys.filter(function(k){ return k !== CACHE; }).map(function(k){ return caches.delete(k); }));
+    Promise.all([
+      // Eski barcha keshlarni tozalaymiz (IMG_CACHE bundan mustasno)
+      caches.keys().then(function(keys) {
+        return Promise.all(
+          keys.filter(function(k) {
+            return k !== CACHE && k !== IMG_CACHE;
+          }).map(function(k) {
+            return caches.delete(k);
+          })
+        );
+      }),
+      // Joriy ochiq sahifalarni ham yangi SW ostida ishlashga o'tkazamiz
+      // - bu maktab kompyuterida sahifani yopmasdan yangilanishini ta'minlaydi
+      self.clients.claim()
+    ])
+  );
+});
+
+// Sahifani yangilash kerakligini mijozga xabar berish
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then(function(clients) {
+      clients.forEach(function(client) {
+        // Yangi versiya o'rnatilganini sahifaga xabar beramiz
+        client.postMessage({ type: 'SW_UPDATED', cache: CACHE });
+      });
     })
   );
-  self.clients.claim();
 });
 
 function isImageRequest(url) {
-  // Supabase Storage'dagi savol/javob rasmlari (edutest-images bucket) -
-  // boshqa origindan keladi, shuning uchun asosiy sayt keshidan alohida,
-  // MAXSUS kesh bilan boshqariladi (offline test uchun MUHIM).
   return /\/storage\/v1\/object\/public\/edutest-images\//.test(url) ||
          /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
 }
@@ -33,9 +56,6 @@ self.addEventListener('fetch', function(e) {
   var url = e.request.url;
 
   if (isImageRequest(url)) {
-    // Kesh-birinchi (cache-first): agar oldin keshlangan bo'lsa, internet
-    // bo'lmasa ham DARHOL o'sha rasm ko'rsatiladi - test davomida internet
-    // o'chib qolsa ham savol/javob rasmlari yo'qolmaydi.
     e.respondWith(
       caches.open(IMG_CACHE).then(function(cache) {
         return cache.match(e.request).then(function(cached) {
@@ -50,15 +70,16 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  // MUHIM: faqat OZ saytimiz (GitHub Pages) fayllarini keshlaymiz.
-  // Avval bu tekshiruv yoq edi, shuning uchun Render serverimizga ketayotgan
-  // /parse_batch_status kabi DINAMIK API sorovlari ham shu yerda ushlanib,
-  // ikkilanib xato berardi va bekorga keshlashga urinardi.
   if (new URL(url).origin !== self.location.origin) return;
+
+  // Network-first strategiya: avval internetdan olish, bo'lmasa keshdan.
+  // index.html uchun har doim yangi versiyani tekshiramiz.
   e.respondWith(
     fetch(e.request).then(function(res) {
-      var clone = res.clone();
-      caches.open(CACHE).then(function(cache){ cache.put(e.request, clone); });
+      if (res && res.status === 200) {
+        var clone = res.clone();
+        caches.open(CACHE).then(function(cache){ cache.put(e.request, clone); });
+      }
       return res;
     }).catch(function() {
       return caches.match(e.request);
@@ -66,9 +87,6 @@ self.addEventListener('fetch', function(e) {
   );
 });
 
-// Test boshlanishidan oldin index.html shu buyruq bilan kerakli rasmlarni
-// OLDINDAN yuklab, IMG_CACHE'ga solib qo'yadi - shunda test davomida
-// internet o'chsa ham rasmlar allaqachon lokal keshda bo'ladi.
 self.addEventListener('message', function(e) {
   var data = e.data || {};
   if (data.type === 'CACHE_IMAGES' && Array.isArray(data.urls)) {
@@ -82,12 +100,16 @@ self.addEventListener('message', function(e) {
       })
     );
   }
+  // Eski keshni to'liq tozalash buyrug'i (admin/debug uchun)
+  if (data.type === 'CLEAR_CACHE') {
+    e.waitUntil(
+      caches.keys().then(function(keys) {
+        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+      })
+    );
+  }
 });
 
-// ─── PUSH BILDIRISHNOMA ────────────────────────────────────────────────────
-// Ustozga: "yangi imtihon natijasi keldi" yoki "o'quvchi internetsiz
-// topshirdi, internet tiklanganda tekshiring" kabi xabarlar shu orqali
-// keladi (server /notify_teacher orqali yuboradi).
 self.addEventListener('push', function(e) {
   var data = {};
   try { data = e.data ? e.data.json() : {}; } catch (err) {}
