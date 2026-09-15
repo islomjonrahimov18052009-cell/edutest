@@ -873,10 +873,17 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 <!-- FOLDER PICK MODAL (bitta test yuklanganda qaysi faylga/papkaga qo'shishni tanlash) -->
 <div class="mbg" id="fp-modal" style="display:none">
   <div class="modal">
-    <div class="mh"><h3>Qaysi faylga qo'shamiz?</h3><button class="xb" onclick="closeFP()">&#x2715;</button></div>
-    <p class="ts tm" style="margin-bottom:10px">Har bir test albatta biror faylga (kitobga) tegishli bo'lishi kerak. Mavjud fayllardan birini tanlang yoki yangisini yarating.</p>
-    <div id="fp-existing" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:14px"></div>
-    <div class="fg"><label>Yangi fayl yaratish</label>
+    <div class="mh"><h3>Import sozlamalari</h3><button class="xb" onclick="closeFP()">&#x2715;</button></div>
+    <!-- 1. Fan tanlash -->
+    <div class="fg">
+      <label>Qaysi fanga saqlash kerak?</label>
+      <div id="fp-subj-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px"></div>
+    </div>
+    <!-- 2. Fayl tanlash -->
+    <div class="fg">
+      <label>Qaysi faylga qo'shamiz?</label>
+      <p class="ts tm" style="margin-bottom:8px">Mavjud fayllardan birini tanlang yoki yangisini yarating.</p>
+      <div id="fp-existing" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-bottom:10px"></div>
       <div class="fx" style="gap:8px">
         <input type="text" id="fp-newname" placeholder="Yangi fayl nomi" style="flex:1">
         <button class="btn bpu bsm" onclick="submitFP(null,true)">&#x2795; Yaratish</button>
@@ -899,7 +906,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <label>Savol matni</label>
       <textarea id="aq-text" placeholder="Savolni yozing..." oninput="updateMathPreview()"></textarea>
       <div class="sarea" id="aq-syms"></div>
-      <div class="ts tm" style="margin-top:4px">💡 <b>Kasr</b> (a/b), <b>ildiz</b> (√, ∛, ⁿ√) va <b>daraja</b> (xⁿ) tugmalarini bosganda ekranda kiritish paneli ochiladi — surat, mahraj yoki ko'rsatkichni kiriting, "Qo'shish"ni bosing. Belgilab (select) olingan matn avtomatik suratga/asosga aylanadi. Daraja ustiga daraja: birinchi natijani belgilab, yana xⁿ bosing.</div>
+      <div class="ts tm" style="margin-top:4px">💡 <b>a/b</b> — kasr, <b>√</b> — ildiz, <b>xⁿ</b> — daraja. Belgilab (select) olingan matn avtomatik suratga/asosga aylanadi.</div>
       <div id="aq-preview" style="display:none;margin-top:8px;padding:12px 14px;background:#f8f9fc;border:1px dashed var(--color-border);border-radius:8px;font-size:16px;line-height:1.8;overflow-x:auto"></div>
     </div>
     <div class="fg">
@@ -1709,17 +1716,58 @@ function insLatex(latex){
   updateMathPreview();
 }
 // KASR - inline panel orqali (prompt() yo'q)
+// KASR - bosilishi bilanoq inline panel ochiladi, darhol surat maydoniga fokus
+// Surat yozib Enter → mahraj maydoniga o'tadi → Enter → formula qo'shiladi
+// Ichma-ich kasr: chiqgan formulani belgilab, yana a/b bosing → surat bo'ladi
 function insFraction(){
   var ta=document.getElementById('aq-text');
   var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
   var preNum=sel?stripMathDelim(sel):'';
-  _mhShow({
-    type:'frac', title:'➗ Kasr',
-    fields:[
-      {id:'num',label:'Surat (ustki qism)',ph:'Masalan: 2x+1',val:preNum},
-      {id:'den',label:'Mahraj (pastki qism)',ph:'Masalan: x-3',val:''}
-    ]
-  });
+  var panel=document.getElementById('math-helper-panel');
+  if(!panel){
+    panel=document.createElement('div');
+    panel.id='math-helper-panel';
+    panel.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid var(--pri);padding:14px 16px 20px;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)';
+    document.body.appendChild(panel);
+  }
+  // Kasr uchun soddalashtirilgan UI — faqat ikkita input, label yo'q
+  panel.innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+      '<span style="font-size:15px;font-weight:700">➗ Kasr</span>'+
+      '<button onclick="_mhClose()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#888">✕</button>'+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;align-items:center;gap:0;background:#f8f9fc;border-radius:10px;padding:12px;margin-bottom:12px">'+
+      '<input id="mh-num" type="text" value="'+preNum+'" placeholder="Surat (ustki)" '+
+        'style="width:100%;padding:10px;border:1.5px solid var(--pri);border-radius:8px;font-size:16px;font-family:monospace;text-align:center;margin-bottom:6px">'+
+      '<div style="width:80%;height:2px;background:#333;border-radius:2px;margin:2px 0"></div>'+
+      '<input id="mh-den" type="text" placeholder="Mahraj (pastki)" '+
+        'style="width:100%;padding:10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:16px;font-family:monospace;text-align:center;margin-top:6px">'+
+    '</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="_fracApply()" style="flex:1;padding:10px;background:var(--pri);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer">✓ Qo\'shish</button>'+
+      '<button onclick="_mhClose()" style="padding:10px 16px;background:#f1f5f9;border:none;border-radius:9px;font-size:14px;cursor:pointer">Bekor</button>'+
+    '</div>';
+  _mhPending={type:'frac'};
+  // Surat maydoniga darhol fokus
+  setTimeout(function(){
+    var numEl=document.getElementById('mh-num');
+    if(numEl){ numEl.focus(); if(preNum){numEl.select();} }
+    // Surat → Enter → mahraj
+    var denEl=document.getElementById('mh-den');
+    if(numEl) numEl.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){e.preventDefault();if(denEl)denEl.focus();}
+    });
+    if(denEl) denEl.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){e.preventDefault();_fracApply();}
+    });
+  },60);
+}
+function _fracApply(){
+  var num=(document.getElementById('mh-num')||{}).value||'';
+  var den=(document.getElementById('mh-den')||{}).value||'';
+  _mhClose();
+  if(!num&&!den)return;
+  insLatex('\\frac{'+(num||' ')+'}{'+den+'}');
 }
 // ILDIZ - inline panel orqali
 function insNthRoot(){
@@ -5211,7 +5259,12 @@ async function saveImportedQs(parsed,msg){
     q.id=Date.now()+'_'+idx+'_'+Math.random().toString(36).slice(2,8);
     q.teacherId=ME.id;
     q.topic=parsed.topic;
-    if(!q.subject)q.subject=ME.subject||'math';
+    // Fan: _fpOverrideSubject tanlangan bo'lsa shu fan, aks holda o'z fani
+    if(window._fpOverrideSubject){
+      q.subject=window._fpOverrideSubject;
+    } else if(!q.subject){
+      q.subject=ME.subject||'math';
+    }
   });
 
   // Rasmlarni Supabase Storage'ga yuklab, asosiy JSON ichida
@@ -5361,17 +5414,34 @@ function getMyFolders(){
   return names.sort();
 }
 var _fpPendingFile=null;
+var _pendingImportSubject=null; // fan tanlash
 function isDocFile(name){ return /\.(docx|pdf|txt)$/i.test(name); }
 function isExeFile(name){ return /\.exe$/i.test(name); }
 function isImageFile(name){ return /\.(jpe?g|png)$/i.test(name); }
-var _fpMode='import'; // 'import' - oddiy import, 'generate' - kitobdan tuzish
+var _fpMode='import';
 function askFolderThenImport(file,mode){
   _fpMode=mode||'import';
   _fpPendingFile=file;
+  _pendingImportSubject=null;
+
+  // Fan tanlash ro'yxati
+  var subjBox=document.getElementById('fp-subj-list');
+  if(subjBox){
+    // "O'z fanim" + barcha boshqa fanlar
+    var mySubj=ME&&ME.subject?ME.subject:'math';
+    var btns='<button class="tbtn on" id="fp-subj-own" style="padding:6px 12px;font-size:13px" onclick="fpSetSubj(null,this)">✅ O\'z fanim ('+subjName(mySubj)+')</button>';
+    SUBJECTS.forEach(function(s){
+      if(s.v===mySubj) return; // o'z fanini skip
+      btns+='<button class="tbtn" id="fp-subj-'+s.v+'" style="padding:6px 12px;font-size:13px" onclick="fpSetSubj(\''+s.v+'\',this)">'+s.n+'</button>';
+    });
+    subjBox.innerHTML=btns;
+  }
+
+  // Fayl ro'yxati
   var folders=getMyFolders();
   var box=document.getElementById('fp-existing');
   if(!folders.length){
-    box.innerHTML='<div class="ts tm" style="text-align:center;padding:8px">Hali fayl (kitob) yaratilmagan. Pastda yangisini yarating.</div>';
+    box.innerHTML='<div class="ts tm" style="text-align:center;padding:8px">Hali fayl yaratilmagan. Pastda yangisini yarating.</div>';
   } else {
     box.innerHTML=folders.map(function(fn){
       var esc=fn.replace(/'/g,"\\'");
@@ -5381,6 +5451,13 @@ function askFolderThenImport(file,mode){
   var defaultName=file.name.replace(/\.(exe|docx|pdf|txt|jpe?g|png)$/i,'').replace(/[\s_-]*\d+$/,'')||'Yangi fayl';
   document.getElementById('fp-newname').value=defaultName;
   document.getElementById('fp-modal').style.display='flex';
+}
+function fpSetSubj(subj, el){
+  _pendingImportSubject=subj; // null = o'z fani
+  // Aktiv tugmani belgilash
+  var all=document.querySelectorAll('#fp-subj-list .tbtn');
+  all.forEach(function(b){b.classList.remove('on');});
+  if(el) el.classList.add('on');
 }
 function closeFP(){document.getElementById('fp-modal').style.display='none';_fpPendingFile=null;}
 function submitFP(folderName,isNew){
@@ -5393,6 +5470,14 @@ function submitFP(folderName,isNew){
   document.getElementById('fp-modal').style.display='none';
   _fpPendingFile=null;
   _pendingImportFolder=folderName;
+  // Fan: agar boshqa fan tanlangan bo'lsa, global o'zgaruvchiga saqlaymiz
+  // saveImportedQs() uni q.subject sifatida ishlatadi
+  if(_pendingImportSubject){
+    window._fpOverrideSubject=_pendingImportSubject;
+  } else {
+    window._fpOverrideSubject=null; // o'z fani — ME.subject ishlatiladi
+  }
+  _pendingImportSubject=null;
   if(_fpMode==='generate'){
     openGenModal(file);
     return;
@@ -6387,7 +6472,7 @@ function renderDuelRace(){
     (DL.mode==='bot'?'<span class="ts tm" id="duel-bot-progress">Bot: 0/'+DL.questions.length+'</span>':'<span class="ts tm" id="duel-opp-progress">Raqib: 0/'+DL.questions.length+'</span>')+
     '</div>'+
     '<div class="tmr" id="duel-timer" style="margin-bottom:10px">'+secPerQ+'</div>'+
-    '<div style="font-weight:700;margin-bottom:12px">'+q.text+'</div>'+
+    '<div style="font-weight:700;margin-bottom:12px;line-height:1.6">'+q.text+'</div>'+
     (q.image||q.img?'<img src="'+imgSrcVal(q.image||q.img)+'" style="max-width:100%;max-height:130px;border-radius:6px;margin-bottom:10px">':'')+
     q.options.map(function(o,i){return '<div class="opt" onclick="answerDuel('+i+')"><span>'+String.fromCharCode(65+i)+'. '+o+'</span></div>';}).join('');
   var left=secPerQ;
@@ -6398,6 +6483,8 @@ function renderDuelRace(){
     if(tel) tel.textContent=left;
     if(left<=0){ clearInterval(DL.timerIv); answerDuel(-1); }
   },1000);
+  // KaTeX formulalar va Canvas savol rasmi
+  renderMathIn(body);
 }
 function answerDuel(optIdx){
   if(DL.timerIv){clearInterval(DL.timerIv);DL.timerIv=null;}
