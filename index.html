@@ -2647,49 +2647,75 @@ function _eduMoire(ctx, W, H, rng) {
 // OCR uchun: character baseline va spacing o'zgaradi → segmentation xato.
 // Kamera: JPEG compression bu micro-shift'larni kuchaytiradi.
 function _eduDrawText(ctx, text, x, y, rng, intensity) {
-  // intensity: 0=himoyasiz, 1=maksimal (lekin o'quvchiga ta'sir minimni saqlaydi)
-  var amp = intensity * 1.2; // max 1.2px siljish — ko'rinmas
-  var rotAmp = intensity * 0.028; // max ~1.6° — ko'rinmas
-  var scaleAmp = intensity * 0.013; // max 1.3% — ko'rinmas
-
+  var amp      = intensity * 1.2;
+  var rotAmp   = intensity * 0.028;
+  var scaleAmp = intensity * 0.013;
   ctx.save();
   var curX = x;
   var chars = text.split('');
-
   for (var i = 0; i < chars.length; i++) {
     var ch = chars[i];
-    if (ch === ' ') { curX += ctx.measureText(' ').width; continue; }
+    // Bo'sh joy ham random kenglikda — OCR word spacing detection buziladi
+    if (ch === ' ') { curX += ctx.measureText(' ').width * (1 + rng.r(-0.09,0.09)); continue; }
     var cw = ctx.measureText(ch).width;
-
-    // Har belgi uchun deterministik (seed asosida) micro-transform
     var dx  = rng.r(-amp, amp);
     var dy  = rng.r(-amp * 0.4, amp * 0.4);
     var rot = rng.r(-rotAmp, rotAmp);
     var sx  = 1 + rng.r(-scaleAmp, scaleAmp);
     var sy  = 1 + rng.r(-scaleAmp * 0.7, scaleAmp * 0.7);
-
     ctx.save();
     ctx.translate(curX + cw / 2 + dx, y + dy);
     ctx.rotate(rot);
     ctx.scale(sx, sy);
     ctx.fillText(ch, -cw / 2, 0);
     ctx.restore();
-
-    curX += cw;
+    // Belgilar orasidagi interval ham random — OCR kerning detection buziladi
+    curX += cw * (1 + rng.r(-0.035, 0.035));
   }
   ctx.restore();
-  return curX - x; // qaytilgan kenglik
+  return curX - x;
 }
 
-// ── Sub-pixel noise overlay ──────────────────────────────────────────
-// Screenshot: OCR preprocessing (contrast enhance, sharpen) buni ko'radi.
-// Kamera: JPEG quantization buni kuchaytiradi, edge detection buziladi.
+// ── Decoy strokes (screenshot OCR himoyasi) ───────────────────────────
+// Screenshot → OCR preprocessing: grayscale → contrast boost → binarize.
+// Biz bu pipeline'ni buzamiz: matn atrofiga ko'zga ko'rinmas "soxta
+// chiziqlar" qo'shamiz. Kontrast boost'dan KEYIN ular OCR uchun yangi
+// "belgilar" sifatida namoyon bo'ladi, lekin inson ko'zi uchun fon bilan
+// bir xil. Natija: OCR haqiqiy harflar bilan soxta harflarni aralashtirib
+// yuboradi → character accuracy sezilarli pasayadi.
+function _eduDecoyStrokes(ctx, W, lineY, lineH, rng) {
+  ctx.save();
+  // Vertikal soxta "strokes" — OCR segment qila olmaydi
+  var n = Math.floor(W / 13) + 4;
+  for (var i = 0; i < n; i++) {
+    var sx  = rng.r(0, W);
+    var sy  = lineY - lineH * rng.r(0.38, 0.48);
+    var sh  = rng.r(lineH * 0.25, lineH * 0.8);
+    var g   = Math.floor(rng.r(232, 248));
+    var op  = rng.r(0.07, 0.20);
+    ctx.strokeStyle = 'rgba('+g+','+g+','+(g-6)+','+op+')';
+    ctx.lineWidth   = rng.r(0.35, 1.0);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + rng.r(-1.2, 1.2), sy + sh);
+    ctx.stroke();
+  }
+  // Mikro "dot" naqshi — OCR feature extraction scatter qiladi
+  for (var j = 0; j < 55; j++) {
+    ctx.fillStyle = 'rgba(195,192,208,'+rng.r(0.05,0.14)+')';
+    ctx.beginPath();
+    ctx.arc(rng.r(0,W), rng.r(lineY-lineH*0.5, lineY+lineH*0.5), rng.r(0.3,0.85), 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ── Sub-pixel noise overlay ───────────────────────────────────────────
 function _eduNoise(ctx, W, H, rng, intensity) {
   if (intensity < 0.3) return;
   var d = ctx.getImageData(0, 0, W, H);
   var px = d.data;
-  var amp = intensity * 4; // max ±4 per channel (ko'zga ko'rinmas)
-  // Har 3 pikseln'i bir marta — performance va o'quvchi tajribasi
+  var amp = intensity * 4;
   for (var i = 0; i < px.length; i += 12) {
     var n = Math.floor(rng.r(-amp, amp));
     px[i]   = Math.max(0, Math.min(255, px[i]   + n));
@@ -2762,7 +2788,9 @@ function _eduRenderAll(canvas, q, ans, seed) {
   ctx.font = 'bold ' + qFont + 'px "Segoe UI",system-ui,sans-serif';
   ctx.textBaseline = 'middle';
   for (var li = 0; li < qLines.length; li++) {
-    _eduDrawText(ctx, qLines[li], pad, curY + qFont * lineH * li + qFont / 2, rng, 0.85);
+    var lineY = curY + qFont * lineH * li + qFont / 2;
+    _eduDrawText(ctx, qLines[li], pad, lineY, rng, 0.85);
+    _eduDecoyStrokes(ctx, W, lineY, qFont * lineH, rng);
   }
   curY += qLines.length * qFont * lineH + 16;
 
@@ -2838,11 +2866,9 @@ function _eduRenderAll(canvas, q, ans, seed) {
       ctx.font = (sel ? '600 ' : '') + optFont + 'px "Segoe UI",system-ui,sans-serif';
       ctx.textBaseline = 'middle';
       for (var lj = 0; lj < info.lines.length; lj++) {
-        _eduDrawText(
-          ctx, info.lines[lj],
-          pad + 28, y0 + optFont * lineH * lj + optFont / 2 + 6,
-          rng, 0.7  // Variantlarda biroz kamroq perturbation (o'qish oson)
-        );
+        var optLineY = y0 + optFont * lineH * lj + optFont / 2 + 6;
+        _eduDrawText(ctx, info.lines[lj], pad + 28, optLineY, rng, 0.7);
+        _eduDecoyStrokes(ctx, W, optLineY, optFont * lineH, rng);
       }
     }
 
@@ -2864,7 +2890,21 @@ function _eduCanvasClick(e, canvasId) {
   if (!canvas) return;
   var rect = canvas.getBoundingClientRect();
   var scaleY = canvas.height / rect.height;
-  var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  var scaleX = canvas.width / rect.width;
+  // TUZATISH: touchend paytida e.touches BOSH bo'ladi!
+  // e.changedTouches ishlatilishi shart — avvalgi kod har doim
+  // clientY = undefined qaytarardi => cy = NaN => hech qanday zone topilmasdi
+  var clientY, clientX;
+  if (e.changedTouches && e.changedTouches.length) {
+    clientY = e.changedTouches[0].clientY;
+    clientX = e.changedTouches[0].clientX;
+  } else if (e.touches && e.touches.length) {
+    clientY = e.touches[0].clientY;
+    clientX = e.touches[0].clientX;
+  } else {
+    clientY = e.clientY;
+    clientX = e.clientX;
+  }
   var cy = (clientY - rect.top) * scaleY;
   for (var i = 0; i < zones.length; i++) {
     if (cy >= zones[i].y0 && cy <= zones[i].y1) {
