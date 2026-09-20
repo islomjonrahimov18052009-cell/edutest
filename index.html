@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathlive" defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -32,7 +33,7 @@ body{background:linear-gradient(125deg,#151b3d,var(--purd) 30%,var(--pri) 55%,va
 #mathBg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
 #heroArt{position:fixed;left:0;right:0;bottom:0;height:clamp(220px,35vh,380px);z-index:-2;pointer-events:none;overflow:hidden}
 #heroArt svg{width:100%;height:100%;display:block}
-#touchGlow{position:fixed;top:0;left:0;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;pointer-events:none;z-index:-1;opacity:0;transition:opacity .5s ease;will-change:transform;mix-blend-mode:screen;background:radial-gradient(circle,rgba(255,230,160,.85) 0%,rgba(255,216,115,.5) 25%,rgba(240,180,41,.2) 50%,rgba(240,180,41,0) 72%)}
+#touchGlow{position:fixed;top:0;left:0;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;pointer-events:none;z-index:5;opacity:0;transition:opacity .5s ease;will-change:transform;background:radial-gradient(circle,rgba(255,244,214,.7) 0%,rgba(255,214,140,.4) 35%,rgba(240,180,90,.16) 60%,rgba(240,180,90,0) 78%)}
 #mathBg span{position:absolute;color:rgba(255,255,255,.16);font-family:'Space Grotesk',sans-serif;font-weight:600;user-select:none;animation:floatSym linear infinite}
 @keyframes floatSym{
   0%{transform:translateY(8vh) translateX(0) rotate(0deg);opacity:0}
@@ -70,8 +71,9 @@ textarea{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radiu
 .mathedit{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radius:9px;font-size:15px;line-height:1.9;font-family:inherit;outline:none;min-height:75px;max-height:280px;overflow-y:auto;transition:border .15s,box-shadow .15s;white-space:pre-wrap;word-break:break-word}
 .mathedit:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,49,109,.12)}
 .mathedit:empty::before{content:attr(data-placeholder);color:#94a3b8}
-.mfrag{display:inline-block;vertical-align:middle;padding:0 3px;margin:0 1px;cursor:pointer;border-radius:4px;transition:background .12s}
-.mfrag:hover{background:#eef1f9;outline:1px dashed var(--pri)}
+.mfrag{display:inline-block;vertical-align:middle;margin:0 2px;border-radius:6px;font-size:1.02em;border:1.5px solid transparent;transition:border-color .15s,background .15s;--placeholder-opacity:.45;min-width:1.6em}
+.mfrag:hover{border-color:var(--bdr)}
+.mfrag:focus-within{border-color:var(--pri);background:#f5f6fb}
 textarea:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,49,109,.12)}
 .fg{margin-bottom:13px}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -147,9 +149,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 <svg viewBox="0 0 1600 420" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;object-fit:cover">
   <defs>
     <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ffd873" stop-opacity=".9"/>
-      <stop offset="60%" stop-color="#f0b429" stop-opacity=".35"/>
-      <stop offset="100%" stop-color="#f0b429" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#ffd9c7" stop-opacity=".92"/>
+      <stop offset="60%" stop-color="#e8607a" stop-opacity=".38"/>
+      <stop offset="100%" stop-color="#e8607a" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <!-- yulduzchalar -->
@@ -158,9 +160,12 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <circle cx="720" cy="95" r="2.5"/><circle cx="950" cy="45" r="2"/><circle cx="1080" cy="120" r="2"/>
     <circle cx="1480" cy="70" r="2.5"/><circle cx="1560" cy="140" r="2"/>
   </g>
-  <!-- quyosh - tepalik chizig'idan past, doim to'liq ko'rinsin -->
+  <!-- quyosh - endi MARJON-ATIRGUL rangda (sariq/oltin emas) - fonning
+       fan-rangi (--accent, odatda sariq/oltin oilasidan) bilan hech qachon
+       bir xil bo'lib qolmaydi, chunki butunlay boshqa rang oilasidan
+       tanlangan (qizil-pushti), sariq emas -->
   <circle id="sunGlowCircle" cx="1280" cy="160" r="130" fill="url(#sunGlow)"/>
-  <circle id="sunCoreCircle" cx="1280" cy="160" r="48" fill="#ffd873" opacity=".85"/>
+  <circle id="sunCoreCircle" cx="1280" cy="160" r="48" fill="#ffd9c7" opacity=".92"/>
   <!-- orqa tepalik -->
   <path d="M0,270 C220,210 380,255 600,225 C830,195 1000,245 1220,210 C1380,185 1500,215 1600,205 L1600,420 L0,420 Z" fill="#5b3ea6" opacity=".38"/>
   <!-- old tepalik -->
@@ -916,7 +921,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <label>Savol matni</label>
       <div id="aq-text" class="mathedit" contenteditable="true" data-placeholder="Savolni yozing..."></div>
       <div class="sarea" id="aq-syms"></div>
-      <div class="ts tm" style="margin-top:4px">💡 <b>a/b</b> — kasr, <b>√</b> — ildiz, <b>xⁿ</b> — daraja. Formulalar shu yerning o'zida, chizilgan holda ko'rinadi. Ichma-ich kasr uchun: Kasr panelidagi maydonda kerakli qismni belgilab, ➗ tugmasini bosing.</div>
+      <div class="ts tm" style="margin-top:4px">💡 <b>a/b</b> — kasr, <b>√</b> — ildiz, <b>xⁿ</b> — daraja. Formula darhol bo'sh joy (to'rtburchak) bilan chiqadi — o'sha joyga to'g'ridan-to'g'ri yozing. Ichma-ich kasr/ildiz uchun: kursorni formula ichiga qo'yib, tugmani yana bosing.</div>
     </div>
     <div class="fg">
       <label>Savol rasmi (ixtiyoriy)</label>
@@ -1744,86 +1749,23 @@ function clearAQImg(){
   if(inp)inp.value='';
 }
 
-function _mhShow(cfg){
-  _mhPending=cfg;
-  var panel=document.getElementById('math-helper-panel');
-  if(!panel){
-    panel=document.createElement('div');
-    panel.id='math-helper-panel';
-    panel.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid var(--pri);padding:14px 16px 20px;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)';
-    document.body.appendChild(panel);
-  }
-  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><b style="font-size:15px">'+cfg.title+'</b><button onclick="_mhClose()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#888">✕</button></div>';
-  cfg.fields.forEach(function(f){
-    html+='<div style="margin-bottom:8px"><label style="font-size:12px;font-weight:700;color:#666;text-transform:uppercase">'+f.label+'</label>';
-    html+='<input id="mh-'+f.id+'" type="text" value="'+(f.val||'')+'" placeholder="'+f.ph+'" style="width:100%;padding:8px 10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:15px;margin-top:3px;font-family:\'JetBrains Mono\',monospace"></div>';
-  });
-  html+='<div style="display:flex;gap:8px;margin-top:4px">';
-  html+='<button onclick="_mhApply()" style="flex:1;padding:10px;background:var(--pri);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer">✓ Qo\'shish</button>';
-  html+='<button onclick="_mhClose()" style="padding:10px 16px;background:#f1f5f9;border:none;border-radius:9px;font-size:14px;cursor:pointer">Bekor</button>';
-  html+='</div>';
-  panel.innerHTML=html;
-  // Birinchi inputga fokus
-  setTimeout(function(){ var el=document.getElementById('mh-'+cfg.fields[0].id); if(el)el.focus(); },80);
-}
-function _mhClose(){
-  var panel=document.getElementById('math-helper-panel');
-  if(panel)panel.remove();
-  _mhPending=null;
-}
-function _mhVal(id){ var el=document.getElementById('mh-'+id); return el?el.value.trim():''; }
-function _mhApply(){
-  if(!_mhPending)return;
-  var c=_mhPending;
-  var latex='';
-  if(c.type==='frac'){
-    var num=_mhVal('num'),den=_mhVal('den');
-    if(!num&&!den){_mhClose();return;}
-    latex='\\frac{'+(num||' ')+'}{'+den+'}';
-  } else if(c.type==='root'){
-    var content=_mhVal('content'),deg=_mhVal('deg')||c._fixedDeg||'';
-    latex=deg?('\\sqrt['+deg+']{'+content+'}'):('\\sqrt{'+(content||' ')+'}');
-  } else if(c.type==='exp'){
-    var base2=_mhVal('base'),exp2=_mhVal('exp');
-    if(!base2&&!exp2){_mhClose();return;}
-    latex=(base2||'x')+'^{'+(exp2||'2')+'}';
-  } else if(c.type==='raw'){
-    latex=_mhVal('raw');
-    if(!latex){_mhClose();return;}
-  }
-  _mhClose();
-  insLatex(latex);
-}
-// Enter tugmasi bosqanda ham qo'shilsin
-document.addEventListener('keydown',function(e){
-  if(e.key==='Enter'&&_mhPending){
-    var panel=document.getElementById('math-helper-panel');
-    if(panel&&document.activeElement&&panel.contains(document.activeElement)){
-      e.preventDefault();_mhApply();
-    }
-  }
-  if(e.key==='Escape'&&_mhPending){ _mhClose(); }
-});
-
-function stripMathDelim(s){
-  s=s.trim();
-  if(s.length>=2&&s.charAt(0)==='$'&&s.charAt(s.length-1)==='$')return s.slice(1,-1);
-  return s;
-}
-
 // ═══════════════════════════════════════════════════════════════════════
-// WYSIWYG FORMULA MUHARRIRI (aq-text) — 2026-09-18 tuzatish
-// Muammo edi: formula qo'shilgach, xom "$\frac{a}{b}$" matni textarea ichida
-// ko'rinib qolar, pastda alohida (ikkinchi) joyda esa chizilgan ko'rinishi
-// chiqardi — ustozni chalg'itardi. Endi #aq-text <textarea> emas, balki
-// contenteditable DIV: har bir formula darhol O'SHA JOYNING O'ZIDA, chizilgan
-// (KaTeX) "chip" sifatida ko'rinadi, xom LaTeX matni umuman ko'rinmaydi.
-// Saqlash formati o'zgarmadi — DB'ga baribir "$latex$" ko'rinishida yoziladi
-// (mathEditGetLatexString orqali), shuning uchun eski savollar, render
-// funksiyalari (renderMathIn, t-qbody va h.k.) hech narsa o'zgartirmasdan
-// ishlayveradi.
-var _mhEditChip=null;   // formula "chip"ni qayta tahrirlash rejimi
-var _aqSavedRange=null; // foydalanuvchi oxirgi turgan kursor joyi (contenteditable)
+// WYSIWYG FORMULA MUHARRIRI (aq-text) — 2026-09-20, MathLive integratsiyasi
+// TARIX: avval formulalar KaTeX bilan chizilgan STATIK rasm ("chip") edi -
+// tahrirlash uchun tashqi panel ochilib, Surat/Mahraj alohida so'ralardi.
+// Ustoz buni "Word'dagidek, chiziqning tagiga to'g'ridan-to'g'ri bosib
+// yozish" bilan almashtirishni so'radi. Endi har bir formula haqiqiy
+// JONLI, TAHRIRLANADIGAN maydon (<math-field>, MathLive kutubxonasi) -
+// kasrning surat/mahraj qismiga, ildiz ostiga va h.k. TO'G'RIDAN-TO'G'RI
+// bosib kiritish mumkin, bo'sh joylar maxsus to'rtburchak (placeholder)
+// ko'rinishida ko'rinadi, ichma-ich kasr/ildiz cheklovsiz yoziladi -
+// tashqi panel, "Surat/Mahraj so'rash" bosqichi BUTUNLAY OLIB TASHLANDI.
+// Saqlash formati o'zgarmadi — DB'ga baribir "$latex$" ko'rinishida
+// yoziladi (mathEditGetLatexString orqali), shuning uchun eski savollar,
+// render funksiyalari (renderMathIn, t-qbody va h.k.) hech narsa
+// o'zgartirmasdan ishlayveradi - bu FAQAT ustoz "Savol qo'shish" oynasidagi
+// muharrirga tegishli.
+var _aqSavedRange=null; // foydalanuvchi oxirgi turgan kursor joyi (contenteditable, aq-text ichida)
 
 function aqTextEl(){ return document.getElementById('aq-text'); }
 function aqTextContains(node){ var el=aqTextEl(); return !!(el&&node&&el.contains(node)); }
@@ -1839,7 +1781,7 @@ document.addEventListener('selectionchange', function(){
 });
 
 // Tanlangan matnni (yoki aynan bitta belgilangan formula-chipning xom
-// LaTeX kodini — ichma-ich formula uchun) qaytaradi
+// LaTeX kodini) qaytaradi - yangi formulaga "boshlang'ich qiymat" sifatida
 function getAqSelectionForPrefill(){
   var el=aqTextEl();
   var sel=window.getSelection();
@@ -1848,31 +1790,43 @@ function getAqSelectionForPrefill(){
   if(range.collapsed) return '';
   if(range.startContainer===range.endContainer && range.startContainer.nodeType===1 && (range.endOffset-range.startOffset)===1){
     var only=range.startContainer.childNodes[range.startOffset];
-    if(only && only.classList && only.classList.contains('mfrag')) return only.dataset.latex||'';
+    if(only && only.tagName==='MATH-FIELD'){ try{ return only.value||''; }catch(e){ return ''; } }
   }
   return sel.toString();
 }
 
-function renderChipKatex(span, latex){
-  span.dataset.latex=latex;
-  try{
-    if(typeof katex!=='undefined'){ katex.render(latex, span, {throwOnError:false}); }
-    else { span.textContent='$'+latex+'$'; }
-  }catch(e){ span.textContent='$'+latex+'$'; }
-}
+// Jonli, tahrirlanadigan formula maydoni (MathLive <math-field>) yaratadi.
+// Fokusdan chiqib ketilganda (chapga/o'ngga strelka bilan "chegaradan
+// tashqariga" chiqilsa) - kursor avtomatik atrofdagi oddiy matnga qaytadi,
+// xuddi Word'dagi formula maydonlaridek.
 function makeChip(latex){
-  var span=document.createElement('span');
-  span.className='mfrag';
-  span.setAttribute('contenteditable','false');
-  span.title="Tahrirlash uchun ikki marta bosing";
-  span.ondblclick=function(e){ e.stopPropagation(); e.preventDefault(); openEditChipPanel(span); };
-  renderChipKatex(span, latex);
-  return span;
+  var mf=document.createElement('math-field');
+  mf.className='mfrag';
+  try{ mf.value=latex; }catch(e){}
+  mf.setAttribute('virtual-keyboard-mode','onfocus');
+  mf.setAttribute('smart-fence','on');
+  mf.setAttribute('smart-superscript','on');
+  function exitField(dir){
+    var r=document.createRange();
+    if(dir==='forward') r.setStartAfter(mf); else r.setStartBefore(mf);
+    r.collapse(true);
+    var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    _aqSavedRange=r.cloneRange();
+    var el=aqTextEl(); if(el) el.focus();
+  }
+  mf.addEventListener('move-out', function(ev){
+    var dir=(ev.detail&&ev.detail.direction==='backward')?'backward':'forward';
+    exitField(dir);
+  });
+  mf.addEventListener('moveOut', function(ev){
+    var dir=(ev.detail&&ev.detail.direction==='backward')?'backward':'forward';
+    exitField(dir);
+  });
+  return mf;
 }
-function setChipLatex(chip, latex){ renderChipKatex(chip, latex); }
 
 // Matn (masalan DB'dan kelgan "...text $\frac{1}{2}$ text...") ni
-// contenteditable DIV ichiga, formulalarni chip qilib, chizib qo'yadi
+// contenteditable DIV ichiga, formulalarni jonli <math-field> qilib qo'yadi
 function mathEditSetValue(el, text){
   if(!el) return;
   el.innerHTML='';
@@ -1895,7 +1849,7 @@ function mathEditGetLatexString(el){
     node.childNodes.forEach(function(n){
       if(n.nodeType===3){ out+=n.textContent.replace(/\u200b/g,''); }
       else if(n.nodeType===1){
-        if(n.classList && n.classList.contains('mfrag')){ out+='$'+(n.dataset.latex||'')+'$'; }
+        if(n.tagName==='MATH-FIELD'){ var lv=''; try{ lv=n.value||''; }catch(e){} out+='$'+lv+'$'; }
         else if(n.tagName==='BR'){ out+='\n'; }
         else { if(out && out.charAt(out.length-1)!=='\n') out+='\n'; walk(n); }
       }
@@ -1905,13 +1859,8 @@ function mathEditGetLatexString(el){
   return out;
 }
 
-// Kursor turgan joyga (yoki tahrirlanayotgan chip o'rniga) formula qo'yadi
+// Kursor turgan joyga, tayyor (bo'sh joysiz) LaTeX'ni chip sifatida qo'yadi
 function insLatex(latex){
-  if(_mhEditChip && _mhEditChip.parentNode){
-    setChipLatex(_mhEditChip, latex);
-    _mhEditChip=null;
-    return;
-  }
   var el=aqTextEl();
   el.focus();
   var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer)) ? _aqSavedRange.cloneRange() : getEndRange(el);
@@ -1924,8 +1873,27 @@ function insLatex(latex){
   var nr=document.createRange(); nr.setStart(sp,1); nr.collapse(true);
   var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(nr);
   _aqSavedRange=nr.cloneRange();
+  return chip;
+}
+// Kursor turgan joyga QOLIP (bo'sh joylari bilan, masalan "\frac{#0}{#0}")
+// qo'yadi va darhol o'sha bo'sh joyga fokus qiladi - xuddi Word'dagidek,
+// ustoz chiziqning tagiga/ustiga bosib emas, formula paydo bo'lishi bilan
+// TO'G'RIDAN-TO'G'RI o'sha bo'sh joyga yoza boshlaydi.
+function insLatexTemplate(latex){
+  var chip=insLatex(latex);
+  setTimeout(function(){
+    try{ chip.focus(); }catch(e){}
+  }, 30);
+  return chip;
 }
 function insSym(s){
+  // Agar kursor hozir biror formula maydonining (<math-field>) ICHIDA
+  // tursa - belgi O'SHA formula ichiga qo'yiladi (MathLive o'zining
+  // ichki kursoriga qarab). Aks holda - oddiy matn sifatida qo'shiladi.
+  var af=document.activeElement;
+  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+    try{ af.executeCommand(['insert', s]); return; }catch(e){}
+  }
   var el=aqTextEl(); el.focus();
   var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer)) ? _aqSavedRange.cloneRange() : getEndRange(el);
   try{ range.deleteContents(); }catch(e){}
@@ -1936,6 +1904,10 @@ function insSym(s){
   _aqSavedRange=nr.cloneRange();
 }
 function insWrapAny(){
+  var af=document.activeElement;
+  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+    try{ af.executeCommand(['insert', '(#0)']); return; }catch(e){}
+  }
   var el=aqTextEl();
   var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer) && !_aqSavedRange.collapsed) ? _aqSavedRange.cloneRange() : null;
   if(!range){ insSym('()'); return; }
@@ -1948,173 +1920,46 @@ function insWrapAny(){
   el.focus();
 }
 
-// ➗ KASR paneli (surat/mahraj) — endi har bir maydon yonida yana bitta ➗
-// tugma bor: maydon ichida biror qism belgilansa (select), o'sha qism
-// avtomatik ICHMA-ICH kasrga aylanadi (KaTeX buni o'zi kichikroq chizadi,
-// qo'shimcha hisob-kitob kerak emas)
-function openFracPanel(preNum, preDen){
-  preNum=preNum||''; preDen=preDen||'';
-  var panel=document.getElementById('math-helper-panel');
-  if(!panel){
-    panel=document.createElement('div');
-    panel.id='math-helper-panel';
-    panel.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid var(--pri);padding:14px 16px 20px;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)';
-    document.body.appendChild(panel);
+// ➗ KASR: agar kursor hozir bir formula maydoni ICHIDA bo'lsa - o'sha
+// yerga (kerak bo'lsa ICHMA-ICH, MathLive buni cheklovsiz qo'llab-quvvatlaydi)
+// yangi kasr qo'shiladi. Aks holda - matnga yangi formula-maydon qo'yiladi,
+// va surat qismi (bo'sh to'rtburchak) DARHOL tahrirlash uchun tayyor bo'ladi.
+function insFraction(){
+  var af=document.activeElement;
+  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+    try{ af.executeCommand(['insert','\\frac{#0}{#0}']); return; }catch(e){}
   }
-  panel.innerHTML=
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
-      '<span style="font-size:15px;font-weight:700">➗ Kasr</span>'+
-      '<button onclick="_mhClose()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#888">✕</button>'+
-    '</div>'+
-    '<div style="display:flex;flex-direction:column;align-items:center;gap:0;background:#f8f9fc;border-radius:10px;padding:12px;margin-bottom:12px">'+
-      '<div style="display:flex;width:100%;gap:6px;margin-bottom:6px">'+
-        '<input id="mh-num" type="text" value="'+preNum.replace(/"/g,'&quot;')+'" placeholder="Surat (ustki)" style="flex:1;padding:10px;border:1.5px solid var(--pri);border-radius:8px;font-size:16px;font-family:monospace;text-align:center">'+
-        '<button type="button" onclick="wrapFracField(\'mh-num\')" title="Belgilangan qismni ichma-ich kasr qiladi" style="padding:0 12px;border:1.5px solid var(--bdr);border-radius:8px;background:#fff;cursor:pointer;font-size:15px">➗</button>'+
-      '</div>'+
-      '<div style="width:80%;height:2px;background:#333;border-radius:2px;margin:2px 0"></div>'+
-      '<div style="display:flex;width:100%;gap:6px;margin-top:6px">'+
-        '<input id="mh-den" type="text" value="'+preDen.replace(/"/g,'&quot;')+'" placeholder="Mahraj (pastki)" style="flex:1;padding:10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:16px;font-family:monospace;text-align:center">'+
-        '<button type="button" onclick="wrapFracField(\'mh-den\')" title="Belgilangan qismni ichma-ich kasr qiladi" style="padding:0 12px;border:1.5px solid var(--bdr);border-radius:8px;background:#fff;cursor:pointer;font-size:15px">➗</button>'+
-      '</div>'+
-    '</div>'+
-    '<div class="ts tm" style="margin-bottom:10px">💡 Ichma-ich kasr: maydon ichida kerakli qismni belgilang, so\'ng shu maydon yonidagi ➗ tugmasini bosing.</div>'+
-    '<div style="display:flex;gap:8px">'+
-      '<button onclick="_fracApply()" style="flex:1;padding:10px;background:var(--pri);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer">✓ Qo\'shish</button>'+
-      '<button onclick="_mhClose()" style="padding:10px 16px;background:#f1f5f9;border:none;border-radius:9px;font-size:14px;cursor:pointer">Bekor</button>'+
-    '</div>';
-  _mhPending={type:'frac'};
-  setTimeout(function(){
-    var numEl=document.getElementById('mh-num');
-    if(numEl){ numEl.focus(); if(preNum) numEl.select(); }
-    var denEl=document.getElementById('mh-den');
-    if(numEl) numEl.addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();if(denEl)denEl.focus();} });
-    if(denEl) denEl.addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();_fracApply();} });
-  },60);
+  var num=getAqSelectionForPrefill();
+  insLatexTemplate(num?('\\frac{'+num+'}{#0}'):'\\frac{#0}{#0}');
 }
-function wrapFracField(id){
-  var el=document.getElementById(id);
-  if(!el) return;
-  var st=el.selectionStart, en=el.selectionEnd;
-  if(st===en){ alert("Avval o'sha maydon ichida kerakli qismni belgilang (select qiling)."); el.focus(); return; }
-  var v=el.value, sel=v.slice(st,en);
-  var inserted='\\frac{'+sel+'}{';
-  el.value=v.slice(0,st)+inserted+'}'+v.slice(en);
-  var newPos=st+inserted.length;
-  el.focus(); el.setSelectionRange(newPos,newPos);
-}
-function insFraction(){ _mhEditChip=null; openFracPanel(getAqSelectionForPrefill(), ''); }
-function _fracApply(){
-  var num=(document.getElementById('mh-num')||{}).value||'';
-  var den=(document.getElementById('mh-den')||{}).value||'';
-  _mhClose();
-  if(!num&&!den)return;
-  insLatex('\\frac{'+(num||' ')+'}{'+den+'}');
-}
-// ILDIZ - inline panel orqali
 function insNthRoot(){
-  _mhEditChip=null;
-  var preContent=getAqSelectionForPrefill();
-  _mhShow({
-    type:'root', title:'√ Ildiz',
-    fields:[
-      {id:'content',label:'Ildiz ostidagi ifoda',ph:'Masalan: 25 yoki x+7',val:preContent},
-      {id:'deg',label:'Daraja (kvadrat ildiz uchun bo\'sh qoldiring)',ph:'Masalan: 3, n (bo\'sh = √)',val:''}
-    ]
-  });
+  var af=document.activeElement;
+  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+    try{ af.executeCommand(['insert','\\sqrt{#0}']); return; }catch(e){}
+  }
+  var content=getAqSelectionForPrefill();
+  insLatexTemplate(content?('\\sqrt{'+content+'}'):'\\sqrt{#0}');
 }
 function insRootQuick(n){
-  _mhEditChip=null;
+  var af=document.activeElement;
+  var tmpl = n ? ('\\sqrt['+n+']{#0}') : '\\sqrt{#0}';
+  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+    try{ af.executeCommand(['insert', tmpl]); return; }catch(e){}
+  }
   var content=getAqSelectionForPrefill();
-  if(content){
-    insLatex(n?('\\sqrt['+n+']{'+content+'}'):('\\sqrt{'+content+'}'));
-  } else {
-    _mhShow({
-      type:'root', title:(n?('∛ '+n+'-daraja ildiz'):'√ Kvadrat ildiz'),
-      fields:[{id:'content',label:'Ildiz ostidagi ifoda',ph:'Masalan: 25, x+7',val:''}].concat(
-        n?[]:[{id:'deg',label:'Daraja (bo\'sh qolsa √)',ph:'Masalan: 3, n',val:''}]
-      ),
-      _fixedDeg: n||''
-    });
-  }
+  if(content){ insLatexTemplate(n?('\\sqrt['+n+']{'+content+'}'):('\\sqrt{'+content+'}')); }
+  else { insLatexTemplate(tmpl); }
 }
-// DARAJA - inline panel orqali, daraja ustiga daraja ham yoziladi:
-// avvalgi natijani belgilab (select qilib), yana xⁿ tugmasini bosish yetarli
+// DARAJA: asosni belgilab (select qilib) tursangiz, u SURAT bo'lib qoladi;
+// daraja ustiga daraja - chiqqan natijaning ichiga kursor bilan kirib,
+// yana xⁿ tugmasini bosish kifoya (MathLive ichma-ichlikni o'zi boshqaradi).
 function insCustomExp(){
-  _mhEditChip=null;
-  var preBase=getAqSelectionForPrefill();
-  _mhShow({
-    type:'exp', title:'xⁿ Daraja',
-    fields:[
-      {id:'base',label:'Asos (daraja qo\'yiladigan son/harf)',ph:'Masalan: x, 5, (a+b)',val:preBase},
-      {id:'exp',label:'Daraja ko\'rsatkichi',ph:'Masalan: 2, n, 2n+1',val:''}
-    ]
-  });
-}
-
-// Mavjud formula-chipni ikki marta bosganda — qayta tahrirlash.
-// Oddiy kasr/ildiz/daraja bo'lsa mos panelga aynan shu qiymatlar bilan
-// qaytadan ochiladi; murakkab/ichma-ich formula bo'lsa xom LaTeX ko'rinishida
-// (kamdan-kam kerak bo'ladigan, ilg'or foydalanuvchilar uchun) tahrirlanadi.
-function matchBrace(str, openIdx){
-  var depth=0;
-  for(var i=openIdx;i<str.length;i++){
-    if(str[i]==='{') depth++;
-    else if(str[i]==='}'){ depth--; if(depth===0) return i; }
+  var af=document.activeElement;
+  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+    try{ af.executeCommand(['insert','^{#0}']); return; }catch(e){}
   }
-  return -1;
-}
-function parseLatexForEdit(latex){
-  latex=(latex||'').trim();
-  try{
-    if(latex.indexOf('\\frac{')===0){
-      var o1=5, c1=matchBrace(latex,o1);
-      if(c1<0||latex[c1+1]!=='{') return null;
-      var o2=c1+1, c2=matchBrace(latex,o2);
-      if(c2<0||c2!==latex.length-1) return null;
-      return {type:'frac', num:latex.slice(o1+1,c1), den:latex.slice(o2+1,c2)};
-    }
-    if(latex.indexOf('\\sqrt[')===0){
-      var ci=latex.indexOf(']');
-      if(ci<0||latex[ci+1]!=='{') return null;
-      var o=ci+1, c=matchBrace(latex,o);
-      if(c<0||c!==latex.length-1) return null;
-      return {type:'root', content:latex.slice(o+1,c), deg:latex.slice(6,ci)};
-    }
-    if(latex.indexOf('\\sqrt{')===0){
-      var o3=5, c3=matchBrace(latex,o3);
-      if(c3<0||c3!==latex.length-1) return null;
-      return {type:'root', content:latex.slice(o3+1,c3), deg:''};
-    }
-    var ei=latex.indexOf('^{');
-    if(ei>0){
-      var c4=matchBrace(latex,ei+1);
-      if(c4===latex.length-1) return {type:'exp', base:latex.slice(0,ei), exp:latex.slice(ei+2,c4)};
-    }
-  }catch(e){}
-  return null;
-}
-function openEditChipPanel(chip){
-  _mhEditChip=chip;
-  var latex=chip.dataset.latex||'';
-  var parsed=parseLatexForEdit(latex);
-  if(parsed && parsed.type==='frac'){ openFracPanel(parsed.num, parsed.den); return; }
-  if(parsed && parsed.type==='root'){
-    _mhShow({type:'root', title:'√ Ildizni tahrirlash', fields:[
-      {id:'content',label:'Ildiz ostidagi ifoda',ph:'',val:parsed.content},
-      {id:'deg',label:'Daraja (bo\'sh = kvadrat ildiz)',ph:'',val:parsed.deg}
-    ]});
-    return;
-  }
-  if(parsed && parsed.type==='exp'){
-    _mhShow({type:'exp', title:'xⁿ Darajani tahrirlash', fields:[
-      {id:'base',label:'Asos',ph:'',val:parsed.base},
-      {id:'exp',label:'Daraja ko\'rsatkichi',ph:'',val:parsed.exp}
-    ]});
-    return;
-  }
-  _mhShow({type:'raw', title:'Formulani tahrirlash (LaTeX)', fields:[
-    {id:'raw',label:'LaTeX kodi',ph:'',val:latex}
-  ]});
+  var base=getAqSelectionForPrefill();
+  insLatexTemplate(base?(base+'^{#0}'):'x^{#0}');
 }
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -7453,4 +7298,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-  </html>
+      </html>
