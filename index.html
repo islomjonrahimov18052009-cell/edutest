@@ -1539,7 +1539,12 @@ initMathBg();
   document.addEventListener('mousemove', function(e){ setTarget(e.clientX, e.clientY); }, {passive:true});
   document.addEventListener('touchstart', function(e){ if(e.touches&&e.touches[0]) setTarget(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
   document.addEventListener('touchmove', function(e){ if(e.touches&&e.touches[0]) setTarget(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
-  document.addEventListener('touchend', hideNow, {passive:true});
+  // MUHIM TUZATISH: avval "touchend"da nur DARHOL yashirilardi - lekin
+  // oddiy bir marta bosishda (barmoqni surmasdan) touchstart va touchend
+  // deyarli bir zumda ketma-ket keladi, shuning uchun nur chiqishi bilan
+  // bir onda o'chib qolar, umuman ko'rinmasdi ("tegsam ham ozgarmayapti").
+  // Endi touchend'da hech narsa qilinmaydi - nur touchstart'da allaqachon
+  // belgilangan IDLE_MS (700ms) vaqt tugagach, o'zi tabiiy ravishda o'chadi.
   document.addEventListener('mouseleave', hideNow, {passive:true});
 
   function tick(){
@@ -1582,7 +1587,12 @@ initMathBg();
     if(card) updateCardGlow(card, t.clientX, t.clientY);
   }, {passive:true});
   document.addEventListener('touchend', function(){
-    document.querySelectorAll('.card.glow-active').forEach(function(c){ c.classList.remove('glow-active'); });
+    // TUZATISH: darhol emas, kichik kechikish bilan yashiramiz - oddiy
+    // bosishda ham nur ko'rinib ulguradi (yuqoridagi touchGlow tuzatishi
+    // bilan bir xil sabab)
+    setTimeout(function(){
+      document.querySelectorAll('.card.glow-active').forEach(function(c){ c.classList.remove('glow-active'); });
+    }, 500);
   }, {passive:true});
 })();
 
@@ -7443,4 +7453,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-      </html>
+  </html>
