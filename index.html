@@ -32,6 +32,8 @@ body{background:linear-gradient(125deg,#151b3d,var(--purd) 30%,var(--pri) 55%,va
 #mathBg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
 #heroArt{position:fixed;left:0;right:0;bottom:0;height:clamp(220px,35vh,380px);z-index:-2;pointer-events:none;overflow:hidden}
 #heroArt svg{width:100%;height:100%;display:block}
+#touchGlow{position:fixed;top:0;left:0;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;pointer-events:none;z-index:-1;opacity:0;transition:opacity .5s ease;will-change:transform;mix-blend-mode:screen;background:radial-gradient(circle,rgba(255,230,160,.85) 0%,rgba(255,216,115,.5) 25%,rgba(240,180,41,.2) 50%,rgba(240,180,41,0) 72%)}
+@media (prefers-reduced-motion: reduce){#touchGlow{display:none}}
 #mathBg span{position:absolute;color:rgba(255,255,255,.16);font-family:'Space Grotesk',sans-serif;font-weight:600;user-select:none;animation:floatSym linear infinite}
 @keyframes floatSym{
   0%{transform:translateY(8vh) translateX(0) rotate(0deg);opacity:0}
@@ -43,7 +45,10 @@ body{background:linear-gradient(125deg,#151b3d,var(--purd) 30%,var(--pri) 55%,va
   0%{transform:translate(0,0) rotate(0deg);opacity:1}
   100%{transform:translate(var(--drift),105vh) rotate(var(--rot));opacity:.4}
 }
-.card{background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:var(--r);border:1px solid rgba(255,255,255,.6);padding:20px;margin-bottom:14px;box-shadow:0 8px 30px -8px rgba(21,27,61,.35),0 1px 3px rgba(0,0,0,.06)}
+.card{position:relative;overflow:hidden;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:var(--r);border:1px solid rgba(255,255,255,.6);padding:20px;margin-bottom:14px;box-shadow:0 8px 30px -8px rgba(21,27,61,.35),0 1px 3px rgba(0,0,0,.06)}
+.card::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;opacity:0;transition:opacity .35s ease;background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),var(--accent) 0%,transparent 65%)}
+.card:hover::before,.card.glow-active::before{opacity:.28}
+@media (prefers-reduced-motion: reduce){.card::before{display:none}}
 .pg{display:none;animation:pgIn .35s ease}
 .pg.on{display:block}
 @keyframes pgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -63,6 +68,11 @@ label{font-size:11px;font-weight:700;color:var(--mut);display:block;margin-botto
 input[type=text],input[type=password],input[type=number],select{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radius:9px;font-size:14px;font-family:inherit;outline:none;transition:border .15s,box-shadow .15s;background:#fff;color:var(--txt)}
 input:focus,select:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,49,109,.12)}
 textarea{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radius:9px;font-size:14px;font-family:inherit;outline:none;resize:vertical;min-height:75px;transition:border .15s,box-shadow .15s}
+.mathedit{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radius:9px;font-size:15px;line-height:1.9;font-family:inherit;outline:none;min-height:75px;max-height:280px;overflow-y:auto;transition:border .15s,box-shadow .15s;white-space:pre-wrap;word-break:break-word}
+.mathedit:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,49,109,.12)}
+.mathedit:empty::before{content:attr(data-placeholder);color:#94a3b8}
+.mfrag{display:inline-block;vertical-align:middle;padding:0 3px;margin:0 1px;cursor:pointer;border-radius:4px;transition:background .12s}
+.mfrag:hover{background:#eef1f9;outline:1px dashed var(--pri)}
 textarea:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,49,109,.12)}
 .fg{margin-bottom:13px}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -133,6 +143,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 </head>
 <body>
 <div id="mathBg"></div>
+<div id="touchGlow"></div>
 <div id="heroArt" aria-hidden="true">
 <svg viewBox="0 0 1600 420" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;object-fit:cover">
   <defs>
@@ -149,8 +160,8 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <circle cx="1480" cy="70" r="2.5"/><circle cx="1560" cy="140" r="2"/>
   </g>
   <!-- quyosh - tepalik chizig'idan past, doim to'liq ko'rinsin -->
-  <circle cx="1280" cy="160" r="130" fill="url(#sunGlow)"/>
-  <circle cx="1280" cy="160" r="48" fill="#ffd873" opacity=".85"/>
+  <circle id="sunGlowCircle" cx="1280" cy="160" r="130" fill="url(#sunGlow)"/>
+  <circle id="sunCoreCircle" cx="1280" cy="160" r="48" fill="#ffd873" opacity=".85"/>
   <!-- orqa tepalik -->
   <path d="M0,270 C220,210 380,255 600,225 C830,195 1000,245 1220,210 C1380,185 1500,215 1600,205 L1600,420 L0,420 Z" fill="#5b3ea6" opacity=".38"/>
   <!-- old tepalik -->
@@ -904,10 +915,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
     <div class="fg"><label>Berilishi kerak bo'lgan savol soni</label><input type="number" id="aq-qcount" placeholder="20" min="1" style="width:120px"></div>
     <div class="fg">
       <label>Savol matni</label>
-      <textarea id="aq-text" placeholder="Savolni yozing..." oninput="updateMathPreview()"></textarea>
+      <div id="aq-text" class="mathedit" contenteditable="true" data-placeholder="Savolni yozing..."></div>
       <div class="sarea" id="aq-syms"></div>
-      <div class="ts tm" style="margin-top:4px">💡 <b>a/b</b> — kasr, <b>√</b> — ildiz, <b>xⁿ</b> — daraja. Belgilab (select) olingan matn avtomatik suratga/asosga aylanadi.</div>
-      <div id="aq-preview" style="display:none;margin-top:8px;padding:12px 14px;background:#f8f9fc;border:1px dashed var(--color-border);border-radius:8px;font-size:16px;line-height:1.8;overflow-x:auto"></div>
+      <div class="ts tm" style="margin-top:4px">💡 <b>a/b</b> — kasr, <b>√</b> — ildiz, <b>xⁿ</b> — daraja. Formulalar shu yerning o'zida, chizilgan holda ko'rinadi. Ichma-ich kasr uchun: Kasr panelidagi maydonda kerakli qismni belgilab, ➗ tugmasini bosing.</div>
     </div>
     <div class="fg">
       <label>Savol rasmi (ixtiyoriy)</label>
@@ -1495,6 +1505,82 @@ if(!document.getElementById('twinkle-star-style')){
 }
 initMathBg();
 
+// ── KATTA YORUG'LIK NURI - AYNAN TEGINILGAN/BOSILGAN NUQTADAN (2026-09-20) ─
+// Quyoshning o'zi harakatlanmaydi (statik). Alohida, KATTA va YORQIN nur
+// porlashi (#touchGlow) aynan sichqoncha/barmoq TEGINGAN nuqtada paydo
+// bo'ladi. TUZATISH: sichqoncha/barmoq HARAKATSIZ qolsa (masalan ekrandan
+// chiqib ketsa yoki bir necha soniya qimirlamasa), nur SEZILARSIZ bo'lib
+// (yo'q bo'lib) qoladi - faqat haqiqiy harakat paytida ko'rinadi.
+(function(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var glowEl=document.getElementById('touchGlow');
+  if(!glowEl) return;
+  var IDLE_MS=700; // shuncha vaqt qimirlamasa - nur o'chadi
+  var targetX=window.innerWidth/2, targetY=window.innerHeight/2;
+  var curX=targetX, curY=targetY;
+  var idleTimer=null;
+
+  function setTarget(x,y){
+    targetX=x; targetY=y;
+    glowEl.style.opacity='1';
+    if(idleTimer) clearTimeout(idleTimer);
+    idleTimer=setTimeout(function(){ glowEl.style.opacity='0'; }, IDLE_MS);
+  }
+  function hideNow(){
+    if(idleTimer) clearTimeout(idleTimer);
+    glowEl.style.opacity='0';
+  }
+
+  document.addEventListener('mousemove', function(e){ setTarget(e.clientX, e.clientY); }, {passive:true});
+  document.addEventListener('touchstart', function(e){ if(e.touches&&e.touches[0]) setTarget(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  document.addEventListener('touchmove', function(e){ if(e.touches&&e.touches[0]) setTarget(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  document.addEventListener('touchend', hideNow, {passive:true});
+  document.addEventListener('mouseleave', hideNow, {passive:true});
+
+  function tick(){
+    curX += (targetX-curX)*0.14;
+    curY += (targetY-curY)*0.14;
+    glowEl.style.transform='translate3d('+curX+'px,'+curY+'px,0)';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+
+// ── HAR BIR PANELDA (.card) SHU XIL NUR HARAKATI (2026-09-19) ───────────
+// Sichqoncha/barmoq biror panel (.card) ustida qayerga yursa/tegsa, o'sha
+// panelning o'zida ham xuddi shunday yumshoq nur uning ORQASIDAN chiqib,
+// kursor/barmoqqa ergashadi (CSS ::before + --mx/--my orqali). Rang FAN
+// mavzusiga qarab avtomatik moslashadi (var(--accent) ishlatiladi - bu
+// applySubjectTheme() allaqachon boshqaradigan sozlama, unga tegilmaydi).
+(function(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  function updateCardGlow(el, clientX, clientY){
+    var r=el.getBoundingClientRect();
+    if(!r.width||!r.height) return;
+    el.style.setProperty('--mx', ((clientX-r.left)/r.width*100)+'%');
+    el.style.setProperty('--my', ((clientY-r.top)/r.height*100)+'%');
+  }
+  document.addEventListener('mousemove', function(e){
+    var card=e.target.closest && e.target.closest('.card');
+    if(card) updateCardGlow(card, e.clientX, e.clientY);
+  }, {passive:true});
+  document.addEventListener('touchstart', function(e){
+    var t=e.touches&&e.touches[0]; if(!t) return;
+    var el=document.elementFromPoint(t.clientX, t.clientY);
+    var card=el&&el.closest&&el.closest('.card');
+    if(card){ updateCardGlow(card, t.clientX, t.clientY); card.classList.add('glow-active'); }
+  }, {passive:true});
+  document.addEventListener('touchmove', function(e){
+    var t=e.touches&&e.touches[0]; if(!t) return;
+    var el=document.elementFromPoint(t.clientX, t.clientY);
+    var card=el&&el.closest&&el.closest('.card');
+    if(card) updateCardGlow(card, t.clientX, t.clientY);
+  }, {passive:true});
+  document.addEventListener('touchend', function(){
+    document.querySelectorAll('.card.glow-active').forEach(function(c){ c.classList.remove('glow-active'); });
+  }, {passive:true});
+})();
+
 // ── FANLAR VA VILOYAT/TUMAN MALUMOTLARI ────────────────────────────────────
 // ── RASM ANIQLASH VA MANZIL YASASH (umumiy yordamchi) ──────────────────────
 // Rasm endi 3 xil korinishda kelishi mumkin: to'liq data: URL, xom Base64,
@@ -1680,12 +1766,15 @@ function _mhApply(){
     if(!num&&!den){_mhClose();return;}
     latex='\\frac{'+(num||' ')+'}{'+den+'}';
   } else if(c.type==='root'){
-    var content=_mhVal('content'),deg=_mhVal('deg');
+    var content=_mhVal('content'),deg=_mhVal('deg')||c._fixedDeg||'';
     latex=deg?('\\sqrt['+deg+']{'+content+'}'):('\\sqrt{'+(content||' ')+'}');
   } else if(c.type==='exp'){
     var base2=_mhVal('base'),exp2=_mhVal('exp');
     if(!base2&&!exp2){_mhClose();return;}
     latex=(base2||'x')+'^{'+(exp2||'2')+'}';
+  } else if(c.type==='raw'){
+    latex=_mhVal('raw');
+    if(!latex){_mhClose();return;}
   }
   _mhClose();
   insLatex(latex);
@@ -1706,23 +1795,150 @@ function stripMathDelim(s){
   if(s.length>=2&&s.charAt(0)==='$'&&s.charAt(s.length-1)==='$')return s.slice(1,-1);
   return s;
 }
-function insLatex(latex){
-  var ta=document.getElementById('aq-text');
-  var st=ta.selectionStart,en=ta.selectionEnd;
-  var out='$'+latex+'$';
-  ta.value=ta.value.slice(0,st)+out+ta.value.slice(en);
-  ta.selectionStart=ta.selectionEnd=st+out.length;
-  ta.focus();
-  updateMathPreview();
+
+// ═══════════════════════════════════════════════════════════════════════
+// WYSIWYG FORMULA MUHARRIRI (aq-text) — 2026-09-18 tuzatish
+// Muammo edi: formula qo'shilgach, xom "$\frac{a}{b}$" matni textarea ichida
+// ko'rinib qolar, pastda alohida (ikkinchi) joyda esa chizilgan ko'rinishi
+// chiqardi — ustozni chalg'itardi. Endi #aq-text <textarea> emas, balki
+// contenteditable DIV: har bir formula darhol O'SHA JOYNING O'ZIDA, chizilgan
+// (KaTeX) "chip" sifatida ko'rinadi, xom LaTeX matni umuman ko'rinmaydi.
+// Saqlash formati o'zgarmadi — DB'ga baribir "$latex$" ko'rinishida yoziladi
+// (mathEditGetLatexString orqali), shuning uchun eski savollar, render
+// funksiyalari (renderMathIn, t-qbody va h.k.) hech narsa o'zgartirmasdan
+// ishlayveradi.
+var _mhEditChip=null;   // formula "chip"ni qayta tahrirlash rejimi
+var _aqSavedRange=null; // foydalanuvchi oxirgi turgan kursor joyi (contenteditable)
+
+function aqTextEl(){ return document.getElementById('aq-text'); }
+function aqTextContains(node){ var el=aqTextEl(); return !!(el&&node&&el.contains(node)); }
+function getEndRange(el){ var r=document.createRange(); r.selectNodeContents(el); r.collapse(false); return r; }
+
+document.addEventListener('selectionchange', function(){
+  var el=aqTextEl();
+  if(!el) return;
+  var sel=window.getSelection();
+  if(sel.rangeCount && el.contains(sel.anchorNode)){
+    _aqSavedRange = sel.getRangeAt(0).cloneRange();
+  }
+});
+
+// Tanlangan matnni (yoki aynan bitta belgilangan formula-chipning xom
+// LaTeX kodini — ichma-ich formula uchun) qaytaradi
+function getAqSelectionForPrefill(){
+  var el=aqTextEl();
+  var sel=window.getSelection();
+  if(!sel.rangeCount || !el || !el.contains(sel.anchorNode)) return '';
+  var range=sel.getRangeAt(0);
+  if(range.collapsed) return '';
+  if(range.startContainer===range.endContainer && range.startContainer.nodeType===1 && (range.endOffset-range.startOffset)===1){
+    var only=range.startContainer.childNodes[range.startOffset];
+    if(only && only.classList && only.classList.contains('mfrag')) return only.dataset.latex||'';
+  }
+  return sel.toString();
 }
-// KASR - inline panel orqali (prompt() yo'q)
-// KASR - bosilishi bilanoq inline panel ochiladi, darhol surat maydoniga fokus
-// Surat yozib Enter → mahraj maydoniga o'tadi → Enter → formula qo'shiladi
-// Ichma-ich kasr: chiqgan formulani belgilab, yana a/b bosing → surat bo'ladi
-function insFraction(){
-  var ta=document.getElementById('aq-text');
-  var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
-  var preNum=sel?stripMathDelim(sel):'';
+
+function renderChipKatex(span, latex){
+  span.dataset.latex=latex;
+  try{
+    if(typeof katex!=='undefined'){ katex.render(latex, span, {throwOnError:false}); }
+    else { span.textContent='$'+latex+'$'; }
+  }catch(e){ span.textContent='$'+latex+'$'; }
+}
+function makeChip(latex){
+  var span=document.createElement('span');
+  span.className='mfrag';
+  span.setAttribute('contenteditable','false');
+  span.title="Tahrirlash uchun ikki marta bosing";
+  span.ondblclick=function(e){ e.stopPropagation(); e.preventDefault(); openEditChipPanel(span); };
+  renderChipKatex(span, latex);
+  return span;
+}
+function setChipLatex(chip, latex){ renderChipKatex(chip, latex); }
+
+// Matn (masalan DB'dan kelgan "...text $\frac{1}{2}$ text...") ni
+// contenteditable DIV ichiga, formulalarni chip qilib, chizib qo'yadi
+function mathEditSetValue(el, text){
+  if(!el) return;
+  el.innerHTML='';
+  text=text||'';
+  var re=/\$([^$]+)\$/g, lastIdx=0, m;
+  while((m=re.exec(text))){
+    if(m.index>lastIdx) el.appendChild(document.createTextNode(text.slice(lastIdx,m.index)));
+    el.appendChild(makeChip(m[1]));
+    lastIdx=re.lastIndex;
+  }
+  if(lastIdx<text.length) el.appendChild(document.createTextNode(text.slice(lastIdx)));
+}
+// Contenteditable DIV ichidagi holatni yana "...text $latex$ text..."
+// ko'rinishidagi xom matnga qaytaradi — saqlash formatining eskisi bilan
+// 100% mos, boshqa hech qanday joyni o'zgartirish shart emas
+function mathEditGetLatexString(el){
+  if(!el) return '';
+  var out='';
+  function walk(node){
+    node.childNodes.forEach(function(n){
+      if(n.nodeType===3){ out+=n.textContent.replace(/\u200b/g,''); }
+      else if(n.nodeType===1){
+        if(n.classList && n.classList.contains('mfrag')){ out+='$'+(n.dataset.latex||'')+'$'; }
+        else if(n.tagName==='BR'){ out+='\n'; }
+        else { if(out && out.charAt(out.length-1)!=='\n') out+='\n'; walk(n); }
+      }
+    });
+  }
+  walk(el);
+  return out;
+}
+
+// Kursor turgan joyga (yoki tahrirlanayotgan chip o'rniga) formula qo'yadi
+function insLatex(latex){
+  if(_mhEditChip && _mhEditChip.parentNode){
+    setChipLatex(_mhEditChip, latex);
+    _mhEditChip=null;
+    return;
+  }
+  var el=aqTextEl();
+  el.focus();
+  var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer)) ? _aqSavedRange.cloneRange() : getEndRange(el);
+  try{ range.deleteContents(); }catch(e){}
+  var chip=makeChip(latex);
+  range.insertNode(chip);
+  var sp=document.createTextNode('\u200b'); // formuladan keyin yozishni davom ettirish uchun
+  if(chip.nextSibling) chip.parentNode.insertBefore(sp, chip.nextSibling);
+  else chip.parentNode.appendChild(sp);
+  var nr=document.createRange(); nr.setStart(sp,1); nr.collapse(true);
+  var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(nr);
+  _aqSavedRange=nr.cloneRange();
+}
+function insSym(s){
+  var el=aqTextEl(); el.focus();
+  var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer)) ? _aqSavedRange.cloneRange() : getEndRange(el);
+  try{ range.deleteContents(); }catch(e){}
+  var tn=document.createTextNode(s);
+  range.insertNode(tn);
+  var nr=document.createRange(); nr.setStartAfter(tn); nr.collapse(true);
+  var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(nr);
+  _aqSavedRange=nr.cloneRange();
+}
+function insWrapAny(){
+  var el=aqTextEl();
+  var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer) && !_aqSavedRange.collapsed) ? _aqSavedRange.cloneRange() : null;
+  if(!range){ insSym('()'); return; }
+  var frag=range.extractContents();
+  var wrap=document.createDocumentFragment();
+  wrap.appendChild(document.createTextNode('('));
+  wrap.appendChild(frag);
+  wrap.appendChild(document.createTextNode(')'));
+  range.insertNode(wrap);
+  el.focus();
+}
+
+// ➗ KASR paneli (surat/mahraj) — endi har bir maydon yonida yana bitta ➗
+// tugma bor: maydon ichida biror qism belgilansa (select), o'sha qism
+// avtomatik ICHMA-ICH kasrga aylanadi (KaTeX buni o'zi kichikroq chizadi,
+// qo'shimcha hisob-kitob kerak emas)
+function openFracPanel(preNum, preDen){
+  preNum=preNum||''; preDen=preDen||'';
   var panel=document.getElementById('math-helper-panel');
   if(!panel){
     panel=document.createElement('div');
@@ -1730,38 +1946,48 @@ function insFraction(){
     panel.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid var(--pri);padding:14px 16px 20px;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)';
     document.body.appendChild(panel);
   }
-  // Kasr uchun soddalashtirilgan UI — faqat ikkita input, label yo'q
   panel.innerHTML=
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
       '<span style="font-size:15px;font-weight:700">➗ Kasr</span>'+
       '<button onclick="_mhClose()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#888">✕</button>'+
     '</div>'+
     '<div style="display:flex;flex-direction:column;align-items:center;gap:0;background:#f8f9fc;border-radius:10px;padding:12px;margin-bottom:12px">'+
-      '<input id="mh-num" type="text" value="'+preNum+'" placeholder="Surat (ustki)" '+
-        'style="width:100%;padding:10px;border:1.5px solid var(--pri);border-radius:8px;font-size:16px;font-family:monospace;text-align:center;margin-bottom:6px">'+
+      '<div style="display:flex;width:100%;gap:6px;margin-bottom:6px">'+
+        '<input id="mh-num" type="text" value="'+preNum.replace(/"/g,'&quot;')+'" placeholder="Surat (ustki)" style="flex:1;padding:10px;border:1.5px solid var(--pri);border-radius:8px;font-size:16px;font-family:monospace;text-align:center">'+
+        '<button type="button" onclick="wrapFracField(\'mh-num\')" title="Belgilangan qismni ichma-ich kasr qiladi" style="padding:0 12px;border:1.5px solid var(--bdr);border-radius:8px;background:#fff;cursor:pointer;font-size:15px">➗</button>'+
+      '</div>'+
       '<div style="width:80%;height:2px;background:#333;border-radius:2px;margin:2px 0"></div>'+
-      '<input id="mh-den" type="text" placeholder="Mahraj (pastki)" '+
-        'style="width:100%;padding:10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:16px;font-family:monospace;text-align:center;margin-top:6px">'+
+      '<div style="display:flex;width:100%;gap:6px;margin-top:6px">'+
+        '<input id="mh-den" type="text" value="'+preDen.replace(/"/g,'&quot;')+'" placeholder="Mahraj (pastki)" style="flex:1;padding:10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:16px;font-family:monospace;text-align:center">'+
+        '<button type="button" onclick="wrapFracField(\'mh-den\')" title="Belgilangan qismni ichma-ich kasr qiladi" style="padding:0 12px;border:1.5px solid var(--bdr);border-radius:8px;background:#fff;cursor:pointer;font-size:15px">➗</button>'+
+      '</div>'+
     '</div>'+
+    '<div class="ts tm" style="margin-bottom:10px">💡 Ichma-ich kasr: maydon ichida kerakli qismni belgilang, so\'ng shu maydon yonidagi ➗ tugmasini bosing.</div>'+
     '<div style="display:flex;gap:8px">'+
       '<button onclick="_fracApply()" style="flex:1;padding:10px;background:var(--pri);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer">✓ Qo\'shish</button>'+
       '<button onclick="_mhClose()" style="padding:10px 16px;background:#f1f5f9;border:none;border-radius:9px;font-size:14px;cursor:pointer">Bekor</button>'+
     '</div>';
   _mhPending={type:'frac'};
-  // Surat maydoniga darhol fokus
   setTimeout(function(){
     var numEl=document.getElementById('mh-num');
-    if(numEl){ numEl.focus(); if(preNum){numEl.select();} }
-    // Surat → Enter → mahraj
+    if(numEl){ numEl.focus(); if(preNum) numEl.select(); }
     var denEl=document.getElementById('mh-den');
-    if(numEl) numEl.addEventListener('keydown',function(e){
-      if(e.key==='Enter'){e.preventDefault();if(denEl)denEl.focus();}
-    });
-    if(denEl) denEl.addEventListener('keydown',function(e){
-      if(e.key==='Enter'){e.preventDefault();_fracApply();}
-    });
+    if(numEl) numEl.addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();if(denEl)denEl.focus();} });
+    if(denEl) denEl.addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();_fracApply();} });
   },60);
 }
+function wrapFracField(id){
+  var el=document.getElementById(id);
+  if(!el) return;
+  var st=el.selectionStart, en=el.selectionEnd;
+  if(st===en){ alert("Avval o'sha maydon ichida kerakli qismni belgilang (select qiling)."); el.focus(); return; }
+  var v=el.value, sel=v.slice(st,en);
+  var inserted='\\frac{'+sel+'}{';
+  el.value=v.slice(0,st)+inserted+'}'+v.slice(en);
+  var newPos=st+inserted.length;
+  el.focus(); el.setSelectionRange(newPos,newPos);
+}
+function insFraction(){ _mhEditChip=null; openFracPanel(getAqSelectionForPrefill(), ''); }
 function _fracApply(){
   var num=(document.getElementById('mh-num')||{}).value||'';
   var den=(document.getElementById('mh-den')||{}).value||'';
@@ -1771,9 +1997,8 @@ function _fracApply(){
 }
 // ILDIZ - inline panel orqali
 function insNthRoot(){
-  var ta=document.getElementById('aq-text');
-  var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
-  var preContent=sel?stripMathDelim(sel):'';
+  _mhEditChip=null;
+  var preContent=getAqSelectionForPrefill();
   _mhShow({
     type:'root', title:'√ Ildiz',
     fields:[
@@ -1783,9 +2008,8 @@ function insNthRoot(){
   });
 }
 function insRootQuick(n){
-  var ta=document.getElementById('aq-text');
-  var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
-  var content=sel?stripMathDelim(sel):'';
+  _mhEditChip=null;
+  var content=getAqSelectionForPrefill();
   if(content){
     insLatex(n?('\\sqrt['+n+']{'+content+'}'):('\\sqrt{'+content+'}'));
   } else {
@@ -1801,9 +2025,8 @@ function insRootQuick(n){
 // DARAJA - inline panel orqali, daraja ustiga daraja ham yoziladi:
 // avvalgi natijani belgilab (select qilib), yana xⁿ tugmasini bosish yetarli
 function insCustomExp(){
-  var ta=document.getElementById('aq-text');
-  var sel=ta.value.slice(ta.selectionStart,ta.selectionEnd);
-  var preBase=sel?stripMathDelim(sel):'';
+  _mhEditChip=null;
+  var preBase=getAqSelectionForPrefill();
   _mhShow({
     type:'exp', title:'xⁿ Daraja',
     fields:[
@@ -1812,19 +2035,74 @@ function insCustomExp(){
     ]
   });
 }
-function updateMathPreview(){
-  var ta=document.getElementById('aq-text');
-  var prev=document.getElementById('aq-preview');
-  if(!ta||!prev)return;
-  var txt=ta.value;
-  if(!txt.trim()){prev.style.display='none';return;}
-  prev.style.display='block';
-  // MUHIM: textContent emas innerHTML orqali o'rnatiladi - aks holda KaTeX
-  // belgilari render bo'lmay, oddiy matn sifatida ko'rinib qoladi.
-  // Xavfsizlik: foydalanuvchi o'z savoliga o'zi yozayapti, XSS xavfi yo'q.
-  prev.innerHTML=txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  renderMathIn(prev);
+
+// Mavjud formula-chipni ikki marta bosganda — qayta tahrirlash.
+// Oddiy kasr/ildiz/daraja bo'lsa mos panelga aynan shu qiymatlar bilan
+// qaytadan ochiladi; murakkab/ichma-ich formula bo'lsa xom LaTeX ko'rinishida
+// (kamdan-kam kerak bo'ladigan, ilg'or foydalanuvchilar uchun) tahrirlanadi.
+function matchBrace(str, openIdx){
+  var depth=0;
+  for(var i=openIdx;i<str.length;i++){
+    if(str[i]==='{') depth++;
+    else if(str[i]==='}'){ depth--; if(depth===0) return i; }
+  }
+  return -1;
 }
+function parseLatexForEdit(latex){
+  latex=(latex||'').trim();
+  try{
+    if(latex.indexOf('\\frac{')===0){
+      var o1=5, c1=matchBrace(latex,o1);
+      if(c1<0||latex[c1+1]!=='{') return null;
+      var o2=c1+1, c2=matchBrace(latex,o2);
+      if(c2<0||c2!==latex.length-1) return null;
+      return {type:'frac', num:latex.slice(o1+1,c1), den:latex.slice(o2+1,c2)};
+    }
+    if(latex.indexOf('\\sqrt[')===0){
+      var ci=latex.indexOf(']');
+      if(ci<0||latex[ci+1]!=='{') return null;
+      var o=ci+1, c=matchBrace(latex,o);
+      if(c<0||c!==latex.length-1) return null;
+      return {type:'root', content:latex.slice(o+1,c), deg:latex.slice(6,ci)};
+    }
+    if(latex.indexOf('\\sqrt{')===0){
+      var o3=5, c3=matchBrace(latex,o3);
+      if(c3<0||c3!==latex.length-1) return null;
+      return {type:'root', content:latex.slice(o3+1,c3), deg:''};
+    }
+    var ei=latex.indexOf('^{');
+    if(ei>0){
+      var c4=matchBrace(latex,ei+1);
+      if(c4===latex.length-1) return {type:'exp', base:latex.slice(0,ei), exp:latex.slice(ei+2,c4)};
+    }
+  }catch(e){}
+  return null;
+}
+function openEditChipPanel(chip){
+  _mhEditChip=chip;
+  var latex=chip.dataset.latex||'';
+  var parsed=parseLatexForEdit(latex);
+  if(parsed && parsed.type==='frac'){ openFracPanel(parsed.num, parsed.den); return; }
+  if(parsed && parsed.type==='root'){
+    _mhShow({type:'root', title:'√ Ildizni tahrirlash', fields:[
+      {id:'content',label:'Ildiz ostidagi ifoda',ph:'',val:parsed.content},
+      {id:'deg',label:'Daraja (bo\'sh = kvadrat ildiz)',ph:'',val:parsed.deg}
+    ]});
+    return;
+  }
+  if(parsed && parsed.type==='exp'){
+    _mhShow({type:'exp', title:'xⁿ Darajani tahrirlash', fields:[
+      {id:'base',label:'Asos',ph:'',val:parsed.base},
+      {id:'exp',label:'Daraja ko\'rsatkichi',ph:'',val:parsed.exp}
+    ]});
+    return;
+  }
+  _mhShow({type:'raw', title:'Formulani tahrirlash (LaTeX)', fields:[
+    {id:'raw',label:'LaTeX kodi',ph:'',val:latex}
+  ]});
+}
+// ═══════════════════════════════════════════════════════════════════════
+
 function renderMathIn(el){
   if(!el||typeof renderMathInElement!=='function')return;
   try{
@@ -3552,7 +3830,7 @@ function closeEditQ(){
 function openAddQ(){
   aqOpts=['','','',''];aqCorr=[];aqIsM=false;_aqImgData=null;
   document.getElementById('aq-topic').value=_curQFolder?'':'';
-  document.getElementById('aq-text').value='';
+  mathEditSetValue(document.getElementById('aq-text'), '');
   document.getElementById('aq-qcount').value='';
   var imgPrev=document.getElementById('aq-img-preview');
   var imgInp=document.getElementById('aq-img-inp');
@@ -3590,17 +3868,13 @@ function tgC(i){var x=aqCorr.indexOf(i);if(x>=0)aqCorr.splice(x,1);else aqCorr.p
 function stC(i){aqCorr=[i];renderAQO();}
 function addOpt(){aqOpts.push('');renderAQO();}
 function rmO(i){aqOpts.splice(i,1);aqCorr=aqCorr.filter(function(c){return c!==i;}).map(function(c){return c>i?c-1:c;});renderAQO();}
-function insSym(s){var ta=document.getElementById('aq-text');var st=ta.selectionStart,en=ta.selectionEnd;ta.value=ta.value.slice(0,st)+s+ta.value.slice(en);ta.selectionStart=ta.selectionEnd=st+s.length;ta.focus();}
-function insWrapAny(){
-  var ta=document.getElementById('aq-text');
-  var st=ta.selectionStart,en=ta.selectionEnd;
-  var sel=ta.value.slice(st,en);
-  ta.value=ta.value.slice(0,st)+'('+sel+')'+ta.value.slice(en);
-  ta.selectionStart=st+1;ta.selectionEnd=st+1+sel.length;
-  ta.focus();
-}
+// (insSym va insWrapAny endi yuqorida, WYSIWYG formula muharriri blokida
+// contenteditable #aq-text uchun to'g'ri yozilgan — bu yerdagi eski,
+// <textarea>.value ga mo'ljallangan nusxalar 2026-09-18'da olib tashlandi,
+// aks holda ular pastda turgani uchun yuqoridagi to'g'ri versiyalarni
+// "bosib" qo'yib, eski xatoni qaytarardi.)
 function saveQ(){
-  var topic=document.getElementById('aq-topic').value.trim(),text=document.getElementById('aq-text').value.trim(),subj=document.getElementById('aq-subj').value,qcount=parseInt(document.getElementById('aq-qcount').value)||null;
+  var topic=document.getElementById('aq-topic').value.trim(),text=mathEditGetLatexString(document.getElementById('aq-text')).trim(),subj=document.getElementById('aq-subj').value,qcount=parseInt(document.getElementById('aq-qcount').value)||null;
   if(!topic){alert("Mavzu kiriting!");return;}if(!text){alert("Savol matnini kiriting!");return;}
   var opts=aqOpts.filter(function(o){return o.trim();});if(opts.length<2){alert("Kamida 2 ta variant!");return;}if(!aqCorr.length){alert("To'g'ri javobni belgilang!");return;}
   var q={id:Date.now(),subject:subj,topic:topic,text:text,options:opts,correct:aqCorr.filter(function(c){return c<opts.length;}),isMulti:aqIsM,teacherId:ME.id};
@@ -5270,42 +5544,49 @@ async function distributedExeImport(files, folderName, msg){
 }
 
 async function saveImportedQs(parsed,msg){
-  // MUHIM: mavzu nomi tekshiruvi ENDI birinchi bo'lib ishlaydi - aks holda
-  // "Bekor qilish" (yangi mavzu sifatida saqlash) tanlansa ham, har bir
-  // savolga ESKI nom allaqachon yozib bo'lingan bo'lib qolar edi.
-  // 2026-08-18 TUZATISH: avval bu yerda confirm() BLOKLOVCHI dialog chiqarardi.
-  // Ko'p faylli (masalan 16 ta) import paytida, agar 2+ fayldan bir xil
-  // nomli mavzu chiqsa, har birida shu savol so'ralardi. Agar shu payt
-  // TUZATISH (2026-08-31): oldin BITTA fayl import qilinganda hali ham
-  // confirm() so'rovi chiqardi ("Yangilash yoki yangi saqlash?"). Agar
-  // foydalanuvchi shoshilib yoki odatiga ko'ra "OK" (=Yangilash, eskisini
-  // BUTUNLAY OCHIRIB, ustidan yozish) bossa - o'quvchining ismi o'zgargan
-  // bo'lsa-yu, tasodifan eski fayl bilan bir xil nomda saqlangan bo'lsa,
-  // ESKI MAVZU BUTUNLAY YO'QOLIB KETARDI. Bu juda xavfli va qaytarib
-  // bo'lmas edi. Endi HECH QACHON so'ralmaydi va HECH QACHON ustidan
-  // yozilmaydi - har doim avtomatik noyob nom beriladi (masalan "Mavzu (2)"),
-  // hech narsa yo'qolmaydi. Agar chindan eski mavzuni yangilamoqchi bo'lsa,
-  // buni FAQAT "Savollar" bo'limida o'sha mavzuni ochirib, keyin qayta
-  // import qilish orqali ataylab qilish mumkin.
-  var _dbCheck=getDB();
-  var topicExists=(_dbCheck.userQs||[]).some(function(q){return q.topic===parsed.topic&&q.teacherId===ME.id;});
-  if(topicExists){
-    parsed.topic=uniqueTopicName(parsed.topic);
-  }
-
-  // MUHIM: har bir savolga GLOBAL nodir ID beramiz (bir nechta mavzu
-  // import qilinganda ID lar takrorlanib qolmasligi uchun)
+  // MUHIM YANGILANISH (2026-09-19): avval bir xil nomli mavzu import
+  // qilinsa, avtomatik "Mavzu (2)" kabi NOYOB nomga o'tkazilardi - bu 2 ta
+  // bir xil testni yaratardi. Endi mavzu allaqachon mavjud bo'lsa, savollar
+  // MOS TOPILADI: agar savolda RASM bo'lsa - rasm MAZMUNI (perceptual hash
+  // orqali, tarmoqqa chiqmasdan, xotirada) solishtiriladi - bu ENG ANIQ
+  // usul, chunki "Hisoblang. 40 ta son bor." kabi bir xil matnli 10+ ta
+  // savol bitta mavzuda bo'lishi mumkin, ularni faqat RASM (formula)ning
+  // o'zi farqlaydi. Rasm bo'lmasa - matn o'xshashligi (bo'shliq/tinish
+  // belgisi farqiga chidamli) ishlatiladi. Mos savol topilib, javob/variant
+  // bir xil bo'lsa - TEGILMAYDI; boshqacha bo'lsa - O'SHA savol (eski ID
+  // saqlangan holda) YANGILANADI; mos topilmasa - YANGI qo'shiladi.
   parsed.qs.forEach(function(q,idx){
     q.id=Date.now()+'_'+idx+'_'+Math.random().toString(36).slice(2,8);
     q.teacherId=ME.id;
     q.topic=parsed.topic;
-    // Fan: _fpOverrideSubject tanlangan bo'lsa shu fan, aks holda o'z fani
     if(window._fpOverrideSubject){
       q.subject=window._fpOverrideSubject;
     } else if(!q.subject){
       q.subject=ME.subject||'math';
     }
   });
+
+  // Rasm-asosli savollarni ANIQ farqlash uchun - har biriga tez (perceptual)
+  // hash hisoblab qo'yamiz. Bu FAQAT xotirada (hali R2'ga yuklanmagan
+  // data: URL ustida) ishlaydi - hech qanday tarmoq so'rovi ketmaydi,
+  // shuning uchun 10-100+ savol bo'lsa ham bir necha soniyada tugaydi.
+  var imgQs=parsed.qs.filter(function(q){return q.img;});
+  if(imgQs.length){
+    msg.innerHTML='<div class="alt ai">&#x1F50D; '+imgQs.length+' ta rasm solishtirish uchun tahlil qilinmoqda...</div>';
+    await Promise.all(imgQs.map(async function(q){
+      try{ q._imgHash=await computeImageDHash(q.img); }catch(e){}
+    }));
+  }
+
+  var db=getDB();
+  db.userQs=db.userQs||[];
+  var existingTopicQs=db.userQs.filter(function(q){return q.topic===parsed.topic&&q.teacherId===ME.id;});
+  var plan=existingTopicQs.length?computeMergePlan(existingTopicQs,parsed.qs):{pairs:[],newOnes:parsed.qs,unchanged:0};
+
+  if(existingTopicQs.length && !plan.pairs.length && !plan.newOnes.length){
+    msg.innerHTML='<div class="alt ai">&#x2139;&#xFE0F; "<b>'+parsed.topic+'</b>" testi allaqachon mavjud va hech narsa o\'zgarmagan - qayta import qilish shart emas.</div>';
+    return;
+  }
 
   // Rasmlarni Supabase Storage'ga yuklab, asosiy JSON ichida
   // faqat qisqa havolalarni qoldiramiz (localStorage/Supabase
@@ -5326,17 +5607,146 @@ async function saveImportedQs(parsed,msg){
     }
   }
 
-  var db=getDB();
-  db.userQs=db.userQs||[];
-  db.userQs=db.userQs.filter(function(q){return !(q.topic===parsed.topic&&q.teacherId===ME.id);});
-  db.userQs=db.userQs.concat(parsed.qs);
+  // Rasm-yuklashdan KEYIN (haqiqiy R2/Storage havolalari tayyor bo'lgach)
+  // moslashtirilgan juftliklarni haqiqiy DB'dagi eski savolga tatbiq qilamiz
+  plan.pairs.forEach(function(p){
+    p.old.options=p.nq.options;
+    p.old.correct=p.nq.correct;
+    p.old.isMulti=p.nq.isMulti;
+    if(p.nq.img) p.old.img=p.nq.img;
+    if(p.nq._imgHash) p.old._imgHash=p.nq._imgHash;
+    if(p.nq.text) p.old.text=p.nq.text;
+  });
+  db.userQs=db.userQs.concat(plan.newOnes); // faqat haqiqatan YANGI savollar qo'shiladi
+
   db.topicsMeta=db.topicsMeta||[];
   var f=false;
-  db.topicsMeta.forEach(function(m){if(m.topic===parsed.topic&&m.teacherId===ME.id){m.questionsToAsk=parsed.questionsToAsk;if(_pendingImportFolder)m.folder=_pendingImportFolder;f=true;}});
+  db.topicsMeta.forEach(function(m){if(m.topic===parsed.topic&&m.teacherId===ME.id){if(_pendingImportFolder)m.folder=_pendingImportFolder;f=true;}});
   if(!f)db.topicsMeta.push({topic:parsed.topic,questionsToAsk:parsed.questionsToAsk,teacherId:ME.id,subject:ME.subject||'math',folder:_pendingImportFolder||undefined});
   saveDB(db);renderQT();
-  var imgCount=(parsed.qs||[]).filter(function(q){return q.img;}).length;
-  msg.innerHTML='<div class="alt as">&#x2705; <strong>'+parsed.qs.length+' ta savol</strong>'+(imgCount?' ('+imgCount+' ta rasm bilan)':'')+' import qilindi: "<b>'+parsed.topic+'</b>" ('+parsed.questionsToAsk+' ta beriladi)</div>';
+
+  if(existingTopicQs.length){
+    var parts=[];
+    if(plan.newOnes.length) parts.push(plan.newOnes.length+' ta yangi savol qo\'shildi');
+    if(plan.pairs.length) parts.push(plan.pairs.length+' ta savolning javobi/varianti yangilandi');
+    var tail=plan.unchanged?(' ('+plan.unchanged+' ta o\'zgarishsiz qoldi)'):'';
+    msg.innerHTML='<div class="alt as">&#x2705; "<b>'+parsed.topic+'</b>" yangilandi: '+(parts.length?parts.join(', '):'o\'zgarish yo\'q')+tail+'.</div>';
+  } else {
+    var imgCount=(parsed.qs||[]).filter(function(q){return q.img;}).length;
+    msg.innerHTML='<div class="alt as">&#x2705; <strong>'+parsed.qs.length+' ta savol</strong>'+(imgCount?' ('+imgCount+' ta rasm bilan)':'')+' import qilindi: "<b>'+parsed.topic+'</b>" ('+parsed.questionsToAsk+' ta beriladi)</div>';
+  }
+}
+// Ikki savolni MOS deb topish endi ANIQ matn tengligiga emas, balki
+// O'XSHASHLIK DARAJASIGA (bigram/Dice koeffitsienti) asoslanadi - shunda
+// AI bir xil faylni ikkinchi marta o'qib, bo'shliq/tinish belgisi/kichik
+// so'z tartibi farqi bilan chiqarsa ham, savol baribir TOPILADI (avvalgi
+// "aniq mos kelishi kerak" cheklovi shu bilan bartaraf etildi). Savol
+// matni bo'sh (faqat rasm) bo'lsa, variantlar matni ham hisobga olinadi -
+// shunda rasm-asosli savollar ham (agar variantlari matn bo'lsa) mos
+// topiladi. Rasm-maydonlarning o'zi hech qachon solishtirilmaydi (har
+// safar yuklashda yangi Storage-havola olinadi).
+function _bigrams(s){
+  s=(s||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
+  var set={};
+  for(var i=0;i<s.length-1;i++){ set[s.substr(i,2)]=true; }
+  return set;
+}
+function _diceSim(a,b){
+  var A=_bigrams(a), B=_bigrams(b);
+  var keysA=Object.keys(A), keysB=Object.keys(B);
+  if(!keysA.length || !keysB.length) return 0; // ikkalasi ham "boshqa signal"siz bo'lsa - mos deb topilmaydi (xavfsizroq)
+  var inter=0;
+  keysA.forEach(function(k){ if(B[k]) inter++; });
+  return (2*inter)/(keysA.length+keysB.length);
+}
+function _isImgOptVal(s){ return typeof s==='string' && (s.indexOf('data:image')===0 || s.indexOf('http://')===0 || s.indexOf('https://')===0); }
+function _compareKeyOf(q){
+  var optsText=(q.options||[]).filter(function(o){return !_isImgOptVal(o);}).join(' ');
+  return ((q.text||'')+' '+optsText).trim();
+}
+function _optsRoughlyEqual(a,b){
+  a=a||[]; b=b||[];
+  if(a.length!==b.length) return false;
+  for(var i=0;i<a.length;i++){
+    if(_isImgOptVal(a[i])||_isImgOptVal(b[i])) continue; // rasm - solishtirilmaydi
+    if((a[i]||'').trim()!==(b[i]||'').trim()) return false;
+  }
+  return true;
+}
+var SIM_THRESHOLD=0.82; // shundan yuqori matn-o'xshashligi - "bir xil savol" deb hisoblanadi
+var IMG_HASH_MAX_DIST=6; // 64 bitdan shu qadar farq bolsa ham - "aynan shu rasm" deb hisoblanadi
+function _hamming(a,b){
+  if(!a||!b||a.length!==b.length) return 64;
+  var d=0;
+  for(var i=0;i<a.length;i++) if(a[i]!==b[i]) d++;
+  return d;
+}
+// Rasmning tez (perceptual) "difference hash"ini hisoblaydi - 64 bitli
+// '0'/'1' satr. Bu ODDIY baytlarni emas, RASM KO'RINISHINI hisobga oladi,
+// shuning uchun qayta yuklanganda (R2'ga saqlashda) bir necha bayt ozgarsa
+// ham (siqilish farqi va h.k.) natija baribir bir xil chiqadi. Butunlay
+// xotirada ishlaydi (tarmoqqa chiqmaydi) - juda tez, 100+ rasm bolsa ham
+// bir necha soniyada tugaydi.
+async function computeImageDHash(dataUrl){
+  var blob=await (await fetch(dataUrl)).blob();
+  var bitmap=await createImageBitmap(blob);
+  var w=9, h=8; // 9x8 kulrang -> qoshni piksellar solishtirilib 8x8=64 bit chiqadi
+  var canvas=document.createElement('canvas');
+  canvas.width=w; canvas.height=h;
+  var ctx=canvas.getContext('2d', {willReadFrequently:true});
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  var data=ctx.getImageData(0,0,w,h).data;
+  if(bitmap.close) bitmap.close();
+  var gray=[];
+  for(var i=0;i<w*h;i++){
+    gray.push(0.299*data[i*4]+0.587*data[i*4+1]+0.114*data[i*4+2]);
+  }
+  var bits='';
+  for(var yy=0; yy<h; yy++){
+    for(var xx=0; xx<w-1; xx++){
+      var idx=yy*w+xx;
+      bits += (gray[idx] < gray[idx+1]) ? '1' : '0';
+    }
+  }
+  return bits;
+}
+function computeMergePlan(existingQs, newQs){
+  var pool=existingQs.slice(); // hali mos topilmagan eski savollar shu yerda qoladi
+  var pairs=[], newOnes=[], unchanged=0;
+  newQs.forEach(function(nq){
+    var matched=null;
+    if(nq._imgHash){
+      // 1-BOSQICH: rasm bor - MATNGA QARAMASDAN, faqat rasm mazmuni
+      // (hash) boyicha eng yaqin nomzodni qidiramiz. Shu bilan "Hisoblang.
+      // 40 ta son bor." kabi bir xil matnli, lekin har xil formula-rasmli
+      // 10+ savol ham TOGRI (ozining aynan rasmiga qarab) moslashadi.
+      var bestDist=999, bestI=-1;
+      for(var i=0;i<pool.length;i++){
+        if(pool[i]._imgHash){
+          var d=_hamming(nq._imgHash, pool[i]._imgHash);
+          if(d<bestDist){ bestDist=d; bestI=i; }
+        }
+      }
+      if(bestI>=0 && bestDist<=IMG_HASH_MAX_DIST){ matched=pool.splice(bestI,1)[0]; }
+    }
+    if(!matched){
+      // 2-BOSQICH: rasm yoq (yoki eski savolda hali hash yoq - eski
+      // ma'lumot) - matn o'xshashligiga tayanamiz
+      var bestScore=0, bestJ=-1;
+      for(var j=0;j<pool.length;j++){
+        var sc=_diceSim(_compareKeyOf(nq), _compareKeyOf(pool[j]));
+        if(sc>bestScore){ bestScore=sc; bestJ=j; }
+      }
+      if(bestJ>=0 && bestScore>=SIM_THRESHOLD){ matched=pool.splice(bestJ,1)[0]; }
+    }
+    if(!matched){ newOnes.push(nq); return; }
+    var correctSame=JSON.stringify((matched.correct||[]).slice().sort())===JSON.stringify((nq.correct||[]).slice().sort());
+    var optsSame=_optsRoughlyEqual(matched.options,nq.options);
+    var multiSame=!!matched.isMulti===!!nq.isMulti;
+    if(correctSame&&optsSame&&multiSame){ unchanged++; }
+    else { pairs.push({old:matched,nq:nq}); }
+  });
+  return {pairs:pairs, newOnes:newOnes, unchanged:unchanged};
 }
 
 async function importViaBrowser(data,msg){
@@ -5499,8 +5909,24 @@ function fpSetSubj(subj, el){
   all.forEach(function(b){b.classList.remove('on');});
   if(el) el.classList.add('on');
 }
-function closeFP(){document.getElementById('fp-modal').style.display='none';_fpPendingFile=null;}
+function closeFP(){document.getElementById('fp-modal').style.display='none';_fpPendingFile=null;_fpBatch=null;}
 function submitFP(folderName,isNew){
+  if(_fpMode==='batch'){
+    if(isNew){
+      folderName=(document.getElementById('fp-newname').value||'').trim();
+      if(!folderName){alert('Fayl nomini kiriting!');return;}
+    }
+    document.getElementById('fp-modal').style.display='none';
+    window._fpOverrideSubject=_pendingImportSubject||null;
+    _pendingImportSubject=null;
+    var batch=_fpBatch; _fpBatch=null;
+    if(!batch) return;
+    _pendingImportFolder=folderName;
+    if(batch.imgFiles.length) importImageFiles(batch.imgFiles, folderName, batch.unsupportedNote);
+    if(batch.docFiles.length) importDocumentFiles(batch.docFiles, folderName, batch.unsupportedNote);
+    if(batch.exeFiles.length){ warmUpImportServers(); distributedExeImport(batch.exeFiles, folderName, document.getElementById('imp-msg')); }
+    return;
+  }
   var file=_fpPendingFile;
   if(!file)return;
   if(isNew){
@@ -5599,37 +6025,52 @@ function importMultipleFiles(files,suggestedFolder){
     return;
   }
   var unsupportedNote=unsupported.length?(' ('+unsupported.length+' ta qollab-quvvatlanmaydigan fayl otkazib yuborildi)'):'';
-  // Word/PDF/TXT fayllar - alohida, sodda (AI asosidagi) oqim orqali
-  if(docFiles.length){
-    importDocumentFiles(docFiles, suggestedFolder, unsupportedNote);
-  }
-  // Rasm (foto) fayllar - Vision AI orqali
-  if(imgFiles.length){
-    importImageFiles(imgFiles, suggestedFolder, unsupportedNote);
-  }
-  // .exe fayllar - mavjud, EMF/LibreOffice asosidagi murakkab oqim orqali
-  if(!exeFiles.length) return;
-  valid=exeFiles; // pastdagi mavjud mantiq shu ozgaruvchini ishlatadi
-  if(valid.length===1 && !suggestedFolder && !docFiles.length){
-    askFolderThenImport(valid[0]);
+
+  // TUZATISH (2026-09-18): avval faqat BITTA fayl tashlanganda fan (subject)
+  // so'rov oynasi (fp-modal) chiqar, ko'p fayl/papka tashlanganda esa bu
+  // qadam butunlay o'tkazib yuborilar edi - natijada import har doim
+  // ustozning o'z faniga yozilardi. Endi 1 ta ham, 10 ta ham bir xil - har
+  // doim fan+papka so'raladi.
+  var totalCount=exeFiles.length+docFiles.length+imgFiles.length;
+  if(totalCount===1 && !suggestedFolder){
+    askFolderThenImport((docFiles[0]||imgFiles[0]||exeFiles[0]));
     return;
   }
-  var defaultName=suggestedFolder||valid[0].name.replace(/\.exe$/i,'').replace(/[\s_-]*\d+$/,'')||'Kitob 1';
-  var folderName=suggestedFolder||prompt('Bu '+valid.length+' ta .exe faylni bitta "kitob" nomiga birlashtiramiz.\nKitob nomini tasdiqlang yoki ozgartiring:', defaultName);
-  if(folderName===null)return; // bekor qilindi
-  folderName=folderName.trim()||'Kitob';
-
-  // Import boshlanishi bilan darhol BARCHA import-serverlarni parallel
-  // uygotamiz - shunda ular birinchi haqiqiy fayl kelguncha allaqachon
-  // tayyor boladi (cold-start kechikishi keyingi bosqichlarga qoshilmaydi)
-  warmUpImportServers();
-
-  // YANGI (2026-08): fayllar endi ALOHIDA-ALOHIDA serverlarga "qattiq"
-  // biriktirilmaydi. Avval XML ochiladi (tez), keyin BARCHA formula/rasm
-  // (EMF) vazifalari BITTA umumiy navbatga yigiladi va SERVER_POOL'dagi
-  // hamma serverga bir vaqtda, ularning tezligiga (weight) qarab
-  // tarqatiladi - distributedExeImport() shu ishni bajaradi.
-  distributedExeImport(valid, folderName, msg);
+  askFolderThenImportBatch(exeFiles, docFiles, imgFiles, suggestedFolder, unsupportedNote);
+}
+// Bir nechta (yoki aralash turdagi) fayl uchun ham fp-modal orqali FAN va
+// PAPKA so'raladi, so'ng har bir turdagi fayl o'zining parallel importeriga
+// (SERVER_POOL bo'yicha taqsimlangan holda) yuboriladi.
+var _fpBatch=null;
+function askFolderThenImportBatch(exeFiles, docFiles, imgFiles, suggestedFolder, unsupportedNote){
+  _fpMode='batch';
+  _fpBatch={exeFiles:exeFiles||[], docFiles:docFiles||[], imgFiles:imgFiles||[], unsupportedNote:unsupportedNote||''};
+  _pendingImportSubject=null;
+  var subjBox=document.getElementById('fp-subj-list');
+  if(subjBox){
+    var mySubj=ME&&ME.subject?ME.subject:'math';
+    var btns='<button class="tbtn on" id="fp-subj-own" style="padding:6px 12px;font-size:13px" onclick="fpSetSubj(null,this)">✅ O\'z fanim ('+subjName(mySubj)+')</button>';
+    SUBJECTS.forEach(function(s){
+      if(s.v===mySubj) return;
+      btns+='<button class="tbtn" id="fp-subj-'+s.v+'" style="padding:6px 12px;font-size:13px" onclick="fpSetSubj(\''+s.v+'\',this)">'+s.n+'</button>';
+    });
+    subjBox.innerHTML=btns;
+  }
+  var folders=getMyFolders();
+  var box=document.getElementById('fp-existing');
+  if(!folders.length){
+    box.innerHTML='<div class="ts tm" style="text-align:center;padding:8px">Hali fayl yaratilmagan. Pastda yangisini yarating.</div>';
+  } else {
+    box.innerHTML=folders.map(function(fn){
+      var esc=fn.replace(/'/g,"\\'");
+      return '<div class="tbtn" style="text-align:left;padding:10px 12px" onclick="submitFP(\''+esc+'\',false)">&#x1F4D8; '+fn+'</div>';
+    }).join('');
+  }
+  var totalCount=(exeFiles?exeFiles.length:0)+(docFiles?docFiles.length:0)+(imgFiles?imgFiles.length:0);
+  var firstFile=(docFiles&&docFiles[0])||(imgFiles&&imgFiles[0])||(exeFiles&&exeFiles[0])||{name:''};
+  var defaultName=suggestedFolder||firstFile.name.replace(/\.(exe|docx|pdf|txt|jpe?g|png)$/i,'').replace(/[\s_-]*\d+$/,'')||('Kitob ('+totalCount+' ta fayl)');
+  document.getElementById('fp-newname').value=defaultName;
+  document.getElementById('fp-modal').style.display='flex';
 }
 function importExe(file){
   var msg=document.getElementById('imp-msg');
@@ -5642,11 +6083,20 @@ function importExeAsync(file){
   return sendToServer(file,msg);
 }
 
-// ─── WORD/PDF/TXT IMPORT (AI asosida) ─────────────────────────────────────
+// ─── WORD/PDF/TXT IMPORT (AI asosida) — PARALLEL (2026-09-18 tuzatish) ────
 // Bular EasyQuizzy kabi qatiy strukturaga ega emas, shuning uchun serverdagi
 // /parse_document AI (Groq) yordamida erkin formatdagi matnni strukturaga
 // solib beradi. Har bir fayl - alohida mavzu sifatida saqlanadi, hammasi
 // bitta "kitob" (papka) ostiga birlashtiriladi.
+//
+// MUHIM TUZATISH: avval bu yerda fayllar KETMA-KET (for...await) yuborilar
+// edi - 1 mavzu ham, 10 mavzu ham bitta serverga navbat bilan borar, 6 ta
+// import-serverdan (SERVER_POOL) faqat BITTASI ishlar edi. Endi fayllar
+// SERVER_POOL.length ta ishchi (worker) orqali PARALLEL yuboriladi - agar
+// 10-15 mavzu import qilinsa, hammasi bir vaqtda 6 ta serverga tarqaladi;
+// 1 ta mavzu bo'lsa ham, avval warmUpImportServers() bilan barcha serverlar
+// oldindan "uyg'otiladi", shu bilan yagona fayl uchun ham eng tez javob
+// beradigan (sovuq holatda bo'lmagan) serverga tez yetadi.
 function sendDocumentToServer(file){
   return new Promise(function(resolve){
     var reader=new FileReader();
@@ -5683,21 +6133,40 @@ async function importDocumentFiles(files, suggestedFolder, unsupportedNote){
   }
   if(folderName) _pendingImportFolder=folderName;
   await acquireImportWakeLock();
+  warmUpImportServers(); // barcha 6 serverni oldindan uyg'otamiz - 1 fayl bo'lsa ham tez javob kelsin
   window._batchImportMode=true; // duplikat mavzu nomida BLOKLOVCHI dialog chiqmasin
   var okTotal=0, errTotal=0, failedNames=[];
-  for(var i=0;i<files.length;i++){
-    if(!checkAndIncrementUsage('questions', 5)){ break; }
-    msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x23F3; AI orqali tahlil qilinmoqda: "'+files[i].name+'" ('+(i+1)+'/'+files.length+')...'+(unsupportedNote||'')+'</div>';
-    var res=await sendDocumentToServer(files[i]);
-    if(res.ok){
-      var qs=(res.data.questions||[]).map(function(q){ if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1; return q; });
-      await saveImportedQs({qs:qs, topic:res.data.topic, questionsToAsk:res.data.questionsToAsk}, msg);
-      okTotal++;
-    } else {
-      errTotal++;
-      failedNames.push(res.filename+' ('+res.error+')');
+  var CONCURRENCY=Math.min(SERVER_POOL.length, files.length);
+  var status=files.map(function(){return '';});
+  function renderStatus(){
+    var lines=status.filter(Boolean);
+    msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">'+(lines.length?lines.join('<br>'):'&#x23F3; Boshlanmoqda...')+(unsupportedNote||'')+'</div>';
+  }
+  var nextIdx=0;
+  async function worker(){
+    while(nextIdx<files.length){
+      var i=nextIdx++;
+      if(!checkAndIncrementUsage('questions', 5)){ status[i]='&#x23F8; to\'xtatildi (oylik limit)'; renderStatus(); continue; }
+      status[i]='&#x23F3; "'+files[i].name+'" AI orqali tahlil qilinmoqda... ('+(i+1)+'/'+files.length+')';
+      renderStatus();
+      var res=await sendDocumentToServer(files[i]);
+      if(res.ok){
+        var qs=(res.data.questions||[]).map(function(q){ if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1; return q; });
+        var pMsg={set innerHTML(html){status[i]=html.replace(/<[^>]+>/g,'');renderStatus();}};
+        await saveImportedQs({qs:qs, topic:res.data.topic, questionsToAsk:res.data.questionsToAsk}, pMsg);
+        okTotal++;
+        status[i]='&#x2705; "'+files[i].name+'" tayyor';
+      } else {
+        errTotal++;
+        failedNames.push(res.filename+' ('+res.error+')');
+        status[i]='&#x274C; "'+files[i].name+'" - xato';
+      }
+      renderStatus();
     }
   }
+  var workers=[];
+  for(var w=0;w<CONCURRENCY;w++) workers.push(worker());
+  await Promise.all(workers);
   _pendingImportFolder=null;
   window._batchImportMode=false;
   var bgNote=_importWasBackgrounded?'<div class="ts tm" style="margin-top:6px">&#x2139;&#xFE0F; Ekran/ilova fonga otganini aniqladik - agar xato uchragan bolsa, shu sabab bolishi mumkin.</div>':'';
@@ -5748,21 +6217,40 @@ async function importImageFiles(files, suggestedFolder, unsupportedNote){
   }
   if(folderName) _pendingImportFolder=folderName;
   await acquireImportWakeLock();
+  warmUpImportServers();
   window._batchImportMode=true; // duplikat mavzu nomida BLOKLOVCHI dialog chiqmasin
   var okTotal=0, errTotal=0, failedNames=[];
-  for(var i=0;i<files.length;i++){
-    if(!checkAndIncrementUsage('images', 1)){ break; }
-    msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">&#x1F4F7; Rasm AI orqali oqilmoqda: "'+files[i].name+'" ('+(i+1)+'/'+files.length+')...'+(unsupportedNote||'')+'</div>';
-    var res=await sendImageToServer(files[i]);
-    if(res.ok){
-      var qs=(res.data.questions||[]).map(function(q){ if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1; return q; });
-      await saveImportedQs({qs:qs, topic:res.data.topic, questionsToAsk:res.data.questionsToAsk}, msg);
-      okTotal++;
-    } else {
-      errTotal++;
-      failedNames.push(res.filename+' ('+res.error+')');
+  var CONCURRENCY=Math.min(SERVER_POOL.length, files.length);
+  var status=files.map(function(){return '';});
+  function renderStatus(){
+    var lines=status.filter(Boolean);
+    msg.innerHTML=importBgWarningHtml()+'<div class="alt ai">'+(lines.length?lines.join('<br>'):'&#x23F3; Boshlanmoqda...')+(unsupportedNote||'')+'</div>';
+  }
+  var nextIdx=0;
+  async function worker(){
+    while(nextIdx<files.length){
+      var i=nextIdx++;
+      if(!checkAndIncrementUsage('images', 1)){ status[i]='&#x23F8; to\'xtatildi (oylik limit)'; renderStatus(); continue; }
+      status[i]='&#x1F4F7; "'+files[i].name+'" AI orqali oqilmoqda... ('+(i+1)+'/'+files.length+')';
+      renderStatus();
+      var res=await sendImageToServer(files[i]);
+      if(res.ok){
+        var qs=(res.data.questions||[]).map(function(q){ if(q.isMulti===undefined)q.isMulti=(q.correct||[]).length>1; return q; });
+        var pMsg={set innerHTML(html){status[i]=html.replace(/<[^>]+>/g,'');renderStatus();}};
+        await saveImportedQs({qs:qs, topic:res.data.topic, questionsToAsk:res.data.questionsToAsk}, pMsg);
+        okTotal++;
+        status[i]='&#x2705; "'+files[i].name+'" tayyor';
+      } else {
+        errTotal++;
+        failedNames.push(res.filename+' ('+res.error+')');
+        status[i]='&#x274C; "'+files[i].name+'" - xato';
+      }
+      renderStatus();
     }
   }
+  var workers=[];
+  for(var w=0;w<CONCURRENCY;w++) workers.push(worker());
+  await Promise.all(workers);
   _pendingImportFolder=null;
   window._batchImportMode=false;
   releaseImportWakeLock();
