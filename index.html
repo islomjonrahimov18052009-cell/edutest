@@ -44,7 +44,7 @@ body{background:linear-gradient(125deg,#151b3d,var(--purd) 30%,var(--pri) 55%,va
   0%{transform:translate(0,0) rotate(0deg);opacity:1}
   100%{transform:translate(var(--drift),105vh) rotate(var(--rot));opacity:.4}
 }
-.card{position:relative;overflow:hidden;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:var(--r);border:1px solid rgba(255,255,255,.6);padding:20px;margin-bottom:14px;box-shadow:0 8px 30px -8px rgba(21,27,61,.35),0 1px 3px rgba(0,0,0,.06)}
+.card{position:relative;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:var(--r);border:1px solid rgba(255,255,255,.6);padding:20px;margin-bottom:14px;box-shadow:0 8px 30px -8px rgba(21,27,61,.35),0 1px 3px rgba(0,0,0,.06)}
 .card::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;opacity:0;transition:opacity .35s ease;background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),var(--accent) 0%,transparent 65%)}
 .card:hover::before,.card.glow-active::before{opacity:.28}
 @media (prefers-reduced-motion: reduce){.card::before{display:none}}
@@ -7443,4 +7443,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-          </html>
+      </html>
