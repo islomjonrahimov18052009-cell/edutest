@@ -33,7 +33,6 @@ body{background:linear-gradient(125deg,#151b3d,var(--purd) 30%,var(--pri) 55%,va
 #heroArt{position:fixed;left:0;right:0;bottom:0;height:clamp(220px,35vh,380px);z-index:-2;pointer-events:none;overflow:hidden}
 #heroArt svg{width:100%;height:100%;display:block}
 #touchGlow{position:fixed;top:0;left:0;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;pointer-events:none;z-index:-1;opacity:0;transition:opacity .5s ease;will-change:transform;mix-blend-mode:screen;background:radial-gradient(circle,rgba(255,230,160,.85) 0%,rgba(255,216,115,.5) 25%,rgba(240,180,41,.2) 50%,rgba(240,180,41,0) 72%)}
-@media (prefers-reduced-motion: reduce){#touchGlow{display:none}}
 #mathBg span{position:absolute;color:rgba(255,255,255,.16);font-family:'Space Grotesk',sans-serif;font-weight:600;user-select:none;animation:floatSym linear infinite}
 @keyframes floatSym{
   0%{transform:translateY(8vh) translateX(0) rotate(0deg);opacity:0}
@@ -1511,8 +1510,14 @@ initMathBg();
 // bo'ladi. TUZATISH: sichqoncha/barmoq HARAKATSIZ qolsa (masalan ekrandan
 // chiqib ketsa yoki bir necha soniya qimirlamasa), nur SEZILARSIZ bo'lib
 // (yo'q bo'lib) qoladi - faqat haqiqiy harakat paytida ko'rinadi.
+// TUZATISH (2026-09-20): "prefers-reduced-motion" tekshiruvi OLIB
+// TASHLANDI - ba'zi Samsung telefonlarda "Animatsiyalarni kamaytirish"
+// sozlamasi yoqilgan bo'lsa, bu tekshiruv butun effektni ISHGA
+// TUSHIRMASDAN to'xtatib qo'yar edi ("tegsam ham hech narsa chiqmadi"
+// muammosining aynan shu sababi edi). Bu - kichik, mahalliy (faqat teginilgan
+// joyda) porlash, uzoq/keng ekran animatsiyasi emas, shuning uchun bu
+// sozlamaga bog'liq qilib qo'yish shart emas edi.
 (function(){
-  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var glowEl=document.getElementById('touchGlow');
   if(!glowEl) return;
   var IDLE_MS=700; // shuncha vaqt qimirlamasa - nur o'chadi
@@ -7438,4 +7443,4 @@ history.pushState(null, '', location.href);
     </div>
   </div>
 </body>
-      </html>
+          </html>
