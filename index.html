@@ -76,6 +76,7 @@ textarea{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radiu
    faqat nozik pastki chiziq bilan - "bu yerga formula qo'yiladi" degan
    yengil ishorani beradi, ko'zga tashlanib qolmaydi */
 .mfrag{display:inline-block;vertical-align:middle;margin:0 1px;font-size:1.02em;border:none;border-bottom:1.5px dashed transparent;transition:border-color .15s;--placeholder-opacity:.25;min-width:1.4em}
+#aq-text .mfrag{font-size:1.5em}
 .mfrag:hover{border-bottom-color:var(--bdr)}
 .mfrag:focus-within{border-bottom-color:var(--pri)}
 /* MathLive'ning o'zi qo'shadigan qo'shimcha asboblar paneli/klaviatura
@@ -2002,12 +2003,17 @@ function insRootQuick(n){
 // daraja ustiga daraja - chiqqan natijaning ichiga kursor bilan kirib,
 // yana xⁿ tugmasini bosish kifoya (MathLive ichma-ichlikni o'zi boshqaradi).
 function insCustomExp(){
+  // TUZATISH: "^{#0}" faqat KO'RSATKICH qismi - ASOSI yo'q, shuning uchun
+  // MathLive buni tushunolmay, alohida bo'sh qutichalarga "parchalab"
+  // yuborardi (kasrda ikkala qism - surat va mahraj - to'liq bo'lgani
+  // uchun kasr muammosiz ishlagan). Endi asos ham, ko'rsatkich ham HAR
+  // DOIM TO'LIQ qolip ("#0^{#0}") - kasr bilan bir xil mantiq.
   var af=document.activeElement;
   if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
-    try{ af.executeCommand(['insert','^{#0}']); return; }catch(e){}
+    try{ af.executeCommand(['insert','#0^{#0}']); return; }catch(e){}
   }
   var base=getAqSelectionForPrefill();
-  insLatexTemplate(base?(base+'^{#0}'):'x^{#0}');
+  insLatexTemplate(base?(base+'^{#0}'):'#0^{#0}');
 }
 // ═══════════════════════════════════════════════════════════════════════
 
