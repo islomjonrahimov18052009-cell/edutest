@@ -1555,7 +1555,7 @@ initMathBg();
   // TUZATISH (2026-09-20): endi nur FAQAT sichqoncha/barmoq biror panel
   // (.card) USTIDA bo'lganda ko'rinadi - sahifaning bo'sh (panelsiz)
   // joylarida umuman chiqmaydi.
-  function isOverCard(target){ return !!(target && target.closest && target.closest('.card')); }
+  function isOverCard(target){ return !!(target && target.closest && target.closest('.card, .modal')); }
 
   document.addEventListener('mousemove', function(e){
     if(isOverCard(e.target)) setTarget(e.clientX, e.clientY);
@@ -3759,8 +3759,13 @@ function refreshSyms(){
     '(':['insWrapAny()','Belgilangan qismni qavsga oladi']
   };
   document.getElementById('aq-syms').innerHTML=syms.map(function(s){
-    if(special[s])return '<button class="symb" onclick="'+special[s][0]+'" title="'+special[s][1]+'">'+s+'</button>';
-    return '<button class="symb" onclick="insSym(\''+s+'\')">'+s+'</button>';
+    // MUHIM TUZATISH: onmousedown="event.preventDefault()" - aks holda
+    // tugmani bosish formula maydonidagi FOKUSNI tugmaga "o'g'irlab"
+    // ketardi, shuning uchun "siz hozir formula ichidasizmi" tekshiruvi
+    // doim yolg'on chiqib, ICHMA-ICH kasr o'rniga har doim YANGI, ALOHIDA
+    // kasr qo'shilib qolardi ("2 ta bo'lib qoldi" muammosi shu edi).
+    if(special[s])return '<button class="symb" onmousedown="event.preventDefault()" onclick="'+special[s][0]+'" title="'+special[s][1]+'">'+s+'</button>';
+    return '<button class="symb" onmousedown="event.preventDefault()" onclick="insSym(\''+s+'\')">'+s+'</button>';
   }).join('');
 }
 function closeAQ(){document.getElementById('aq-modal').style.display='none';}
