@@ -1554,23 +1554,26 @@ initMathBg();
   }
 
   // TUZATISH (2026-09-20): endi nur FAQAT sichqoncha/barmoq biror panel
-  // (.card) USTIDA bo'lganda ko'rinadi - sahifaning bo'sh (panelsiz)
-  // joylarida umuman chiqmaydi.
+  // (.card/.modal) USTIDA bo'lganda O'CHADI - faqat sahifaning bo'sh
+  // (panelsiz) joylarida ko'rinadi. (Avvalgi versiyada bu TESKARI edi -
+  // asl talab: "faqat panellarga KIRGUNCHA bo'lsin" - ya'ni panel ichida
+  // emas, tashqarisida.)
   function isOverCard(target){ return !!(target && target.closest && target.closest('.card, .modal')); }
 
   document.addEventListener('mousemove', function(e){
-    if(isOverCard(e.target)) setTarget(e.clientX, e.clientY);
+    if(!isOverCard(e.target)) setTarget(e.clientX, e.clientY);
     else hideNow();
   }, {passive:true});
   document.addEventListener('touchstart', function(e){
     var t=e.touches&&e.touches[0]; if(!t) return;
     var el=document.elementFromPoint(t.clientX, t.clientY);
-    if(isOverCard(el)) setTarget(t.clientX, t.clientY);
+    if(!isOverCard(el)) setTarget(t.clientX, t.clientY);
+    else hideNow();
   }, {passive:true});
   document.addEventListener('touchmove', function(e){
     var t=e.touches&&e.touches[0]; if(!t) return;
     var el=document.elementFromPoint(t.clientX, t.clientY);
-    if(isOverCard(el)) setTarget(t.clientX, t.clientY);
+    if(!isOverCard(el)) setTarget(t.clientX, t.clientY);
     else hideNow();
   }, {passive:true});
   // MUHIM TUZATISH: avval "touchend"da nur DARHOL yashirilardi - lekin
@@ -1973,25 +1976,32 @@ function insWrapAny(){
 // yangi kasr qo'shiladi. Aks holda - siz OXIRGI TURGAN maydonga (savol
 // matni yoki biror variant) yangi formula-maydon qo'yiladi, va surat qismi
 // (bo'sh to'rtburchak) DARHOL tahrirlash uchun tayyor bo'ladi.
+// MUHIM TUZATISH (2026-09-21): "#0" MathLive'da "bo'sh joy" DEGANI EMAS -
+// bu "hozir BELGILANGAN matn" degani (masalan matnni qavsga olish uchun).
+// Belgilangan matn bo'lmasa, "#0" deyarli HECH NARSA qo'ymaydi - shuning
+// uchun "\frac{#0}{#0}" aslida "\frac{}{}"  (bazan strukturasi buzilgan)
+// bo'lib qolar, "^{#0}" esa asossiz qolib, MathLive buni tushunolmay 2 ta
+// ajralgan qutichaga "parchalab" yuborardi. Haqiqiy BO'SH-TO'LDIRILADIGAN
+// joy uchun MathLive'ning O'Z buyrug'i - "\placeholder{}" kerak ekan.
 function insFraction(){
   var af=document.activeElement;
   if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
-    try{ af.executeCommand(['insert','\\frac{#0}{#0}']); return; }catch(e){}
+    try{ af.executeCommand(['insert','\\frac{\\placeholder{}}{\\placeholder{}}']); return; }catch(e){}
   }
   var num=getAqSelectionForPrefill();
-  insLatexTemplate(num?('\\frac{'+num+'}{#0}'):'\\frac{#0}{#0}');
+  insLatexTemplate(num?('\\frac{'+num+'}{\\placeholder{}}'):'\\frac{\\placeholder{}}{\\placeholder{}}');
 }
 function insNthRoot(){
   var af=document.activeElement;
   if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
-    try{ af.executeCommand(['insert','\\sqrt{#0}']); return; }catch(e){}
+    try{ af.executeCommand(['insert','\\sqrt{\\placeholder{}}']); return; }catch(e){}
   }
   var content=getAqSelectionForPrefill();
-  insLatexTemplate(content?('\\sqrt{'+content+'}'):'\\sqrt{#0}');
+  insLatexTemplate(content?('\\sqrt{'+content+'}'):'\\sqrt{\\placeholder{}}');
 }
 function insRootQuick(n){
   var af=document.activeElement;
-  var tmpl = n ? ('\\sqrt['+n+']{#0}') : '\\sqrt{#0}';
+  var tmpl = n ? ('\\sqrt['+n+']{\\placeholder{}}') : '\\sqrt{\\placeholder{}}';
   if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
     try{ af.executeCommand(['insert', tmpl]); return; }catch(e){}
   }
@@ -2003,17 +2013,12 @@ function insRootQuick(n){
 // daraja ustiga daraja - chiqqan natijaning ichiga kursor bilan kirib,
 // yana xⁿ tugmasini bosish kifoya (MathLive ichma-ichlikni o'zi boshqaradi).
 function insCustomExp(){
-  // TUZATISH: "^{#0}" faqat KO'RSATKICH qismi - ASOSI yo'q, shuning uchun
-  // MathLive buni tushunolmay, alohida bo'sh qutichalarga "parchalab"
-  // yuborardi (kasrda ikkala qism - surat va mahraj - to'liq bo'lgani
-  // uchun kasr muammosiz ishlagan). Endi asos ham, ko'rsatkich ham HAR
-  // DOIM TO'LIQ qolip ("#0^{#0}") - kasr bilan bir xil mantiq.
   var af=document.activeElement;
   if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
-    try{ af.executeCommand(['insert','#0^{#0}']); return; }catch(e){}
+    try{ af.executeCommand(['insert','\\placeholder{}^{\\placeholder{}}']); return; }catch(e){}
   }
   var base=getAqSelectionForPrefill();
-  insLatexTemplate(base?(base+'^{#0}'):'#0^{#0}');
+  insLatexTemplate(base?(base+'^{\\placeholder{}}'):'\\placeholder{}^{\\placeholder{}}');
 }
 // ═══════════════════════════════════════════════════════════════════════
 
