@@ -71,9 +71,20 @@ textarea{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radiu
 .mathedit{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radius:9px;font-size:15px;line-height:1.9;font-family:inherit;outline:none;min-height:75px;max-height:280px;overflow-y:auto;transition:border .15s,box-shadow .15s;white-space:pre-wrap;word-break:break-word}
 .mathedit:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,49,109,.12)}
 .mathedit:empty::before{content:attr(data-placeholder);color:#94a3b8}
-.mfrag{display:inline-block;vertical-align:middle;margin:0 2px;border-radius:6px;font-size:1.02em;border:1.5px solid transparent;transition:border-color .15s,background .15s;--placeholder-opacity:.45;min-width:1.6em}
-.mfrag:hover{border-color:var(--bdr)}
-.mfrag:focus-within{border-color:var(--pri);background:#f5f6fb}
+.mathedit.optedit{min-height:44px;max-height:120px;flex:1;padding:8px 10px;font-size:14px;line-height:1.6}
+/* TUZATISH: formula "to'rtburchagi" avvalgi qattiq chegara/fon o'rniga endi
+   faqat nozik pastki chiziq bilan - "bu yerga formula qo'yiladi" degan
+   yengil ishorani beradi, ko'zga tashlanib qolmaydi */
+.mfrag{display:inline-block;vertical-align:middle;margin:0 1px;font-size:1.02em;border:none;border-bottom:1.5px dashed transparent;transition:border-color .15s;--placeholder-opacity:.25;min-width:1.4em}
+.mfrag:hover{border-bottom-color:var(--bdr)}
+.mfrag:focus-within{border-bottom-color:var(--pri)}
+/* MathLive'ning o'zi qo'shadigan qo'shimcha asboblar paneli/klaviatura
+   ochish tugmasi - biz o'zimizning "aq-syms" panelimizni ishlatamiz,
+   shuning uchun bular chalg'itmasin deb yashirilgan */
+math-field::part(virtual-keyboard-toggle),
+math-field::part(menu-toggle){display:none!important}
+.ML__keyboard-toggle,.ML__virtual-keyboard-toggle,.ML__menu-toggle,
+div[part="virtual-keyboard-toggle"],div[part="menu-toggle"]{display:none!important}
 textarea:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,49,109,.12)}
 .fg{margin-bottom:13px}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -912,9 +923,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 <div class="mbg" id="aq-modal" style="display:none">
   <div class="modal">
     <div class="mh"><h3>Savol qo'shish</h3><button class="xb" onclick="closeAQ()">&#x2715;</button></div>
-    <div class="fg"><label>Mavzu</label><input type="text" id="aq-topic" placeholder="Mavzu nomi"></div>
+    <div class="fg"><label>Mavzu</label><input type="text" id="aq-topic" list="aq-topic-list" placeholder="Mavzu nomi (tanlang yoki yangisini yozing)" autocomplete="off"><datalist id="aq-topic-list"></datalist></div>
     <div class="fg"><label>Fan</label>
-      <select id="aq-subj" onchange="refreshSyms()"></select>
+      <select id="aq-subj" onchange="refreshSyms();refreshTopicList()"></select>
     </div>
     <div class="fg"><label>Berilishi kerak bo'lgan savol soni</label><input type="number" id="aq-qcount" placeholder="20" min="1" style="width:120px"></div>
     <div class="fg">
@@ -1541,9 +1552,26 @@ initMathBg();
     glowEl.style.opacity='0';
   }
 
-  document.addEventListener('mousemove', function(e){ setTarget(e.clientX, e.clientY); }, {passive:true});
-  document.addEventListener('touchstart', function(e){ if(e.touches&&e.touches[0]) setTarget(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
-  document.addEventListener('touchmove', function(e){ if(e.touches&&e.touches[0]) setTarget(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  // TUZATISH (2026-09-20): endi nur FAQAT sichqoncha/barmoq biror panel
+  // (.card) USTIDA bo'lganda ko'rinadi - sahifaning bo'sh (panelsiz)
+  // joylarida umuman chiqmaydi.
+  function isOverCard(target){ return !!(target && target.closest && target.closest('.card')); }
+
+  document.addEventListener('mousemove', function(e){
+    if(isOverCard(e.target)) setTarget(e.clientX, e.clientY);
+    else hideNow();
+  }, {passive:true});
+  document.addEventListener('touchstart', function(e){
+    var t=e.touches&&e.touches[0]; if(!t) return;
+    var el=document.elementFromPoint(t.clientX, t.clientY);
+    if(isOverCard(el)) setTarget(t.clientX, t.clientY);
+  }, {passive:true});
+  document.addEventListener('touchmove', function(e){
+    var t=e.touches&&e.touches[0]; if(!t) return;
+    var el=document.elementFromPoint(t.clientX, t.clientY);
+    if(isOverCard(el)) setTarget(t.clientX, t.clientY);
+    else hideNow();
+  }, {passive:true});
   // MUHIM TUZATISH: avval "touchend"da nur DARHOL yashirilardi - lekin
   // oddiy bir marta bosishda (barmoqni surmasdan) touchstart va touchend
   // deyarli bir zumda ketma-ket keladi, shuning uchun nur chiqishi bilan
@@ -1765,25 +1793,40 @@ function clearAQImg(){
 // render funksiyalari (renderMathIn, t-qbody va h.k.) hech narsa
 // o'zgartirmasdan ishlayveradi - bu FAQAT ustoz "Savol qo'shish" oynasidagi
 // muharrirga tegishli.
-var _aqSavedRange=null; // foydalanuvchi oxirgi turgan kursor joyi (contenteditable, aq-text ichida)
+var _aqSavedRange=null;   // foydalanuvchi oxirgi turgan kursor joyi
+var _activeEditorEl=null; // hozir "faol" mathedit konteyner - aq-text YOKI biror variant maydoni.
+                           // Shu orqali a/b, √, xⁿ tugmalari HAR DOIM siz oxirgi turgan
+                           // maydonga yoziladi - savol matniga emas (avvalgi xato shu edi).
 
 function aqTextEl(){ return document.getElementById('aq-text'); }
 function aqTextContains(node){ var el=aqTextEl(); return !!(el&&node&&el.contains(node)); }
 function getEndRange(el){ var r=document.createRange(); r.selectNodeContents(el); r.collapse(false); return r; }
+function isMathEditContainer(el){ return !!(el && el.nodeType===1 && el.classList && el.classList.contains('mathedit')); }
+function findMathEditAncestor(node){
+  while(node){ if(isMathEditContainer(node)) return node; node=node.parentNode; }
+  return null;
+}
+function currentEditorEl(){ return _activeEditorEl || aqTextEl(); }
+function editorContains(node){ var el=currentEditorEl(); return !!(el && node && el.contains(node)); }
 
+document.addEventListener('focusin', function(e){
+  var container=findMathEditAncestor(e.target);
+  if(container) _activeEditorEl=container;
+});
 document.addEventListener('selectionchange', function(){
-  var el=aqTextEl();
-  if(!el) return;
   var sel=window.getSelection();
-  if(sel.rangeCount && el.contains(sel.anchorNode)){
-    _aqSavedRange = sel.getRangeAt(0).cloneRange();
+  if(!sel.rangeCount) return;
+  var container=findMathEditAncestor(sel.anchorNode);
+  if(container){
+    _activeEditorEl=container;
+    _aqSavedRange=sel.getRangeAt(0).cloneRange();
   }
 });
 
 // Tanlangan matnni (yoki aynan bitta belgilangan formula-chipning xom
 // LaTeX kodini) qaytaradi - yangi formulaga "boshlang'ich qiymat" sifatida
 function getAqSelectionForPrefill(){
-  var el=aqTextEl();
+  var el=currentEditorEl();
   var sel=window.getSelection();
   if(!sel.rangeCount || !el || !el.contains(sel.anchorNode)) return '';
   var range=sel.getRangeAt(0);
@@ -1803,7 +1846,8 @@ function makeChip(latex){
   var mf=document.createElement('math-field');
   mf.className='mfrag';
   try{ mf.value=latex; }catch(e){}
-  mf.setAttribute('virtual-keyboard-mode','onfocus');
+  mf.setAttribute('virtual-keyboard-mode','off');
+  mf.setAttribute('math-virtual-keyboard-policy','manual');
   mf.setAttribute('smart-fence','on');
   mf.setAttribute('smart-superscript','on');
   function exitField(dir){
@@ -1812,7 +1856,8 @@ function makeChip(latex){
     r.collapse(true);
     var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
     _aqSavedRange=r.cloneRange();
-    var el=aqTextEl(); if(el) el.focus();
+    var owner=findMathEditAncestor(mf.parentNode);
+    if(owner){ _activeEditorEl=owner; owner.focus(); }
   }
   mf.addEventListener('move-out', function(ev){
     var dir=(ev.detail&&ev.detail.direction==='backward')?'backward':'forward';
@@ -1859,11 +1904,12 @@ function mathEditGetLatexString(el){
   return out;
 }
 
-// Kursor turgan joyga, tayyor (bo'sh joysiz) LaTeX'ni chip sifatida qo'yadi
+// Kursor turgan joyga (qaysi maydonda bo'lsa - savol yoki variant - o'sha
+// yerga), tayyor (bo'sh joysiz) LaTeX'ni chip sifatida qo'yadi
 function insLatex(latex){
-  var el=aqTextEl();
+  var el=currentEditorEl();
   el.focus();
-  var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer)) ? _aqSavedRange.cloneRange() : getEndRange(el);
+  var range=(_aqSavedRange && editorContains(_aqSavedRange.startContainer)) ? _aqSavedRange.cloneRange() : getEndRange(el);
   try{ range.deleteContents(); }catch(e){}
   var chip=makeChip(latex);
   range.insertNode(chip);
@@ -1888,14 +1934,15 @@ function insLatexTemplate(latex){
 }
 function insSym(s){
   // Agar kursor hozir biror formula maydonining (<math-field>) ICHIDA
-  // tursa - belgi O'SHA formula ichiga qo'yiladi (MathLive o'zining
-  // ichki kursoriga qarab). Aks holda - oddiy matn sifatida qo'shiladi.
+  // tursa - belgi O'SHA formula ichiga qo'yiladi. Aks holda - siz OXIRGI
+  // TURGAN maydonga (savol matni YOKI variant - qaysi biri bo'lsa),
+  // oddiy matn sifatida qo'shiladi. (Avvalgi xato: doim savolga yozilardi.)
   var af=document.activeElement;
-  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+  if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
     try{ af.executeCommand(['insert', s]); return; }catch(e){}
   }
-  var el=aqTextEl(); el.focus();
-  var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer)) ? _aqSavedRange.cloneRange() : getEndRange(el);
+  var el=currentEditorEl(); el.focus();
+  var range=(_aqSavedRange && editorContains(_aqSavedRange.startContainer)) ? _aqSavedRange.cloneRange() : getEndRange(el);
   try{ range.deleteContents(); }catch(e){}
   var tn=document.createTextNode(s);
   range.insertNode(tn);
@@ -1905,11 +1952,11 @@ function insSym(s){
 }
 function insWrapAny(){
   var af=document.activeElement;
-  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+  if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
     try{ af.executeCommand(['insert', '(#0)']); return; }catch(e){}
   }
-  var el=aqTextEl();
-  var range=(_aqSavedRange && aqTextContains(_aqSavedRange.startContainer) && !_aqSavedRange.collapsed) ? _aqSavedRange.cloneRange() : null;
+  var el=currentEditorEl();
+  var range=(_aqSavedRange && editorContains(_aqSavedRange.startContainer) && !_aqSavedRange.collapsed) ? _aqSavedRange.cloneRange() : null;
   if(!range){ insSym('()'); return; }
   var frag=range.extractContents();
   var wrap=document.createDocumentFragment();
@@ -1922,11 +1969,12 @@ function insWrapAny(){
 
 // ➗ KASR: agar kursor hozir bir formula maydoni ICHIDA bo'lsa - o'sha
 // yerga (kerak bo'lsa ICHMA-ICH, MathLive buni cheklovsiz qo'llab-quvvatlaydi)
-// yangi kasr qo'shiladi. Aks holda - matnga yangi formula-maydon qo'yiladi,
-// va surat qismi (bo'sh to'rtburchak) DARHOL tahrirlash uchun tayyor bo'ladi.
+// yangi kasr qo'shiladi. Aks holda - siz OXIRGI TURGAN maydonga (savol
+// matni yoki biror variant) yangi formula-maydon qo'yiladi, va surat qismi
+// (bo'sh to'rtburchak) DARHOL tahrirlash uchun tayyor bo'ladi.
 function insFraction(){
   var af=document.activeElement;
-  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+  if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
     try{ af.executeCommand(['insert','\\frac{#0}{#0}']); return; }catch(e){}
   }
   var num=getAqSelectionForPrefill();
@@ -1934,7 +1982,7 @@ function insFraction(){
 }
 function insNthRoot(){
   var af=document.activeElement;
-  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+  if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
     try{ af.executeCommand(['insert','\\sqrt{#0}']); return; }catch(e){}
   }
   var content=getAqSelectionForPrefill();
@@ -1943,7 +1991,7 @@ function insNthRoot(){
 function insRootQuick(n){
   var af=document.activeElement;
   var tmpl = n ? ('\\sqrt['+n+']{#0}') : '\\sqrt{#0}';
-  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+  if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
     try{ af.executeCommand(['insert', tmpl]); return; }catch(e){}
   }
   var content=getAqSelectionForPrefill();
@@ -1955,7 +2003,7 @@ function insRootQuick(n){
 // yana xⁿ tugmasini bosish kifoya (MathLive ichma-ichlikni o'zi boshqaradi).
 function insCustomExp(){
   var af=document.activeElement;
-  if(af && af.tagName==='MATH-FIELD' && aqTextContains(af)){
+  if(af && af.tagName==='MATH-FIELD' && editorContains(af)){
     try{ af.executeCommand(['insert','^{#0}']); return; }catch(e){}
   }
   var base=getAqSelectionForPrefill();
@@ -3071,49 +3119,32 @@ function renderQ(){
     btnSub.style.opacity=unansweredCount>0?'0.5':'1';
   }
 
-  // Savol rasmi (agar bor bo'lsa — canvas'ga kiritmaymiz, alohida)
+  // TUZATISH (2026-09-21): avval savol/variantlar Canvas ichida "chizilgan
+  // rasm" sifatida ko'rsatilardi (AI/skrinshot-himoya maqsadida) - lekin bu
+  // himoya haqiqiy foyda bermadi (skrinshot+AI baribir ishlashda davom
+  // etaverdi - vision-AI'lar rasmdan ham o'qiy oladi), shu bilan birga
+  // formulalar (KaTeX) to'g'ri chizilmasdi, shrift oʻlchami komyuterda
+  // nomutanosib katta chiqardi. Shuning uchun oddiy, tekis HTML ko'rinishga
+  // qaytarildi - formulalar endi to'g'ri, aniq chiqadi.
   var imgSrc=(q.img||q.image)?imgSrcVal(q.img||q.image):'';
-  var imgHtml=imgSrc?'<div style="text-align:center;margin:10px 0"><img src="'+imgSrc+'" style="max-width:100%;max-height:200px;border-radius:8px;background:#fff;padding:4px"></div>':'';
-
-  // Canvas ID — har savol uchun unikal
-  var cid='edu-qcanvas-'+S.idx;
-
-  // t-qbody: faqat Canvas + rasm (plain text yo'q)
+  var imgHtml=imgSrc?'<div style="text-align:center;margin:10px 0"><img src="'+imgSrc+'" style="max-width:100%;max-height:260px;border-radius:8px;background:#fff;padding:4px"></div>':'';
+  var optsHtml=(q.options||[]).map(function(opt,i){
+    var sel=ans.indexOf(i)>=0;
+    var ctrl=q.isMulti
+      ? '<div class="chk'+(sel?' on':'')+'"><span>'+(sel?'&#x2713;':'')+'</span></div>'
+      : '<div class="radio'+(sel?' on':'')+'"></div>';
+    var isImg=isImgVal(opt);
+    var optContent=isImg
+      ? '<img src="'+imgSrcVal(opt)+'" style="max-width:100%;max-height:150px;display:block;margin:6px 0 2px 0;background:#fff;border-radius:6px;padding:4px">'
+      : '<span> '+opt+'</span>';
+    return '<div class="opt'+(sel?' sel':'')+'" onclick="selAns('+i+')">'+ctrl+'<div style="flex:1"><span>'+String.fromCharCode(65+i)+'.</span>'+optContent+'</div></div>';
+  }).join('');
   document.getElementById('t-qbody').innerHTML=
+    '<div style="font-weight:700;font-size:17px;margin-bottom:8px;line-height:1.6">'+(S.idx+1)+'. '+(q.text||'')+'</div>'+
     imgHtml+
-    '<canvas id="'+cid+'" '+
-    'width="'+(document.getElementById('t-qbody').clientWidth||680)+'" height="300" '+
-    'style="width:100%;border-radius:10px;cursor:pointer;display:block;-webkit-tap-highlight-color:transparent" '+
-    'aria-label="Savol '+(S.idx+1)+' — variantni tanlash uchun bosing"></canvas>'+
-    // Ko'rinmas accessibility matni (screen reader uchun, AI uchun emas)
-    '<div class="sr-only" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="false">'+
-      'Savol '+(S.idx+1)+': Javob variantini tanlash uchun canvas ustiga bosing.'+
-    '</div>';
-
-  // Canvas'ga savol + variantlarni chizamiz
-  requestAnimationFrame(function(){
-    var cv=document.getElementById(cid);
-    if(!cv)return;
-    cv.width=cv.offsetWidth||680;
-    q._idx=S.idx;
-    var seed=String(q.id||S.idx)+'|'+S.idx;
-    var zones=_eduRenderAll(cv, q, ans, seed);
-    _EDU_CLICK_ZONES[cid]=zones;
-
-    // Click va touch
-    cv.onclick=function(e){_eduCanvasClick(e,cid);};
-    cv.ontouchend=function(e){e.preventDefault();_eduCanvasClick(e,cid);};
-
-    // KaTeX formulalar bo'lsa — canvas'da render qilolmaymiz,
-    // shuning uchun matnda $ bo'lsa, canvas yoniga ham qo'shamiz
-    if(q.text && q.text.indexOf('$')>=0){
-      var mathDiv=document.createElement('div');
-      mathDiv.style.cssText='position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden';
-      mathDiv.textContent=q.text;
-      document.getElementById('t-qbody').appendChild(mathDiv);
-      renderMathIn(mathDiv);
-    }
-  });
+    (q.isMulti?'<div class="alt ai ts" style="margin-bottom:10px">Ko\'p javobli: bir nechta to\'g\'ri</div>':'')+
+    optsHtml;
+  renderMathIn(document.getElementById('t-qbody'));
 }
 function goQ(d){S.idx=Math.max(0,Math.min(S.test.length-1,S.idx+d));renderQ();}
 function selAns(i){var q=S.test[S.idx],ans=(S.answers[S.idx]||[]).slice();if(q.isMulti){var x=ans.indexOf(i);if(x>=0)ans.splice(x,1);else ans.push(i);}else{ans=[i];}S.answers[S.idx]=ans;renderQ();}
@@ -3700,9 +3731,20 @@ function openAddQ(){
   var subjSel=document.getElementById('aq-subj');
   if(!subjSel.options.length){subjSel.innerHTML=SUBJECTS.map(function(s){return '<option value="'+s.v+'">'+s.n+'</option>';}).join('');}
   if(ME&&ME.subject)subjSel.value=ME.subject;
+  refreshTopicList();
   refreshSyms();
   renderAQO();
   document.getElementById('aq-modal').style.display='flex';
+}
+function refreshTopicList(){
+  var subj=document.getElementById('aq-subj').value||'math';
+  var box=document.getElementById('aq-topic-list');
+  if(!box) return;
+  var mine=getMyQs().filter(function(q){return q.subject===subj;});
+  var topics=[];
+  mine.forEach(function(q){ if(q.topic && topics.indexOf(q.topic)<0) topics.push(q.topic); });
+  topics.sort();
+  box.innerHTML=topics.map(function(t){return '<option value="'+t.replace(/"/g,'&quot;')+'">';}).join('');
 }
 function refreshSyms(){
   var subj=document.getElementById('aq-subj').value||'math';
@@ -3723,7 +3765,20 @@ function refreshSyms(){
 }
 function closeAQ(){document.getElementById('aq-modal').style.display='none';}
 document.querySelectorAll('input[name="aqtype"]').forEach(function(r){r.addEventListener('change',function(){aqIsM=this.value==='multi';aqCorr=[];renderAQO();});});
-function renderAQO(){document.getElementById('aq-opts').innerHTML=aqOpts.map(function(o,i){var s=aqCorr.indexOf(i)>=0;var ctrl=aqIsM?'<div class="csel'+(s?' on':'')+'\" onclick="tgC('+i+')">'+(s?'V':'')+'</div>':'<div class="rsel'+(s?' on':'')+'\" onclick="stC('+i+')"></div>';var rm=aqOpts.length>2?'<button class="btn bg bsm" onclick="rmO('+i+')" style="padding:6px 8px;flex-shrink:0">X</button>':'';return '<div class="or">'+ctrl+'<input value="'+o.replace(/"/g,'&quot;')+'" oninput="aqOpts['+i+']=this.value" placeholder="Variant '+String.fromCharCode(65+i)+'" style="flex:1">'+rm+'</div>';}).join('');}
+function renderAQO(){
+  document.getElementById('aq-opts').innerHTML=aqOpts.map(function(o,i){
+    var s=aqCorr.indexOf(i)>=0;
+    var ctrl=aqIsM?'<div class="csel'+(s?' on':'')+'" onclick="tgC('+i+')">'+(s?'V':'')+'</div>':'<div class="rsel'+(s?' on':'')+'" onclick="stC('+i+')"></div>';
+    var rm=aqOpts.length>2?'<button class="btn bg bsm" onclick="rmO('+i+')" style="padding:6px 8px;flex-shrink:0">X</button>':'';
+    return '<div class="or">'+ctrl+'<div class="mathedit optedit" id="aq-opt-'+i+'" contenteditable="true" data-placeholder="Variant '+String.fromCharCode(65+i)+'"></div>'+rm+'</div>';
+  }).join('');
+  aqOpts.forEach(function(o,i){
+    var el=document.getElementById('aq-opt-'+i);
+    if(!el) return;
+    mathEditSetValue(el, o);
+    el.addEventListener('input', function(){ aqOpts[i]=mathEditGetLatexString(el); });
+  });
+}
 function tgC(i){var x=aqCorr.indexOf(i);if(x>=0)aqCorr.splice(x,1);else aqCorr.push(i);renderAQO();}
 function stC(i){aqCorr=[i];renderAQO();}
 function addOpt(){aqOpts.push('');renderAQO();}
