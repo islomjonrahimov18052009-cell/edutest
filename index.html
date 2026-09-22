@@ -1077,11 +1077,14 @@ function startDbPolling(){
       // Test yechilayotgan bolsa, hech narsaga tegmaymiz - internet
       // muammosi test jarayonini butunlay chetlab otishi kerak.
       if(S.mode) return;
-      var remote=await sbPull();
-      if(!remote){ markConnLost(); return; }
+      var remoteV=await sbPullVersion();
+      if(remoteV===null){ markConnLost(); return; }
       markConnOk();
       flushPendingSync(); // navbatda kutayotgan (offline) natijalar bolsa - shu yerda ham urinib koramiz
       var local=localGetDB();
+      if(remoteV <= (local.v||0)) return; // ozgarish yoq - butun bazani tortmaymiz
+      var remote=await sbPull(); // FAQAT haqiqatan ozgargan bolsa, tolik blokni tortamiz
+      if(!remote) return;
       if((remote.v||0) > (local.v||0)){
         localStorage.setItem(SK, JSON.stringify(remote));
         renderNotifBell();
@@ -1092,14 +1095,19 @@ function startDbPolling(){
         if(ME && ME.role==='admin' && document.getElementById('ta-o') && document.getElementById('ta-o').classList.contains('on')) { renderAdminOverview(); }
       }
     }catch(e){}
-  }, 20000);
+  }, 40000);
 }
 
 // MUHIM: db_save/db_get (login, profil, natijalarni saqlash) ENDI alohida,
 // faqat shu ish uchun ajratilgan serverga (edutest-server-7) boradi - import
 // vaqtida boshqa serverlar formula/rasm qayta ishlash bilan band bolib
 // qolganda ham, ustoz/oquvchi kirish va malumot saqlash SEKINLAMASIN uchun.
-var DB_SERVER='https://edutest-server-7.onrender.com';
+// VAQTINCHA (2026-09-21): Render hisobi butun akkaunt boyicha bandwidth
+// limitiga tegib, edutest-server-7 to'xtatilgani sababli, asosiy server
+// vaqtincha Oracle VM pool'dagi VM1'ga otkazildi (bu - Render emas, boshqa
+// infratuzilma, Render limitiga bogliq emas). Render hisobi tiklangach,
+// buni yana 'https://edutest-server-7.onrender.com'ga qaytarish mumkin.
+var DB_SERVER='https://edutest-oracle.duckdns.org';
 
 async function sbPush(db) {
   if (!_sbReady) return false;
@@ -1125,6 +1133,21 @@ async function sbPull() {
     if (data && data.value) return JSON.parse(data.value);
   } catch(e) { markConnLost(); }
   return null;
+}
+// TUZATISH (2026-09-21): butun bazani (/db_get) HAR SAFAR tortish o'rniga,
+// avval shu YENGIL (bir necha bayt) endpointni chaqiramiz - faqat versiya
+// raqami qaytadi. Trafikni (va Render bandwidth limitini) tejash uchun -
+// avval har 20 soniyada BUTUN baza qayta yuklanardi, hatto ozgarish
+// bolmasa ham; bu ayni traffik limitidan oshib ketishning sababi edi.
+async function sbPullVersion() {
+  if (!_sbReady) return null;
+  try {
+    var res = await fetch(DB_SERVER+'/db_version');
+    if(!res.ok){ markConnLost(); return null; }
+    markConnOk();
+    var data = await res.json();
+    return (data && typeof data.v==='number') ? data.v : 0;
+  } catch(e) { markConnLost(); return null; }
 }
 
 // ─── ULANISH BANNERI (online/offline) ──────────────────────────────────────
@@ -1558,19 +1581,27 @@ initMathBg();
   // (panelsiz) joylarida ko'rinadi. (Avvalgi versiyada bu TESKARI edi -
   // asl talab: "faqat panellarga KIRGUNCHA bo'lsin" - ya'ni panel ichida
   // emas, tashqarisida.)
+  // TUZATISH (2026-09-21): ustoz/admin/o'quvchi tizimga KIRGANDAN keyin
+  // (ME o'rnatilgach) bu effekt ISHLASHNI TO'XTATADI - faqat kirish
+  // sahifasida (login qilishdan oldin) ko'rinadi, ish paneliga xalaqit
+  // bermaydi.
   function isOverCard(target){ return !!(target && target.closest && target.closest('.card, .modal')); }
+  function isLoggedIn(){ return typeof ME!=='undefined' && !!ME; }
 
   document.addEventListener('mousemove', function(e){
+    if(isLoggedIn()){ hideNow(); return; }
     if(!isOverCard(e.target)) setTarget(e.clientX, e.clientY);
     else hideNow();
   }, {passive:true});
   document.addEventListener('touchstart', function(e){
+    if(isLoggedIn()){ hideNow(); return; }
     var t=e.touches&&e.touches[0]; if(!t) return;
     var el=document.elementFromPoint(t.clientX, t.clientY);
     if(!isOverCard(el)) setTarget(t.clientX, t.clientY);
     else hideNow();
   }, {passive:true});
   document.addEventListener('touchmove', function(e){
+    if(isLoggedIn()){ hideNow(); return; }
     var t=e.touches&&e.touches[0]; if(!t) return;
     var el=document.elementFromPoint(t.clientX, t.clientY);
     if(!isOverCard(el)) setTarget(t.clientX, t.clientY);
@@ -1601,6 +1632,7 @@ initMathBg();
 // applySubjectTheme() allaqachon boshqaradigan sozlama, unga tegilmaydi).
 (function(){
   if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  function isLoggedIn(){ return typeof ME!=='undefined' && !!ME; }
   function updateCardGlow(el, clientX, clientY){
     var r=el.getBoundingClientRect();
     if(!r.width||!r.height) return;
@@ -1608,16 +1640,19 @@ initMathBg();
     el.style.setProperty('--my', ((clientY-r.top)/r.height*100)+'%');
   }
   document.addEventListener('mousemove', function(e){
+    if(isLoggedIn()) return;
     var card=e.target.closest && e.target.closest('.card');
     if(card) updateCardGlow(card, e.clientX, e.clientY);
   }, {passive:true});
   document.addEventListener('touchstart', function(e){
+    if(isLoggedIn()) return;
     var t=e.touches&&e.touches[0]; if(!t) return;
     var el=document.elementFromPoint(t.clientX, t.clientY);
     var card=el&&el.closest&&el.closest('.card');
     if(card){ updateCardGlow(card, t.clientX, t.clientY); card.classList.add('glow-active'); }
   }, {passive:true});
   document.addEventListener('touchmove', function(e){
+    if(isLoggedIn()) return;
     var t=e.touches&&e.touches[0]; if(!t) return;
     var el=document.elementFromPoint(t.clientX, t.clientY);
     var card=el&&el.closest&&el.closest('.card');
@@ -1931,9 +1966,22 @@ function insLatex(latex){
 // TO'G'RIDAN-TO'G'RI o'sha bo'sh joyga yoza boshlaydi.
 function insLatexTemplate(latex){
   var chip=insLatex(latex);
-  setTimeout(function(){
-    try{ chip.focus(); }catch(e){}
-  }, 30);
+  // TUZATISH: sobit 30ms kechikish ba'zan yetarli emas edi - math-field
+  // maxsus element sifatida DOM'ga "ko'tarilishi" (upgrade) uchun ba'zan
+  // biroz kupro vaqt kerak bolar, shu payt ichida foydalanuvchi yoza
+  // boshlasa, matn formula ichiga EMAS, tashqi (oddiy) matnga tushib
+  // ketardi. Endi ikki marta requestAnimationFrame + zaxira setTimeout
+  // bilan, fokus ANIQROQ ulanadi.
+  function tryFocus(attemptsLeft){
+    try{
+      chip.focus();
+      if(document.activeElement===chip) return;
+    }catch(e){}
+    if(attemptsLeft>0) setTimeout(function(){ tryFocus(attemptsLeft-1); }, 60);
+  }
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){ tryFocus(4); });
+  });
   return chip;
 }
 function insSym(s){
