@@ -1107,7 +1107,19 @@ function startDbPolling(){
 // vaqtincha Oracle VM pool'dagi VM1'ga otkazildi (bu - Render emas, boshqa
 // infratuzilma, Render limitiga bogliq emas). Render hisobi tiklangach,
 // buni yana 'https://edutest-server-7.onrender.com'ga qaytarish mumkin.
-var DB_SERVER='https://edutest-oracle.duckdns.org';
+// TUZATISH (2026-09-22): DuckDNS manzillari mobil tarmoqlarda (telefonda)
+// "NXDOMAIN" xatosi bilan butunlay ishlamasligi aniqlandi (Xiaomi'da
+// tasdiqlandi) - shuning uchun "telefonda sayt ishlamayapti" muammosi
+// aynan shu edi. nip.io manzillari esa mobilda ham darhol ishlaydi -
+// shuning uchun DB_SERVER endi nip.io'ga o'tkazildi.
+// TUZATISH (2026-09-22): DuckDNS manzillari mobil tarmoqlarda (telefonda)
+// "NXDOMAIN" xatosi bilan butunlay ishlamasligi aniqlandi (Xiaomi'da
+// tasdiqlandi) - shuning uchun "telefonda sayt ishlamayapti" muammosi
+// aynan shu edi. nip.io manzillari esa mobilda ham darhol ishlaydi -
+// shuning uchun DB_SERVER endi VM1'ning haqiqiy IP'siga (nip.io orqali)
+// o'tkazildi - bu aynan "edutest-vnic" (docker orqali .env bilan
+// sozlangan) server, VM8 emas.
+var DB_SERVER='https://92-5-41-212.nip.io';
 
 async function sbPush(db) {
   if (!_sbReady) return false;
@@ -5090,7 +5102,7 @@ var RENDER_SERVER='https://edutest-server-7.onrender.com';
 // Certbot SSL) bilan ishlaydi - VM sozlash tarixi va uchragan xatolar
 // (OCI route-table bug, nginx default_server/IPv6 masalasi va h.k.)
 // uchun edutest-pro skill faylining Changelog bolimiga qarang.
-var IMPORT_SERVER='https://edutest-oracle.duckdns.org';      // VM1 (Oracle)
+var IMPORT_SERVER='https://92-5-41-212.nip.io';               // VM1 (Oracle) - DuckDNS mobilda NXDOMAIN bergani uchun nip.io'ga otkazildi
 var IMPORT_SERVER_2='https://edutest-oracle-2.duckdns.org';  // VM2 (Oracle)
 // 2026-09-06: VM5 (Google Cloud e2-micro) HAVZADAN OLIB TASHLANDI - foydalanuvchi
 // tasdig'i bilan. Sabab: (1) e2-micro atigi 1GB RAM beradi, LibreOffice asosidagi
