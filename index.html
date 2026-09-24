@@ -933,7 +933,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
       <label>Savol matni</label>
       <div id="aq-text" class="mathedit" contenteditable="true" data-placeholder="Savolni yozing..."></div>
       <div class="sarea" id="aq-syms"></div>
-      <div class="ts tm" style="margin-top:4px">💡 <b>a/b</b> — kasr, <b>√</b> — ildiz, <b>xⁿ</b> — daraja. Formula darhol bo'sh joy (to'rtburchak) bilan chiqadi — o'sha joyga to'g'ridan-to'g'ri yozing. Ichma-ich kasr/ildiz uchun: kursorni formula ichiga qo'yib, tugmani yana bosing.</div>
+      <div class="ts tm" style="margin-top:4px">💡 <b>a/b</b> — kasr, <b>√</b> — ildiz, <b>xⁿ</b> — daraja. Formula bo'sh joy (to'rtburchak) bilan chiqadi — <b>o'sha quticha ustiga bosib</b>, keyin yozing. Ichma-ich kasr/ildiz uchun: kursorni formula ichiga qo'yib, tugmani yana bosing.</div>
     </div>
     <div class="fg">
       <label>Savol rasmi (ixtiyoriy)</label>
@@ -1977,23 +1977,17 @@ function insLatex(latex){
 // ustoz chiziqning tagiga/ustiga bosib emas, formula paydo bo'lishi bilan
 // TO'G'RIDAN-TO'G'RI o'sha bo'sh joyga yoza boshlaydi.
 function insLatexTemplate(latex){
+  // TUZATISH (2026-09-23): avtomatik fokusga "majburlab" urinish (rAF +
+  // setTimeout zanjiri) ishonchsiz chiqdi - video orqali tasdiqlandi:
+  // tugma bosilganda quticha TO'G'RI chiqadi, lekin fokus ko'chmagani
+  // uchun foydalanuvchi yozgan matn CHETGA tushib ketardi, va tugmani
+  // qayta bossa yana YANGI (uchinchi, tortinchi...) bo'sh quticha
+  // qo'shilib borardi. Endi faqat BITTA oddiy .focus() chaqiriladi -
+  // agar brauzer buni darhol qabul qilmasa, foydalanuvchi shunchaki
+  // chiqqan quticha ustiga bir marta bossa yetarli (MathLive'ning o'zi
+  // uchun bu - odatiy, 100% ishlaydigan usul).
   var chip=insLatex(latex);
-  // TUZATISH: sobit 30ms kechikish ba'zan yetarli emas edi - math-field
-  // maxsus element sifatida DOM'ga "ko'tarilishi" (upgrade) uchun ba'zan
-  // biroz kupro vaqt kerak bolar, shu payt ichida foydalanuvchi yoza
-  // boshlasa, matn formula ichiga EMAS, tashqi (oddiy) matnga tushib
-  // ketardi. Endi ikki marta requestAnimationFrame + zaxira setTimeout
-  // bilan, fokus ANIQROQ ulanadi.
-  function tryFocus(attemptsLeft){
-    try{
-      chip.focus();
-      if(document.activeElement===chip) return;
-    }catch(e){}
-    if(attemptsLeft>0) setTimeout(function(){ tryFocus(attemptsLeft-1); }, 60);
-  }
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){ tryFocus(4); });
-  });
+  try{ chip.focus(); }catch(e){}
   return chip;
 }
 function insSym(s){
